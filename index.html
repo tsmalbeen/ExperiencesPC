@@ -1,0 +1,517 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Expériences de physique-chimie</title>
+<style>
+  /* ---------- Thème (clair / sombre automatique) ---------- */
+  :root{
+    --bg:#f3ede1;
+    --paper:#fbf8f0;
+    --ink:#22242e;
+    --ink-soft:#5b5a52;
+    --line:#d9d0ba;
+    --wave:#b8362b;
+    --wave-glow:rgba(184,54,43,.14);
+    --accent:#2f6f4f;
+    --blue:#2c5f8a;
+    --brass:#a9793f;
+    --ok:#2f6f4f;
+    --warn:#b8362b;
+    --serif:"Iowan Old Style","Palatino Linotype",Palatino,Georgia,serif;
+    --sans:system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+    --mono:ui-monospace,"Cascadia Mono","SF Mono",Consolas,Menlo,monospace;
+    color-scheme: light dark;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{
+      --bg:#171a21;
+      --paper:#1e222b;
+      --ink:#eae6da;
+      --ink-soft:#9a9689;
+      --line:#33384a;
+      --wave:#ff8a72;
+      --wave-glow:rgba(255,138,114,.14);
+      --accent:#79d6a3;
+      --blue:#7fb4e0;
+      --brass:#c99a5b;
+      --ok:#79d6a3;
+      --warn:#ff8a72;
+    }
+  }
+
+  /* ---------- Mise en page ---------- */
+  *{box-sizing:border-box;}
+  html, body{ margin:0; padding:0; }
+  body{
+    background:var(--bg);
+    color:var(--ink);
+    font-family:var(--sans);
+    padding:28px 16px;
+    display:flex;
+    justify-content:center;
+  }
+  main{
+    width:100%;
+    max-width:920px;
+    display:flex;
+    flex-direction:column;
+    gap:20px;
+  }
+  header{ display:flex; flex-direction:column; gap:4px; }
+  .kicker{
+    font-size:.72rem;
+    text-transform:uppercase;
+    letter-spacing:.08em;
+    color:var(--ink-soft);
+  }
+  h1{
+    font-family:var(--serif);
+    font-weight:600;
+    font-size:clamp(1.5rem, 1.1rem + 1.6vw, 2.2rem);
+    margin:0;
+    text-wrap:balance;
+  }
+  header p{
+    margin:0;
+    color:var(--ink-soft);
+    font-size:.92rem;
+    max-width:66ch;
+  }
+
+  /* ---------- Zone de simulation ---------- */
+  .scene{
+    background:var(--paper);
+    border:1px solid var(--line);
+    border-radius:14px;
+    padding:20px clamp(12px,3vw,28px) 8px;
+    display:flex;
+    flex-direction:column;
+    gap:6px;
+  }
+  .scene-top{
+    display:flex;
+    justify-content:space-between;
+    align-items:baseline;
+    gap:12px;
+    flex-wrap:wrap;
+  }
+  .scene-title{ font-family:var(--serif); font-weight:600; }
+  .status{
+    font-family:var(--mono);
+    font-size:.82rem;
+    padding:3px 10px;
+    border-radius:999px;
+    border:1px solid var(--line);
+    color:var(--ink-soft);
+  }
+  .status.ok{ color:var(--ok); border-color:var(--ok); }
+  .status.off{ color:var(--warn); border-color:var(--warn); }
+  canvas{
+    width:100%;
+    height:auto;
+    display:block;
+  }
+  canvas.draggable{ touch-action:none; cursor:grab; }
+  canvas.dragging{ cursor:grabbing; }
+  .hint{ margin:0; font-size:.78rem; color:var(--ink-soft); }
+
+  /* ---------- Mesures ---------- */
+  .readouts{
+    display:grid;
+    grid-template-columns:repeat(auto-fit,minmax(150px,1fr));
+    gap:10px 18px;
+    padding-block:10px;
+    border-top:1px solid var(--line);
+    margin-top:6px;
+  }
+  .readout{ display:flex; flex-direction:column; gap:2px; }
+  .readout .label{
+    font-size:.78rem;
+    color:var(--ink-soft);
+  }
+  .readout .value{
+    font-family:var(--mono);
+    font-variant-numeric:tabular-nums;
+    font-size:1.05rem;
+    font-weight:500;
+  }
+  .readout .value em{ color:var(--blue); font-style:normal; font-size:.9rem; }
+
+  /* ---------- Contrôles ---------- */
+  .panel{
+    background:var(--paper);
+    border:1px solid var(--line);
+    border-radius:14px;
+    padding:18px clamp(14px,3vw,26px);
+    display:flex;
+    flex-direction:column;
+    gap:18px;
+  }
+  .controls{
+    display:grid;
+    grid-template-columns:repeat(auto-fit,minmax(240px,1fr));
+    gap:18px 32px;
+  }
+  .control{ display:flex; flex-direction:column; gap:6px; }
+  .control .row{
+    display:flex;
+    justify-content:space-between;
+    align-items:baseline;
+    gap:10px;
+  }
+  .control label{ font-size:.86rem; font-weight:500; }
+  .control .num{
+    font-family:var(--mono);
+    font-variant-numeric:tabular-nums;
+    color:var(--wave);
+    font-size:.92rem;
+  }
+  input[type=range]{
+    -webkit-appearance:none;
+    appearance:none;
+    width:100%;
+    height:4px;
+    margin:8px 0;
+    border-radius:999px;
+    background:var(--line);
+    outline:none;
+  }
+  input[type=range]::-webkit-slider-thumb{
+    -webkit-appearance:none;
+    width:20px; height:20px;
+    border-radius:50%;
+    background:var(--wave);
+    border:2px solid var(--paper);
+    box-shadow:0 0 0 1px var(--line);
+    cursor:pointer;
+  }
+  input[type=range]::-moz-range-thumb{
+    width:18px; height:18px;
+    border-radius:50%;
+    background:var(--wave);
+    border:2px solid var(--paper);
+    box-shadow:0 0 0 1px var(--line);
+    cursor:pointer;
+  }
+  select{
+    font-family:var(--sans);
+    font-size:.86rem;
+    padding:7px 10px;
+    border-radius:8px;
+    border:1px solid var(--line);
+    background:var(--paper);
+    color:var(--ink);
+    width:100%;
+  }
+  .check{
+    display:flex;
+    align-items:center;
+    gap:8px;
+    font-size:.86rem;
+    font-weight:500;
+    cursor:pointer;
+  }
+  .check input{ width:18px; height:18px; accent-color:var(--accent); margin:0; }
+  .buttons{ display:flex; gap:10px; flex-wrap:wrap; }
+  button{
+    font-family:var(--sans);
+    font-size:.86rem;
+    font-weight:500;
+    padding:9px 16px;
+    border-radius:8px;
+    border:1px solid var(--line);
+    background:transparent;
+    color:var(--ink);
+    cursor:pointer;
+  }
+  button.primary{
+    background:var(--accent);
+    border-color:var(--accent);
+    color:var(--paper);
+  }
+  button:focus-visible, input:focus-visible, select:focus-visible{
+    outline:2px solid var(--accent);
+    outline-offset:2px;
+  }
+
+  /* ---------- Formules ---------- */
+  .formula{
+    font-family:var(--mono);
+    font-size:.86rem;
+    color:var(--ink-soft);
+    border-top:1px solid var(--line);
+    padding-top:14px;
+    display:flex;
+    flex-wrap:wrap;
+    gap:6px 22px;
+  }
+  .formula b{ color:var(--ink); font-weight:600; }
+  footer{
+    font-size:.78rem;
+    color:var(--ink-soft);
+    text-align:center;
+    text-wrap:balance;
+  }
+
+  /* ---------- Page d'accueil ---------- */
+  main{ gap:26px; }
+  section{ display:flex; flex-direction:column; gap:12px; }
+  h2{
+    font-family:var(--serif);
+    font-weight:600;
+    font-size:1.2rem;
+    margin:0;
+    padding-bottom:6px;
+    border-bottom:1px solid var(--line);
+  }
+  .tools{
+    display:flex;
+    flex-wrap:wrap;
+    gap:10px 14px;
+    align-items:center;
+  }
+  .tools input[type=search]{
+    flex:1 1 220px;
+    font-family:var(--sans);
+    font-size:.92rem;
+    padding:9px 12px;
+    border-radius:8px;
+    border:1px solid var(--line);
+    background:var(--paper);
+    color:var(--ink);
+  }
+  .levels{ display:flex; gap:6px; flex-wrap:wrap; }
+  .levels button{ padding:8px 14px; }
+  .levels button[aria-pressed=true]{ background:var(--accent); border-color:var(--accent); color:var(--paper); }
+  .count{ font-size:.8rem; color:var(--ink-soft); margin:0; }
+  .grid{
+    display:grid;
+    grid-template-columns:repeat(auto-fill,minmax(250px,1fr));
+    gap:12px;
+  }
+  .card{
+    background:var(--paper);
+    border:1px solid var(--line);
+    border-radius:12px;
+    padding:14px 16px;
+    display:flex;
+    flex-direction:column;
+    gap:6px;
+    color:var(--ink);
+    text-decoration:none;
+  }
+  .card:hover, .card:focus-visible{ border-color:var(--accent); outline:none; }
+  .card strong{ font-family:var(--serif); font-size:1.02rem; }
+  .card span{ font-size:.84rem; color:var(--ink-soft); flex:1; }
+  .card small{ font-family:var(--mono); font-size:.72rem; color:var(--accent); }
+  .contact{
+    align-self:flex-start;
+    margin-top:8px;
+    font-size:.86rem;
+    font-weight:500;
+    color:var(--accent);
+    text-decoration:none;
+    border:1px solid var(--line);
+    border-radius:8px;
+    padding:7px 12px;
+    background:var(--paper);
+  }
+  .contact:hover, .contact:focus-visible{ border-color:var(--accent); outline:none; }
+  footer a{ color:var(--accent); }
+  [hidden]{ display:none !important; }
+</style>
+</head>
+<body>
+
+<main>
+  <header>
+    <span class="kicker">Lycée — Seconde, Première, Terminale</span>
+    <h1>Expériences de physique-chimie</h1>
+    <p>Des simulations pour manipuler en classe. Chaque expérience tient dans un seul fichier, qui s'ouvre directement dans le navigateur, sans installation ni connexion.</p>
+    <a class="contact" href="contact.html">Signaler une erreur ou proposer une expérience →</a>
+  </header>
+
+  <div class="tools">
+    <input type="search" id="search" placeholder="Rechercher une expérience, une notion…" aria-label="Rechercher une expérience">
+    <div class="levels" role="group" aria-label="Filtrer par niveau">
+      <button data-level="" aria-pressed="true">Tous les niveaux</button>
+      <button data-level="Seconde" aria-pressed="false">Seconde</button>
+      <button data-level="Première" aria-pressed="false">Première</button>
+      <button data-level="Terminale" aria-pressed="false">Terminale</button>
+    </div>
+  </div>
+  <p class="count" id="count" aria-live="polite"></p>
+
+  <section data-subject>
+    <h2>Mécanique</h2>
+    <div class="grid">
+      <a class="card" href="experiences/mecanique/pendule-simple/index.html" data-level="Première · Terminale">
+        <strong>Pendule simple</strong>
+        <span>Période, vitesse et énergies d'un pendule ; influence de la longueur, de la masse, de l'angle et de la pesanteur.</span>
+        <small>Première · Terminale</small>
+      </a>
+      <a class="card" href="experiences/mecanique/projectile/index.html" data-level="Terminale">
+        <strong>Mouvement d'un projectile</strong>
+        <span>Trajectoire parabolique, portée, hauteur maximale et composantes de la vitesse.</span>
+        <small>Terminale</small>
+      </a>
+      <a class="card" href="experiences/mecanique/chute-libre/index.html" data-level="Seconde · Terminale">
+        <strong>Chute libre</strong>
+        <span>Chute sans vitesse initiale, graphiques z(t) et v(t), comparaison avec une chute dans l'air.</span>
+        <small>Seconde · Terminale</small>
+      </a>
+      <a class="card" href="experiences/mecanique/ressort/index.html" data-level="Première · Terminale">
+        <strong>Oscillateur masse-ressort</strong>
+        <span>Période propre, force de rappel, énergies et amortissement d'un système masse-ressort.</span>
+        <small>Première · Terminale</small>
+      </a>
+      <a class="card" href="experiences/mecanique/collision/index.html" data-level="Terminale">
+        <strong>Collisions</strong>
+        <span>Deux mobiles se percutent sur un banc : quantité de mouvement et énergie cinétique avant et après le choc.</span>
+        <small>Terminale</small>
+      </a>
+    </div>
+  </section>
+
+  <section data-subject>
+    <h2>Ondes</h2>
+    <div class="grid">
+      <a class="card" href="experiences/ondes/corde-melde/index.html" data-level="Première · Terminale">
+        <strong>Corde de Melde</strong>
+        <span>Ondes stationnaires sur une corde tendue : fuseaux, nœuds, ventres et fréquences de résonance.</span>
+        <small>Première · Terminale</small>
+      </a>
+      <a class="card" href="experiences/ondes/interferences/index.html" data-level="Terminale">
+        <strong>Interférences de deux ondes</strong>
+        <span>Cuve à ondes à deux sources : différence de marche, interférences constructives et destructives.</span>
+        <small>Terminale</small>
+      </a>
+      <a class="card" href="experiences/ondes/effet-doppler/index.html" data-level="Terminale">
+        <strong>Effet Doppler</strong>
+        <span>Une source sonore en mouvement : fronts d'onde resserrés ou étirés, fréquence perçue par deux observateurs.</span>
+        <small>Terminale</small>
+      </a>
+      <a class="card" href="experiences/ondes/resonance/index.html" data-level="Terminale">
+        <strong>Résonance</strong>
+        <span>Un oscillateur entraîné par un excitateur : amplitude en fonction de la fréquence, rôle de l'amortissement.</span>
+        <small>Terminale</small>
+      </a>
+    </div>
+  </section>
+
+  <section data-subject>
+    <h2>Optique</h2>
+    <div class="grid">
+      <a class="card" href="experiences/optique/refraction/index.html" data-level="Seconde · Première">
+        <strong>Réfraction de la lumière</strong>
+        <span>Un rayon change de milieu : lois de Snell-Descartes, indice de réfraction et réflexion totale.</span>
+        <small>Seconde · Première</small>
+      </a>
+      <a class="card" href="experiences/optique/lentille-convergente/index.html" data-level="Seconde · Première">
+        <strong>Lentille convergente</strong>
+        <span>Construction de l'image d'un objet : relation de conjugaison, grandissement, image réelle ou virtuelle.</span>
+        <small>Seconde · Première</small>
+      </a>
+      <a class="card" href="experiences/optique/diffraction/index.html" data-level="Terminale">
+        <strong>Diffraction par une fente</strong>
+        <span>Un faisceau laser traverse une fente : largeur de la tache centrale selon λ, la fente et la distance.</span>
+        <small>Terminale</small>
+      </a>
+      <a class="card" href="experiences/optique/dispersion/index.html" data-level="Seconde">
+        <strong>Dispersion par un prisme</strong>
+        <span>La lumière blanche décomposée par un prisme : l'indice du verre dépend de la longueur d'onde.</span>
+        <small>Seconde</small>
+      </a>
+    </div>
+  </section>
+
+  <section data-subject>
+    <h2>Électricité</h2>
+    <div class="grid">
+      <a class="card" href="experiences/electricite/circuit-rc/index.html" data-level="Terminale">
+        <strong>Circuit RC</strong>
+        <span>Charge et décharge d'un condensateur : tension en fonction du temps, constante de temps τ = R·C.</span>
+        <small>Terminale</small>
+      </a>
+      <a class="card" href="experiences/electricite/loi-ohm/index.html" data-level="Seconde · Première">
+        <strong>Loi d'Ohm</strong>
+        <span>Caractéristique tension-intensité d'un conducteur ohmique, comparée à celle d'une lampe.</span>
+        <small>Seconde · Première</small>
+      </a>
+      <a class="card" href="experiences/electricite/circuit-rlc/index.html" data-level="Terminale">
+        <strong>Circuit RLC</strong>
+        <span>Oscillations électriques amorties : période propre, échanges d'énergie entre condensateur et bobine.</span>
+        <small>Terminale</small>
+      </a>
+    </div>
+  </section>
+
+  <section data-subject>
+    <h2>Chimie</h2>
+    <div class="grid">
+      <a class="card" href="experiences/chimie/dilution/index.html" data-level="Seconde">
+        <strong>Dilution</strong>
+        <span>Préparer une solution fille à partir d'une solution mère : facteur de dilution, conservation de la quantité de matière.</span>
+        <small>Seconde</small>
+      </a>
+      <a class="card" href="experiences/chimie/reactif-limitant/index.html" data-level="Seconde · Première">
+        <strong>Réactif limitant</strong>
+        <span>Tableau d'avancement interactif : avancement maximal, réactif limitant, composition finale.</span>
+        <small>Seconde · Première</small>
+      </a>
+      <a class="card" href="experiences/chimie/dosage-acide-base/index.html" data-level="Première · Terminale">
+        <strong>Titrage acide-base</strong>
+        <span>Courbe pH = f(V) d'un titrage : saut de pH, équivalence et choix de l'indicateur coloré.</span>
+        <small>Première · Terminale</small>
+      </a>
+      <a class="card" href="experiences/chimie/cinetique-chimique/index.html" data-level="Terminale">
+        <strong>Cinétique chimique</strong>
+        <span>Évolution des concentrations au cours du temps : temps de demi-réaction, température, catalyseur.</span>
+        <small>Terminale</small>
+      </a>
+      <a class="card" href="experiences/chimie/pile-daniell/index.html" data-level="Première · Terminale">
+        <strong>Pile Daniell</strong>
+        <span>Pile cuivre-zinc : sens des électrons, réactions aux électrodes, capacité et durée de vie.</span>
+        <small>Première · Terminale</small>
+      </a>
+      <a class="card" href="experiences/chimie/loi-beer-lambert/index.html" data-level="Première · Terminale">
+        <strong>Loi de Beer-Lambert</strong>
+        <span>Absorbance d'une solution colorée : droite d'étalonnage et dosage d'une solution inconnue.</span>
+        <small>Première · Terminale</small>
+      </a>
+    </div>
+  </section>
+
+  <footer>Chaque dossier contient un fichier index.html autonome : il peut être copié seul sur une clé USB ou un autre ordinateur. Pour récupérer le fichier faire Clic-Droit, puis "Enregistrer sous.." <a href="contact.html">Signaler une erreur ou proposer une expérience</a>.</footer>
+</main>
+
+<script>
+(function(){
+  // Filtre des cartes par texte et par niveau (la page reste utilisable sans JavaScript)
+  const search = document.getElementById('search'), count = document.getElementById('count');
+  const cards = [...document.querySelectorAll('.card')], buttons = [...document.querySelectorAll('.levels button')];
+  const plain = s => s.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+  let level = '';
+  function apply(){
+    const q = plain(search.value.trim());
+    let shown = 0;
+    for (const card of cards){
+      const ok = (!level || card.dataset.level.includes(level)) && (!q || plain(card.textContent).includes(q));
+      card.hidden = !ok;
+      if (ok) shown++;
+    }
+    for (const sec of document.querySelectorAll('[data-subject]')) sec.hidden = !sec.querySelector('.card:not([hidden])');
+    count.textContent = shown === cards.length ? '' : shown === 0 ? 'Aucune expérience ne correspond.' : shown + ' expérience' + (shown > 1 ? 's' : '') + ' sur ' + cards.length;
+  }
+  search.addEventListener('input', apply);
+  for (const b of buttons) b.addEventListener('click', () => {
+    level = b.dataset.level;
+    for (const o of buttons) o.setAttribute('aria-pressed', String(o === b));
+    apply();
+  });
+})();
+</script>
+</body>
+</html>

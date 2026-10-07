@@ -1,0 +1,446 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Signaler une erreur ou proposer une expérience</title>
+<style>
+  /* ---------- Thème (clair / sombre automatique) ---------- */
+  :root{
+    --bg:#f3ede1;
+    --paper:#fbf8f0;
+    --ink:#22242e;
+    --ink-soft:#5b5a52;
+    --line:#d9d0ba;
+    --wave:#b8362b;
+    --wave-glow:rgba(184,54,43,.14);
+    --accent:#2f6f4f;
+    --blue:#2c5f8a;
+    --brass:#a9793f;
+    --ok:#2f6f4f;
+    --warn:#b8362b;
+    --serif:"Iowan Old Style","Palatino Linotype",Palatino,Georgia,serif;
+    --sans:system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+    --mono:ui-monospace,"Cascadia Mono","SF Mono",Consolas,Menlo,monospace;
+    color-scheme: light dark;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{
+      --bg:#171a21;
+      --paper:#1e222b;
+      --ink:#eae6da;
+      --ink-soft:#9a9689;
+      --line:#33384a;
+      --wave:#ff8a72;
+      --wave-glow:rgba(255,138,114,.14);
+      --accent:#79d6a3;
+      --blue:#7fb4e0;
+      --brass:#c99a5b;
+      --ok:#79d6a3;
+      --warn:#ff8a72;
+    }
+  }
+
+  /* ---------- Mise en page ---------- */
+  *{box-sizing:border-box;}
+  html, body{ margin:0; padding:0; }
+  body{
+    background:var(--bg);
+    color:var(--ink);
+    font-family:var(--sans);
+    padding:28px 16px;
+    display:flex;
+    justify-content:center;
+  }
+  main{
+    width:100%;
+    max-width:920px;
+    display:flex;
+    flex-direction:column;
+    gap:20px;
+  }
+  header{ display:flex; flex-direction:column; gap:4px; }
+  .kicker{
+    font-size:.72rem;
+    text-transform:uppercase;
+    letter-spacing:.08em;
+    color:var(--ink-soft);
+  }
+  h1{
+    font-family:var(--serif);
+    font-weight:600;
+    font-size:clamp(1.5rem, 1.1rem + 1.6vw, 2.2rem);
+    margin:0;
+    text-wrap:balance;
+  }
+  header p{
+    margin:0;
+    color:var(--ink-soft);
+    font-size:.92rem;
+    max-width:66ch;
+  }
+
+  /* ---------- Zone de simulation ---------- */
+  .scene{
+    background:var(--paper);
+    border:1px solid var(--line);
+    border-radius:14px;
+    padding:20px clamp(12px,3vw,28px) 8px;
+    display:flex;
+    flex-direction:column;
+    gap:6px;
+  }
+  .scene-top{
+    display:flex;
+    justify-content:space-between;
+    align-items:baseline;
+    gap:12px;
+    flex-wrap:wrap;
+  }
+  .scene-title{ font-family:var(--serif); font-weight:600; }
+  .status{
+    font-family:var(--mono);
+    font-size:.82rem;
+    padding:3px 10px;
+    border-radius:999px;
+    border:1px solid var(--line);
+    color:var(--ink-soft);
+  }
+  .status.ok{ color:var(--ok); border-color:var(--ok); }
+  .status.off{ color:var(--warn); border-color:var(--warn); }
+  canvas{
+    width:100%;
+    height:auto;
+    display:block;
+  }
+  canvas.draggable{ touch-action:none; cursor:grab; }
+  canvas.dragging{ cursor:grabbing; }
+  .hint{ margin:0; font-size:.78rem; color:var(--ink-soft); }
+
+  /* ---------- Mesures ---------- */
+  .readouts{
+    display:grid;
+    grid-template-columns:repeat(auto-fit,minmax(150px,1fr));
+    gap:10px 18px;
+    padding-block:10px;
+    border-top:1px solid var(--line);
+    margin-top:6px;
+  }
+  .readout{ display:flex; flex-direction:column; gap:2px; }
+  .readout .label{
+    font-size:.78rem;
+    color:var(--ink-soft);
+  }
+  .readout .value{
+    font-family:var(--mono);
+    font-variant-numeric:tabular-nums;
+    font-size:1.05rem;
+    font-weight:500;
+  }
+  .readout .value em{ color:var(--blue); font-style:normal; font-size:.9rem; }
+
+  /* ---------- Contrôles ---------- */
+  .panel{
+    background:var(--paper);
+    border:1px solid var(--line);
+    border-radius:14px;
+    padding:18px clamp(14px,3vw,26px);
+    display:flex;
+    flex-direction:column;
+    gap:18px;
+  }
+  .controls{
+    display:grid;
+    grid-template-columns:repeat(auto-fit,minmax(240px,1fr));
+    gap:18px 32px;
+  }
+  .control{ display:flex; flex-direction:column; gap:6px; }
+  .control .row{
+    display:flex;
+    justify-content:space-between;
+    align-items:baseline;
+    gap:10px;
+  }
+  .control label{ font-size:.86rem; font-weight:500; }
+  .control .num{
+    font-family:var(--mono);
+    font-variant-numeric:tabular-nums;
+    color:var(--wave);
+    font-size:.92rem;
+  }
+  input[type=range]{
+    -webkit-appearance:none;
+    appearance:none;
+    width:100%;
+    height:4px;
+    margin:8px 0;
+    border-radius:999px;
+    background:var(--line);
+    outline:none;
+  }
+  input[type=range]::-webkit-slider-thumb{
+    -webkit-appearance:none;
+    width:20px; height:20px;
+    border-radius:50%;
+    background:var(--wave);
+    border:2px solid var(--paper);
+    box-shadow:0 0 0 1px var(--line);
+    cursor:pointer;
+  }
+  input[type=range]::-moz-range-thumb{
+    width:18px; height:18px;
+    border-radius:50%;
+    background:var(--wave);
+    border:2px solid var(--paper);
+    box-shadow:0 0 0 1px var(--line);
+    cursor:pointer;
+  }
+  select{
+    font-family:var(--sans);
+    font-size:.86rem;
+    padding:7px 10px;
+    border-radius:8px;
+    border:1px solid var(--line);
+    background:var(--paper);
+    color:var(--ink);
+    width:100%;
+  }
+  .check{
+    display:flex;
+    align-items:center;
+    gap:8px;
+    font-size:.86rem;
+    font-weight:500;
+    cursor:pointer;
+  }
+  .check input{ width:18px; height:18px; accent-color:var(--accent); margin:0; }
+  .buttons{ display:flex; gap:10px; flex-wrap:wrap; }
+  button{
+    font-family:var(--sans);
+    font-size:.86rem;
+    font-weight:500;
+    padding:9px 16px;
+    border-radius:8px;
+    border:1px solid var(--line);
+    background:transparent;
+    color:var(--ink);
+    cursor:pointer;
+  }
+  button.primary{
+    background:var(--accent);
+    border-color:var(--accent);
+    color:var(--paper);
+  }
+  button:focus-visible, input:focus-visible, select:focus-visible{
+    outline:2px solid var(--accent);
+    outline-offset:2px;
+  }
+
+  /* ---------- Formules ---------- */
+  .formula{
+    font-family:var(--mono);
+    font-size:.86rem;
+    color:var(--ink-soft);
+    border-top:1px solid var(--line);
+    padding-top:14px;
+    display:flex;
+    flex-wrap:wrap;
+    gap:6px 22px;
+  }
+  .formula b{ color:var(--ink); font-weight:600; }
+  footer{
+    font-size:.78rem;
+    color:var(--ink-soft);
+    text-align:center;
+    text-wrap:balance;
+  }
+
+  /* ---------- Formulaire ---------- */
+  main{ max-width:680px; }
+  .back{ font-size:.84rem; color:var(--accent); text-decoration:none; }
+  .back:hover{ text-decoration:underline; }
+  .field{ display:flex; flex-direction:column; gap:6px; }
+  .field label, legend{ font-size:.86rem; font-weight:500; padding:0; }
+  .field small{ font-size:.78rem; color:var(--ink-soft); }
+  fieldset{ border:0; margin:0; padding:0; display:flex; flex-direction:column; gap:8px; }
+  .choices{ display:flex; flex-wrap:wrap; gap:8px 20px; }
+  .choices label{ display:flex; align-items:center; gap:8px; font-size:.9rem; font-weight:400; cursor:pointer; }
+  .choices input{ width:18px; height:18px; accent-color:var(--accent); margin:0; }
+  input[type=text], textarea{
+    font-family:var(--sans);
+    font-size:.92rem;
+    padding:9px 12px;
+    border-radius:8px;
+    border:1px solid var(--line);
+    background:var(--bg);
+    color:var(--ink);
+    width:100%;
+  }
+  textarea{ min-height:170px; resize:vertical; line-height:1.45; }
+  textarea:focus-visible{ outline:2px solid var(--accent); outline-offset:2px; }
+  .note{ margin:0; font-size:.84rem; color:var(--ink-soft); }
+  .note a{ color:var(--accent); }
+  .feedback{ margin:0; font-size:.86rem; color:var(--ok); min-height:1.2em; }
+  [hidden]{ display:none !important; }
+</style>
+</head>
+<body>
+
+<main>
+  <header>
+    <a class="back" href="index.html">← Toutes les expériences</a>
+    <h1>Une erreur, une idée ?</h1>
+    <p>Vous avez repéré une erreur dans une simulation, ou vous aimeriez qu'une autre expérience soit ajoutée ? Remplissez ce formulaire : il prépare un courriel que vous envoyez depuis votre propre messagerie.</p>
+  </header>
+
+  <form class="panel" id="form" novalidate>
+    <fieldset>
+      <legend>Votre message concerne</legend>
+      <div class="choices">
+        <label><input type="radio" name="kind" value="erreur" checked> Une erreur dans une expérience</label>
+        <label><input type="radio" name="kind" value="idee"> Une nouvelle expérience à ajouter</label>
+        <label><input type="radio" name="kind" value="autre"> Autre chose</label>
+      </div>
+    </fieldset>
+
+    <div class="field" id="expField">
+      <label for="exp">Expérience concernée</label>
+      <select id="exp">
+        <option value="">— Choisir —</option>
+        <optgroup label="Mécanique">
+          <option>Pendule simple</option>
+          <option>Mouvement d'un projectile</option>
+          <option>Chute libre</option>
+          <option>Oscillateur masse-ressort</option>
+          <option>Collisions</option>
+        </optgroup>
+        <optgroup label="Ondes">
+          <option>Corde de Melde</option>
+          <option>Interférences de deux ondes</option>
+          <option>Effet Doppler</option>
+          <option>Résonance</option>
+        </optgroup>
+        <optgroup label="Optique">
+          <option>Réfraction de la lumière</option>
+          <option>Lentille convergente</option>
+          <option>Diffraction par une fente</option>
+          <option>Dispersion par un prisme</option>
+        </optgroup>
+        <optgroup label="Électricité">
+          <option>Circuit RC</option>
+          <option>Loi d'Ohm</option>
+          <option>Circuit RLC</option>
+        </optgroup>
+        <optgroup label="Chimie">
+          <option>Dilution</option>
+          <option>Réactif limitant</option>
+          <option>Titrage acide-base</option>
+          <option>Cinétique chimique</option>
+          <option>Pile Daniell</option>
+          <option>Loi de Beer-Lambert</option>
+        </optgroup>
+        <option>Page d'accueil</option>
+      </select>
+    </div>
+
+    <div class="field" id="ideaField" hidden>
+      <label for="idea">Expérience souhaitée</label>
+      <input type="text" id="idea" maxlength="120" placeholder="Par exemple : spectre d'émission, loi de Mariotte…">
+    </div>
+
+    <div class="field">
+      <label for="message" id="messageLabel">Description de l'erreur</label>
+      <textarea id="message" maxlength="1500" required></textarea>
+      <small id="messageHelp">Indiquez les réglages utilisés, ce qui s'affiche et ce que vous attendiez.</small>
+    </div>
+
+    <div class="field">
+      <label for="who">Votre nom et votre établissement (facultatif)</label>
+      <input type="text" id="who" maxlength="120" autocomplete="name">
+    </div>
+
+    <div class="buttons">
+      <button class="primary" type="submit">Préparer le courriel</button>
+      <button type="button" id="copy">Copier le message</button>
+    </div>
+    <p class="feedback" id="feedback" role="status"></p>
+
+    <p class="note">« Préparer le courriel » ouvre votre messagerie avec le message déjà rédigé ; rien n'est envoyé tant que vous ne l'avez pas validé vous-même. Si rien ne s'ouvre, utilisez « Copier le message » et écrivez directement à <a id="direct" href="mailto:tsmalbeen@gmail.com">tsmalbeen@gmail.com</a>.</p>
+  </form>
+
+  <footer>Aucune donnée n'est collectée par cette page : le message part uniquement de votre messagerie.</footer>
+</main>
+
+<script>
+(function(){
+  // ---------- Constantes ----------
+  const ADDRESS = 'tsmalbeen@gmail.com';
+  const TEXTS = {
+    erreur: { label: 'Description de l\'erreur', help: 'Indiquez les réglages utilisés, ce qui s\'affiche et ce que vous attendiez.', subject: 'Erreur signalée' },
+    idee: { label: 'Ce que l\'expérience devrait montrer', help: 'Niveau visé, grandeurs à faire varier, ce que les élèves doivent observer.', subject: 'Proposition d\'expérience' },
+    autre: { label: 'Votre message', help: '', subject: 'Message' }
+  };
+  const $ = id => document.getElementById(id);
+  const kind = () => document.querySelector('input[name=kind]:checked').value;
+
+  // ---------- Composition du courriel ----------
+  function compose(){
+    const k = kind(), topic = k === 'erreur' ? $('exp').value : k === 'idee' ? $('idea').value.trim() : '';
+    const subject = '[Expériences physique-chimie] ' + TEXTS[k].subject + (topic ? ' : ' + topic : '');
+    const lines = [];
+    if (k === 'erreur') lines.push('Expérience concernée : ' + (topic || 'non précisée'));
+    if (k === 'idee') lines.push('Expérience souhaitée : ' + (topic || 'non précisée'));
+    lines.push('', $('message').value.trim());
+    if ($('who').value.trim()) lines.push('', '— ' + $('who').value.trim());
+    return { subject, body: lines.join('\n').trim() };
+  }
+  const mailto = m => 'mailto:' + ADDRESS + '?subject=' + encodeURIComponent(m.subject) + '&body=' + encodeURIComponent(m.body);
+
+  function check(){
+    if ($('message').value.trim()) return true;
+    $('feedback').textContent = 'Écrivez d\'abord votre message.';
+    $('message').focus();
+    return false;
+  }
+
+  // ---------- Interactions ----------
+  function syncKind(){
+    const k = kind();
+    $('expField').hidden = k !== 'erreur';
+    $('ideaField').hidden = k !== 'idee';
+    $('messageLabel').textContent = TEXTS[k].label;
+    $('messageHelp').textContent = TEXTS[k].help;
+  }
+  document.querySelectorAll('input[name=kind]').forEach(r => r.addEventListener('change', syncKind));
+
+  $('form').addEventListener('submit', evt => {
+    evt.preventDefault();
+    if (!check()) return;
+    const url = mailto(compose());
+    $('direct').href = url;                       // le lien de secours reprend le même message
+    $('feedback').textContent = 'Votre messagerie devrait s\'ouvrir. Sinon, copiez le message.';
+    window.location.href = url;
+  });
+
+  $('copy').addEventListener('click', async () => {
+    if (!check()) return;
+    const m = compose(), text = 'À : ' + ADDRESS + '\nObjet : ' + m.subject + '\n\n' + m.body;
+    try {
+      await navigator.clipboard.writeText(text);
+    } catch (e) {
+      // presse-papiers indisponible (page ouverte en local) : méthode de secours
+      const area = document.createElement('textarea');
+      area.value = text; document.body.appendChild(area); area.select();
+      document.execCommand('copy'); area.remove();
+    }
+    $('feedback').textContent = 'Message copié : collez-le dans un courriel adressé à ' + ADDRESS + '.';
+  });
+
+  // Lien « signaler une erreur » depuis une expérience : contact.html?exp=Titre
+  const wanted = new URLSearchParams(location.search).get('exp');
+  if (wanted) for (const o of $('exp').options) if (o.text === wanted) $('exp').value = o.value;
+  syncKind();
+})();
+</script>
+</body>
+</html>

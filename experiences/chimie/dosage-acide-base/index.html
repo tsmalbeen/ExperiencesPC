@@ -1,0 +1,642 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Titrage acide-base</title>
+<style>
+  /* ---------- Thème (clair / sombre automatique) ---------- */
+  :root{
+    --bg:#f3ede1;
+    --paper:#fbf8f0;
+    --ink:#22242e;
+    --ink-soft:#5b5a52;
+    --line:#d9d0ba;
+    --wave:#b8362b;
+    --wave-glow:rgba(184,54,43,.14);
+    --accent:#2f6f4f;
+    --blue:#2c5f8a;
+    --brass:#a9793f;
+    --ok:#2f6f4f;
+    --warn:#b8362b;
+    --serif:"Iowan Old Style","Palatino Linotype",Palatino,Georgia,serif;
+    --sans:system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+    --mono:ui-monospace,"Cascadia Mono","SF Mono",Consolas,Menlo,monospace;
+    color-scheme: light dark;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{
+      --bg:#171a21;
+      --paper:#1e222b;
+      --ink:#eae6da;
+      --ink-soft:#9a9689;
+      --line:#33384a;
+      --wave:#ff8a72;
+      --wave-glow:rgba(255,138,114,.14);
+      --accent:#79d6a3;
+      --blue:#7fb4e0;
+      --brass:#c99a5b;
+      --ok:#79d6a3;
+      --warn:#ff8a72;
+    }
+  }
+
+  /* ---------- Mise en page ---------- */
+  *{box-sizing:border-box;}
+  html, body{ margin:0; padding:0; }
+  body{
+    background:var(--bg);
+    color:var(--ink);
+    font-family:var(--sans);
+    padding:28px 16px;
+    display:flex;
+    justify-content:center;
+  }
+  main{
+    width:100%;
+    max-width:920px;
+    display:flex;
+    flex-direction:column;
+    gap:20px;
+  }
+  header{ display:flex; flex-direction:column; gap:4px; }
+  .kicker{
+    font-size:.72rem;
+    text-transform:uppercase;
+    letter-spacing:.08em;
+    color:var(--ink-soft);
+  }
+  h1{
+    font-family:var(--serif);
+    font-weight:600;
+    font-size:clamp(1.5rem, 1.1rem + 1.6vw, 2.2rem);
+    margin:0;
+    text-wrap:balance;
+  }
+  header p{
+    margin:0;
+    color:var(--ink-soft);
+    font-size:.92rem;
+    max-width:66ch;
+  }
+
+  /* ---------- Zone de simulation ---------- */
+  .scene{
+    background:var(--paper);
+    border:1px solid var(--line);
+    border-radius:14px;
+    padding:20px clamp(12px,3vw,28px) 8px;
+    display:flex;
+    flex-direction:column;
+    gap:6px;
+  }
+  .scene-top{
+    display:flex;
+    justify-content:space-between;
+    align-items:baseline;
+    gap:12px;
+    flex-wrap:wrap;
+  }
+  .scene-title{ font-family:var(--serif); font-weight:600; }
+  .status{
+    font-family:var(--mono);
+    font-size:.82rem;
+    padding:3px 10px;
+    border-radius:999px;
+    border:1px solid var(--line);
+    color:var(--ink-soft);
+  }
+  .status.ok{ color:var(--ok); border-color:var(--ok); }
+  .status.off{ color:var(--warn); border-color:var(--warn); }
+  canvas{
+    width:100%;
+    height:auto;
+    display:block;
+  }
+  canvas.draggable{ touch-action:none; cursor:grab; }
+  canvas.dragging{ cursor:grabbing; }
+  .hint{ margin:0; font-size:.78rem; color:var(--ink-soft); }
+
+  /* ---------- Mesures ---------- */
+  .readouts{
+    display:grid;
+    grid-template-columns:repeat(auto-fit,minmax(150px,1fr));
+    gap:10px 18px;
+    padding-block:10px;
+    border-top:1px solid var(--line);
+    margin-top:6px;
+  }
+  .readout{ display:flex; flex-direction:column; gap:2px; }
+  .readout .label{
+    font-size:.78rem;
+    color:var(--ink-soft);
+  }
+  .readout .value{
+    font-family:var(--mono);
+    font-variant-numeric:tabular-nums;
+    font-size:1.05rem;
+    font-weight:500;
+  }
+  .readout .value em{ color:var(--blue); font-style:normal; font-size:.9rem; }
+
+  /* ---------- Contrôles ---------- */
+  .panel{
+    background:var(--paper);
+    border:1px solid var(--line);
+    border-radius:14px;
+    padding:18px clamp(14px,3vw,26px);
+    display:flex;
+    flex-direction:column;
+    gap:18px;
+  }
+  .controls{
+    display:grid;
+    grid-template-columns:repeat(auto-fit,minmax(240px,1fr));
+    gap:18px 32px;
+  }
+  .control{ display:flex; flex-direction:column; gap:6px; }
+  .control .row{
+    display:flex;
+    justify-content:space-between;
+    align-items:baseline;
+    gap:10px;
+  }
+  .control label{ font-size:.86rem; font-weight:500; }
+  .control .num{
+    font-family:var(--mono);
+    font-variant-numeric:tabular-nums;
+    color:var(--wave);
+    font-size:.92rem;
+  }
+  input[type=range]{
+    -webkit-appearance:none;
+    appearance:none;
+    width:100%;
+    height:4px;
+    margin:8px 0;
+    border-radius:999px;
+    background:var(--line);
+    outline:none;
+  }
+  input[type=range]::-webkit-slider-thumb{
+    -webkit-appearance:none;
+    width:20px; height:20px;
+    border-radius:50%;
+    background:var(--wave);
+    border:2px solid var(--paper);
+    box-shadow:0 0 0 1px var(--line);
+    cursor:pointer;
+  }
+  input[type=range]::-moz-range-thumb{
+    width:18px; height:18px;
+    border-radius:50%;
+    background:var(--wave);
+    border:2px solid var(--paper);
+    box-shadow:0 0 0 1px var(--line);
+    cursor:pointer;
+  }
+  select{
+    font-family:var(--sans);
+    font-size:.86rem;
+    padding:7px 10px;
+    border-radius:8px;
+    border:1px solid var(--line);
+    background:var(--paper);
+    color:var(--ink);
+    width:100%;
+  }
+  .check{
+    display:flex;
+    align-items:center;
+    gap:8px;
+    font-size:.86rem;
+    font-weight:500;
+    cursor:pointer;
+  }
+  .check input{ width:18px; height:18px; accent-color:var(--accent); margin:0; }
+  .buttons{ display:flex; gap:10px; flex-wrap:wrap; }
+  button{
+    font-family:var(--sans);
+    font-size:.86rem;
+    font-weight:500;
+    padding:9px 16px;
+    border-radius:8px;
+    border:1px solid var(--line);
+    background:transparent;
+    color:var(--ink);
+    cursor:pointer;
+  }
+  button.primary{
+    background:var(--accent);
+    border-color:var(--accent);
+    color:var(--paper);
+  }
+  button:focus-visible, input:focus-visible, select:focus-visible{
+    outline:2px solid var(--accent);
+    outline-offset:2px;
+  }
+
+  /* ---------- Formules ---------- */
+  .formula{
+    font-family:var(--mono);
+    font-size:.86rem;
+    color:var(--ink-soft);
+    border-top:1px solid var(--line);
+    padding-top:14px;
+    display:flex;
+    flex-wrap:wrap;
+    gap:6px 22px;
+  }
+  .formula b{ color:var(--ink); font-weight:600; }
+  footer{
+    font-size:.78rem;
+    color:var(--ink-soft);
+    text-align:center;
+    text-wrap:balance;
+  }
+</style>
+</head>
+<body>
+
+<main>
+  <header>
+    <span class="kicker">Chimie</span>
+    <h1>Titrage acide-base</h1>
+    <p>Une solution d'acide est titrée par une solution de soude versée à la burette. Le pH augmente lentement, puis saute brutalement à l'équivalence. Verse, observe la courbe et le changement de teinte de l'indicateur coloré.</p>
+  </header>
+
+  <section class="scene">
+    <div class="scene-top">
+      <strong class="scene-title">Titrage par la soude à <span id="cbLabel">0,10</span> mol/L</strong>
+      <span id="status" class="status">—</span>
+    </div>
+    <canvas id="stage" style="aspect-ratio:1000/460" aria-label="À gauche, la burette et le bécher dont la teinte dépend du pH ; à droite, la courbe du pH en fonction du volume de soude versé."></canvas>
+    <p class="hint">La bande colorée du graphique est la zone de virage de l'indicateur : il convient si elle contient le pH à l'équivalence.</p>
+    <div class="readouts">
+      <div class="readout"><span class="label">Volume de soude versé</span><span class="value" id="rV">—</span></div>
+      <div class="readout"><span class="label">pH de la solution</span><span class="value" id="rPH">—</span></div>
+      <div class="readout"><span class="label">Teinte de l'indicateur</span><span class="value" id="rCol">—</span></div>
+      <div class="readout"><span class="label">Volume à l'équivalence V<sub>E</sub></span><span class="value" id="rVE">—</span></div>
+      <div class="readout"><span class="label">pH à l'équivalence</span><span class="value" id="rPHE">—</span></div>
+    </div>
+  </section>
+
+  <section class="panel">
+    <div class="controls">
+      <div class="control">
+        <div class="row"><label for="acid">Solution titrée</label></div>
+        <select id="acid">
+          <option value="fort" selected>Acide chlorhydrique (fort)</option>
+          <option value="faible">Acide éthanoïque (faible, pKa 4,8)</option>
+        </select>
+      </div>
+      <div class="control">
+        <div class="row"><label for="ca">Concentration acide C<sub>A</sub></label><span class="num" id="caVal"></span></div>
+        <input type="range" id="ca" min="0.02" max="0.12" step="0.005" value="0.08">
+      </div>
+      <div class="control">
+        <div class="row"><label for="va">Volume d'acide V<sub>A</sub></label></div>
+        <select id="va">
+          <option value="10" selected>10,0 mL</option>
+          <option value="20">20,0 mL</option>
+        </select>
+      </div>
+      <div class="control">
+        <div class="row"><label for="cb">Concentration soude C<sub>B</sub></label></div>
+        <select id="cb">
+          <option value="0.05">0,050 mol/L</option>
+          <option value="0.1" selected>0,10 mol/L</option>
+          <option value="0.2">0,20 mol/L</option>
+        </select>
+      </div>
+      <div class="control">
+        <div class="row"><label for="ind">Indicateur coloré</label></div>
+        <select id="ind">
+          <option value="bbt" selected>Bleu de bromothymol (6,0 – 7,6)</option>
+          <option value="phph">Phénolphtaléine (8,2 – 10,0)</option>
+          <option value="helian">Hélianthine (3,1 – 4,4)</option>
+        </select>
+      </div>
+      <div class="control">
+        <div class="row"><label for="vol">Volume de soude versé V</label><span class="num" id="volVal"></span></div>
+        <input type="range" id="vol" min="0" max="25" step="0.1" value="0">
+      </div>
+      <div class="control" style="justify-content:center">
+        <label class="check"><input type="checkbox" id="showEq"> Afficher l'équivalence sur le graphique</label>
+      </div>
+    </div>
+
+    <div class="buttons">
+      <button class="primary" id="pour">Ouvrir le robinet</button>
+      <button id="reset">Recommencer le titrage</button>
+    </div>
+
+    <div class="formula">
+      <span>à l'équivalence&nbsp;: <b>C<sub>A</sub>·V<sub>A</sub>&nbsp;=&nbsp;C<sub>B</sub>·V<sub>E</sub></b></span>
+      <span>C<sub>A</sub>&nbsp;=&nbsp;<b>C<sub>B</sub>·V<sub>E</sub>&nbsp;/&nbsp;V<sub>A</sub></b></span>
+      <span>pH&nbsp;=&nbsp;<b>−log&nbsp;[H₃O⁺]</b></span>
+    </div>
+  </section>
+
+  <footer>pH calculé à 25 °C à partir de l'électroneutralité de la solution (Ke = 10⁻¹⁴), sans approximation. Réaction support : acide + HO⁻ → base conjuguée + H₂O, supposée totale et rapide.</footer>
+</main>
+
+<script>
+(function(){
+  // ---------- Utilitaires ----------
+  const $ = id => document.getElementById(id);
+  const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
+  const fmt = (v, d) => Number.isFinite(v)
+    ? v.toLocaleString('fr-FR', {minimumFractionDigits:d, maximumFractionDigits:d})
+    : '—';
+  const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const MONO = 'ui-monospace, "Cascadia Mono", "SF Mono", Consolas, Menlo, monospace';
+  const SANS = 'system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif';
+
+  // Couleurs du thème, relues si le système bascule clair/sombre
+  const C = {};
+  function readColors(){
+    const s = getComputedStyle(document.documentElement);
+    for (const n of ['bg','paper','ink','ink-soft','line','wave','wave-glow','accent','blue','brass']){
+      C[n.replace(/-(.)/g, (_, c) => c.toUpperCase())] = s.getPropertyValue('--' + n).trim();
+    }
+  }
+  readColors();
+  window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', readColors);
+
+  // Canvas net sur tout écran : on dessine toujours dans un repère logique W × H
+  function setupCanvas(canvas, W, H){
+    const ctx = canvas.getContext('2d');
+    function fit(){
+      const dpr = Math.min(window.devicePixelRatio || 1, 3);
+      const cw = canvas.clientWidth || W;
+      canvas.width = Math.max(1, Math.round(cw * dpr));
+      canvas.height = Math.max(1, Math.round(cw * H / W * dpr));
+      ctx.setTransform(canvas.width / W, 0, 0, canvas.height / H, 0, 0);
+    }
+    window.addEventListener('resize', fit);
+    fit();
+    return ctx;
+  }
+  // Position du pointeur (souris ou doigt) dans le repère logique
+  function pointerPos(canvas, evt, W, H){
+    const r = canvas.getBoundingClientRect();
+    return { x: (evt.clientX - r.left) * W / r.width, y: (evt.clientY - r.top) * H / r.height };
+  }
+  function arrow(ctx, x1, y1, x2, y2, color, width){
+    const len = Math.hypot(x2 - x1, y2 - y1);
+    if (len < 3) return;
+    const a = Math.atan2(y2 - y1, x2 - x1), h = Math.min(10, len * 0.5);
+    ctx.strokeStyle = color; ctx.fillStyle = color; ctx.lineWidth = width || 2.5;
+    ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2 - Math.cos(a) * h * 0.8, y2 - Math.sin(a) * h * 0.8); ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(x2, y2);
+    ctx.lineTo(x2 - h * Math.cos(a - 0.42), y2 - h * Math.sin(a - 0.42));
+    ctx.lineTo(x2 - h * Math.cos(a + 0.42), y2 - h * Math.sin(a + 0.42));
+    ctx.closePath(); ctx.fill();
+  }
+  // Pas "rond" (1, 2, 5 × 10^n) pour graduer un axe
+  function niceStep(x){
+    if (!(x > 0)) return 1;
+    const p = Math.pow(10, Math.floor(Math.log10(x))), m = x / p;
+    return (m < 1.5 ? 1 : m < 3.5 ? 2 : m < 7.5 ? 5 : 10) * p;
+  }
+
+  // Relie un curseur, une liste ou une case à cocher à un paramètre (et affiche sa valeur)
+  function bind(id, onChange, format){
+    const el = $(id), label = $(id + 'Val');
+    const val = () => el.type === 'checkbox' ? el.checked : parseFloat(el.value);
+    const show = () => { if (label && format) label.textContent = format(val()); };
+    el.addEventListener(el.type === 'range' ? 'input' : 'change', () => { onChange(val()); show(); });
+    show();
+  }
+  const out = (id, text) => { $(id).textContent = text; };
+  function setStatus(text, cls){
+    const s = $('status');
+    s.textContent = text; s.className = 'status' + (cls ? ' ' + cls : '');
+  }
+  // Repère gradué dans le rectangle g ; renvoie les conversions X(x) et Y(y)
+  function axes(ctx, g, o){
+    const xMin = o.xMin || 0, yMin = o.yMin || 0;
+    const X = x => g.x + g.w * (x - xMin) / (o.xMax - xMin);
+    const Y = y => g.y + g.h - g.h * (y - yMin) / (o.yMax - yMin);
+    const ink = o.ink || C.ink, soft = o.soft || C.inkSoft, line = o.line || C.line;
+    const sx = niceStep((o.xMax - xMin) / (o.xTicks || 6)), sy = niceStep((o.yMax - yMin) / (o.yTicks || 4));
+    const dec = s => s >= 1 ? 0 : Math.min(4, Math.ceil(-Math.log10(s) - 1e-9));
+    ctx.save();
+    ctx.font = '13px ' + MONO; ctx.lineWidth = 1; ctx.textAlign = 'center';
+    for (let k = Math.ceil(xMin / sx - 1e-9); k * sx <= o.xMax + sx * 1e-6; k++){
+      ctx.strokeStyle = line; ctx.globalAlpha = 0.55;
+      ctx.beginPath(); ctx.moveTo(X(k * sx), g.y); ctx.lineTo(X(k * sx), g.y + g.h); ctx.stroke();
+      ctx.globalAlpha = 1; ctx.fillStyle = soft;
+      ctx.fillText(fmt(k * sx + 0, dec(sx)), X(k * sx), g.y + g.h + 18);
+    }
+    ctx.textAlign = 'right';
+    for (let k = Math.ceil(yMin / sy - 1e-9); k * sy <= o.yMax + sy * 1e-6; k++){
+      ctx.strokeStyle = line; ctx.globalAlpha = 0.55;
+      ctx.beginPath(); ctx.moveTo(g.x, Y(k * sy)); ctx.lineTo(g.x + g.w, Y(k * sy)); ctx.stroke();
+      ctx.globalAlpha = 1; ctx.fillStyle = soft;
+      ctx.fillText(fmt(k * sy + 0, dec(sy)), g.x - 8, Y(k * sy) + 4);
+    }
+    const y0 = yMin < 0 ? Y(0) : g.y + g.h;
+    ctx.strokeStyle = soft; ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.moveTo(g.x, g.y); ctx.lineTo(g.x, g.y + g.h); ctx.moveTo(g.x, y0); ctx.lineTo(g.x + g.w, y0); ctx.stroke();
+    ctx.fillStyle = ink; ctx.textAlign = 'left'; ctx.font = '14px ' + SANS;
+    if (o.title) ctx.fillText(o.title, g.x + 8, g.y - 10);
+    ctx.fillStyle = soft; ctx.textAlign = 'right'; ctx.font = '13px ' + MONO;
+    if (o.xLabel) ctx.fillText(o.xLabel, g.x + g.w, g.y + g.h + 36);
+    ctx.restore();
+    return { X, Y };
+  }
+  // Trace y = fn(x) entre x0 et x1 dans un repère créé par axes()
+  function curve(ctx, G, fn, x0, x1, color, width, dash){
+    if (!(x1 > x0)) return;
+    ctx.save();
+    ctx.strokeStyle = color; ctx.lineWidth = width || 2.5; ctx.lineJoin = 'round';
+    if (dash) ctx.setLineDash(dash);
+    ctx.beginPath();
+    let pen = false;
+    for (let i = 0; i <= 160; i++){
+      const x = x0 + (x1 - x0) * i / 160, y = fn(x);
+      if (!Number.isFinite(y)){ pen = false; continue; }
+      if (pen) ctx.lineTo(G.X(x), G.Y(y)); else { ctx.moveTo(G.X(x), G.Y(y)); pen = true; }
+    }
+    ctx.stroke();
+    ctx.restore();
+  }
+  // Couleur approchée d'une radiation visible (longueur d'onde en nm)
+  function waveRGB(nm){
+    let r = 0, g = 0, b = 0;
+    if (nm < 440){ r = (440 - nm) / 60; b = 1; }
+    else if (nm < 490){ g = (nm - 440) / 50; b = 1; }
+    else if (nm < 510){ g = 1; b = (510 - nm) / 20; }
+    else if (nm < 580){ r = (nm - 510) / 70; g = 1; }
+    else if (nm < 645){ r = 1; g = (645 - nm) / 65; }
+    else { r = 1; }
+    const k = nm < 420 ? 0.35 + 0.65 * (nm - 380) / 40 : nm > 700 ? 0.35 + 0.65 * (780 - nm) / 80 : 1;
+    return [r, g, b].map(v => Math.round(255 * clamp(v * k, 0, 1)));
+  }
+
+  // ---------- Constantes ----------
+  const W = 1000, H = 460;
+  const KW = 1e-14, KA = Math.pow(10, -4.8);
+  const V_BUR = 25;                          // contenance de la burette (mL)
+  const GRAPH = { x: 430, y: 45, w: 530, h: 350 };
+  const INDICATORS = {
+    bbt: { lo: 6.0, hi: 7.6, a: [226, 196, 60], b: [60, 110, 200], names: ['jaune', 'vert', 'bleu'] },
+    phph: { lo: 8.2, hi: 10, a: [236, 238, 240], b: [214, 70, 150], names: ['incolore', 'rose pâle', 'rose'] },
+    helian: { lo: 3.1, hi: 4.4, a: [214, 70, 60], b: [236, 190, 60], names: ['rouge', 'orangé', 'jaune'] }
+  };
+
+  // ---------- État ----------
+  const canvas = $('stage');
+  const ctx = setupCanvas(canvas, W, H);
+  const P = { acid: 'fort', ca: 0.08, va: 10, cb: 0.1, ind: 'bbt', V: 0, showEq: false };
+  let pouring = false, drop = 0;
+  let last = performance.now();
+
+  // ---------- Chimie ----------
+  const vEq = () => P.ca * P.va / P.cb;
+  // pH après ajout de V mL de soude : électroneutralité [H₃O⁺] + [Na⁺] = [HO⁻] + [A⁻]
+  function pH(V){
+    const ct = P.ca * P.va / (P.va + V), na = P.cb * V / (P.va + V);
+    if (P.acid === 'fort'){
+      const d = ct - na;
+      return -Math.log10((d + Math.sqrt(d * d + 4 * KW)) / 2);
+    }
+    let lo = 0, hi = 14;
+    for (let k = 0; k < 50; k++){
+      const mid = (lo + hi) / 2, h = Math.pow(10, -mid);
+      if (h + na - KW / h - ct * KA / (KA + h) > 0) lo = mid; else hi = mid;
+    }
+    return (lo + hi) / 2;
+  }
+  function indicator(p){
+    const d = INDICATORS[P.ind], u = clamp((p - d.lo) / (d.hi - d.lo), 0, 1);
+    return { rgb: d.a.map((v, k) => Math.round(v + (d.b[k] - v) * u)), name: d.names[u <= 0 ? 0 : u >= 1 ? 2 : 1], zone: u > 0 && u < 1 };
+  }
+
+  // ---------- Affichage des mesures ----------
+  function updateReadouts(p, ic){
+    out('cbLabel', fmt(P.cb, 2));
+    out('rV', fmt(P.V, 1) + ' mL');
+    out('rPH', fmt(p, 2));
+    out('rCol', ic.name);
+    out('rVE', P.showEq ? fmt(vEq(), 2) + ' mL' : 'masqué');
+    out('rPHE', P.showEq ? fmt(pH(vEq()), 2) : 'masqué');
+    if (ic.zone) setStatus('Zone de virage de l\'indicateur', 'off');
+    else setStatus(ic.name === INDICATORS[P.ind].names[0] ? 'Teinte acide de l\'indicateur' : 'Teinte basique de l\'indicateur', 'ok');
+  }
+
+  // ---------- Rendu ----------
+  function drawGlass(p, ic){
+    const bx = 170, top = 40, pxml = 10, bot = top + V_BUR * pxml;
+    // burette graduée
+    ctx.fillStyle = C.blue; ctx.globalAlpha = 0.3;
+    ctx.fillRect(bx - 9, top + P.V * pxml, 18, bot - top - P.V * pxml + 12);
+    ctx.globalAlpha = 1;
+    ctx.strokeStyle = C.ink; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.moveTo(bx - 9, top - 14); ctx.lineTo(bx - 9, bot + 12); ctx.lineTo(bx - 3, bot + 26); ctx.lineTo(bx - 3, bot + 38);
+    ctx.moveTo(bx + 9, top - 14); ctx.lineTo(bx + 9, bot + 12); ctx.lineTo(bx + 3, bot + 26); ctx.lineTo(bx + 3, bot + 38); ctx.stroke();
+    ctx.fillStyle = pouring ? C.accent : C.ink; ctx.fillRect(bx - 16, bot + 16, 32, 6);
+    ctx.font = '12px ' + MONO; ctx.textAlign = 'right'; ctx.lineWidth = 1;
+    for (let v = 0; v <= V_BUR; v += 1){
+      ctx.strokeStyle = C.inkSoft;
+      ctx.beginPath(); ctx.moveTo(bx - 9, top + v * pxml); ctx.lineTo(bx - 9 - (v % 5 === 0 ? 9 : 5), top + v * pxml); ctx.stroke();
+      if (v % 5 === 0){ ctx.fillStyle = C.inkSoft; ctx.fillText(String(v), bx - 24, top + v * pxml + 4); }
+    }
+    ctx.fillStyle = C.inkSoft; ctx.font = '13px ' + SANS; ctx.textAlign = 'left';
+    ctx.fillText('soude', bx + 20, top + 6);
+    ctx.fillText(fmt(P.cb, 2) + ' mol/L', bx + 20, top + 24);
+
+    // bécher : la teinte suit l'indicateur
+    const by = 350, bw = 150, bh = 90, lvl = by + bh - 34 - (P.va + P.V) * 0.9;
+    ctx.fillStyle = 'rgb(' + ic.rgb.join(',') + ')';
+    ctx.fillRect(bx - bw / 2, lvl, bw, by + bh - lvl);
+    ctx.strokeStyle = C.ink; ctx.lineWidth = 2.5; ctx.lineJoin = 'round';
+    ctx.beginPath(); ctx.moveTo(bx - bw / 2, by); ctx.lineTo(bx - bw / 2, by + bh); ctx.lineTo(bx + bw / 2, by + bh); ctx.lineTo(bx + bw / 2, by); ctx.stroke();
+    if (pouring && P.V < V_BUR){
+      ctx.fillStyle = C.blue;
+      ctx.beginPath(); ctx.arc(bx, bot + 40 + drop * (lvl - bot - 40), 3.5, 0, Math.PI * 2); ctx.fill();
+    }
+    // pH-mètre
+    ctx.fillStyle = C.paper; ctx.strokeStyle = C.ink; ctx.lineWidth = 2;
+    ctx.fillRect(280, 360, 110, 54); ctx.strokeRect(280, 360, 110, 54);
+    ctx.fillStyle = C.inkSoft; ctx.font = '12px ' + SANS; ctx.textAlign = 'center';
+    ctx.fillText('pH-mètre', 335, 378);
+    ctx.fillStyle = C.wave; ctx.font = '600 20px ' + MONO;
+    ctx.fillText(fmt(p, 2), 335, 402);
+  }
+  function draw(){
+    const p = pH(P.V), ic = indicator(p);
+    updateReadouts(p, ic);
+    ctx.clearRect(0, 0, W, H);
+    drawGlass(p, ic);
+
+    const G = axes(ctx, GRAPH, { xMax: V_BUR, xTicks: 5, yMax: 14, yTicks: 7, title: 'pH', xLabel: 'V versé (mL)' });
+    // zone de virage de l'indicateur
+    const d = INDICATORS[P.ind];
+    ctx.fillStyle = 'rgb(' + d.b.join(',') + ')'; ctx.globalAlpha = 0.22;
+    ctx.fillRect(GRAPH.x, G.Y(d.hi), GRAPH.w, G.Y(d.lo) - G.Y(d.hi));
+    ctx.globalAlpha = 1;
+    // équivalence
+    if (P.showEq && vEq() <= V_BUR){
+      const ve = vEq(), pe = pH(ve);
+      ctx.setLineDash([5, 6]); ctx.strokeStyle = C.accent; ctx.lineWidth = 1.5;
+      ctx.beginPath(); ctx.moveTo(G.X(ve), GRAPH.y + GRAPH.h); ctx.lineTo(G.X(ve), G.Y(pe)); ctx.lineTo(GRAPH.x, G.Y(pe)); ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.fillStyle = C.accent; ctx.font = '600 13px ' + MONO; ctx.textAlign = 'left';
+      ctx.fillText('E', G.X(ve) + 8, G.Y(pe) + 4);
+    }
+    // courbe relevée jusqu'au volume versé
+    if (P.V > 0){
+      ctx.strokeStyle = C.wave; ctx.lineWidth = 2.5; ctx.lineJoin = 'round';
+      ctx.beginPath();
+      for (let v = 0; v <= P.V + 1e-9; v += 0.05){
+        if (v === 0) ctx.moveTo(G.X(v), G.Y(pH(v))); else ctx.lineTo(G.X(v), G.Y(pH(v)));
+      }
+      ctx.stroke();
+    }
+    ctx.fillStyle = C.wave; ctx.strokeStyle = C.paper; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.arc(G.X(P.V), G.Y(p), 6, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+    if (P.showEq && vEq() > V_BUR){
+      ctx.fillStyle = C.inkSoft; ctx.font = '13px ' + SANS; ctx.textAlign = 'right';
+      ctx.fillText('Équivalence au-delà de la burette (' + fmt(vEq(), 1) + ' mL)', GRAPH.x + GRAPH.w - 8, GRAPH.y + 18);
+    }
+  }
+
+  // ---------- Interactions ----------
+  function setV(v){ P.V = v; $('vol').value = v; out('volVal', fmt(v, 1) + ' mL'); }
+  function stop(){ pouring = false; $('pour').textContent = 'Ouvrir le robinet'; }
+  const restart = () => { stop(); setV(0); };
+  $('acid').addEventListener('change', e => { P.acid = e.target.value; restart(); });
+  bind('ca', v => { P.ca = v; restart(); }, v => fmt(v, 3) + ' mol/L');
+  bind('va', v => { P.va = v; restart(); });
+  bind('cb', v => { P.cb = v; restart(); });
+  $('ind').addEventListener('change', e => { P.ind = e.target.value; });
+  bind('vol', v => { P.V = v; stop(); }, v => fmt(v, 1) + ' mL');
+  bind('showEq', v => { P.showEq = v; });
+  $('pour').addEventListener('click', () => {
+    if (pouring) return stop();
+    if (P.V >= V_BUR) setV(0);
+    pouring = true; $('pour').textContent = 'Fermer le robinet'; last = performance.now();
+  });
+  $('reset').addEventListener('click', restart);
+
+  // ---------- Boucle d'animation ----------
+  function loop(now){
+    const dt = Math.min((now - last) / 1000, 0.05);
+    last = now;
+    if (pouring){
+      setV(Math.min(V_BUR, Math.round((P.V + dt * 1.2) * 1000) / 1000));   // 1,2 mL par seconde
+      drop = (drop + dt * 3) % 1;
+      if (P.V >= V_BUR) stop();
+    }
+    draw();
+    requestAnimationFrame(loop);
+  }
+  requestAnimationFrame(loop);
+})();
+</script>
+</body>
+</html>

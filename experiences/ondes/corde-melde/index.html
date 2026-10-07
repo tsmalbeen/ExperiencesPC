@@ -1,0 +1,652 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Corde de Melde</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500..700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+<style>
+  :root{
+    --bg:#f3ede1;
+    --paper:#fbf8f0;
+    --ink:#22242e;
+    --ink-soft:#5b5a52;
+    --line:#d9d0ba;
+    --wave:#b8362b;
+    --wave-glow:rgba(184,54,43,.14);
+    --node:#22242e;
+    --antinode:#2f6f4f;
+    --accent:#2f6f4f;
+    --brass:#a9793f;
+    --ok:#2f6f4f;
+    --warn:#b8362b;
+    color-scheme: light;
+  }
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]){
+      --bg:#171a21;
+      --paper:#1e222b;
+      --ink:#eae6da;
+      --ink-soft:#9a9689;
+      --line:#33384a;
+      --wave:#ff8a72;
+      --wave-glow:rgba(255,138,114,.14);
+      --node:#eae6da;
+      --antinode:#79d6a3;
+      --accent:#79d6a3;
+      --brass:#c99a5b;
+    }
+  }
+  :root[data-theme="dark"]{
+    --bg:#171a21;
+    --paper:#1e222b;
+    --ink:#eae6da;
+    --ink-soft:#9a9689;
+    --line:#33384a;
+    --wave:#ff8a72;
+    --wave-glow:rgba(255,138,114,.14);
+    --node:#eae6da;
+    --antinode:#79d6a3;
+    --accent:#79d6a3;
+    --brass:#c99a5b;
+  }
+
+  *{box-sizing:border-box;}
+  html, body{ margin:0; padding:0; }
+  body{
+    background:var(--bg);
+    color:var(--ink);
+    font-family:'IBM Plex Sans', system-ui, sans-serif;
+    padding-inline:16px;
+    padding-block:28px;
+    display:flex;
+    justify-content:center;
+  }
+  img{ max-width:100%; }
+  main{
+    width:100%;
+    max-width:920px;
+    display:flex;
+    flex-direction:column;
+    gap:20px;
+  }
+  header{
+    display:flex;
+    flex-direction:column;
+    gap:4px;
+  }
+  h1{
+    font-family:'Fraunces', serif;
+    font-weight:600;
+    font-size:clamp(1.5rem, 1.1rem + 1.6vw, 2.2rem);
+    margin:0;
+    text-wrap:balance;
+  }
+  header p{
+    margin:0;
+    color:var(--ink-soft);
+    font-size:.92rem;
+    max-width:60ch;
+  }
+
+  .scene{
+    background:var(--paper);
+    border:1px solid var(--line);
+    border-radius:14px;
+    padding:20px clamp(12px,3vw,28px) 8px;
+    display:flex;
+    flex-direction:column;
+    gap:2px;
+  }
+  .scene-top{
+    display:flex;
+    justify-content:space-between;
+    align-items:baseline;
+    gap:12px;
+    flex-wrap:wrap;
+  }
+  .status{
+    font-family:'IBM Plex Mono', monospace;
+    font-size:.82rem;
+    padding:3px 10px;
+    border-radius:999px;
+    border:1px solid var(--line);
+    white-space:nowrap;
+  }
+  .status.ok{ color:var(--ok); border-color:var(--ok); }
+  .status.off{ color:var(--warn); border-color:var(--warn); }
+
+  canvas{
+    width:100%;
+    height:auto;
+    display:block;
+    touch-action:none;
+    cursor:grab;
+  }
+  canvas.dragging{
+    cursor:grabbing;
+  }
+
+  .readouts{
+    display:grid;
+    grid-template-columns:repeat(auto-fit,minmax(120px,1fr));
+    gap:10px 18px;
+    padding-block:2px 10px;
+    border-top:1px solid var(--line);
+    margin-top:6px;
+  }
+  .readout{
+    display:flex;
+    flex-direction:column;
+    gap:2px;
+  }
+  .readout .label{
+    font-size:.72rem;
+    text-transform:uppercase;
+    letter-spacing:.06em;
+    color:var(--ink-soft);
+  }
+  .readout .value{
+    font-family:'IBM Plex Mono', monospace;
+    font-variant-numeric:tabular-nums;
+    font-size:1.05rem;
+    font-weight:500;
+  }
+  .readout .value em{
+    color:var(--accent);
+    font-style:normal;
+  }
+
+  .panel{
+    background:var(--paper);
+    border:1px solid var(--line);
+    border-radius:14px;
+    padding:18px clamp(14px,3vw,26px);
+    display:flex;
+    flex-direction:column;
+    gap:18px;
+  }
+  .control{
+    display:flex;
+    flex-direction:column;
+    gap:6px;
+  }
+  .control .row{
+    display:flex;
+    justify-content:space-between;
+    align-items:baseline;
+    gap:10px;
+  }
+  .control label{
+    font-size:.86rem;
+    font-weight:500;
+  }
+  .control .num{
+    font-family:'IBM Plex Mono', monospace;
+    font-variant-numeric:tabular-nums;
+    color:var(--wave);
+    font-size:.92rem;
+  }
+  input[type=range]{
+    -webkit-appearance:none;
+    appearance:none;
+    width:100%;
+    height:4px;
+    border-radius:999px;
+    background:var(--line);
+    outline:none;
+  }
+  input[type=range]::-webkit-slider-thumb{
+    -webkit-appearance:none;
+    width:18px; height:18px;
+    border-radius:50%;
+    background:var(--wave);
+    border:2px solid var(--paper);
+    box-shadow:0 0 0 1px var(--line);
+    cursor:pointer;
+  }
+  input[type=range]::-moz-range-thumb{
+    width:16px; height:16px;
+    border-radius:50%;
+    background:var(--wave);
+    border:2px solid var(--paper);
+    box-shadow:0 0 0 1px var(--line);
+    cursor:pointer;
+  }
+
+  .buttons{
+    display:flex;
+    gap:10px;
+    flex-wrap:wrap;
+  }
+  button{
+    font-family:'IBM Plex Sans', sans-serif;
+    font-size:.86rem;
+    font-weight:500;
+    padding:9px 16px;
+    border-radius:8px;
+    border:1px solid var(--line);
+    background:transparent;
+    color:var(--ink);
+    cursor:pointer;
+  }
+  button.primary{
+    background:var(--accent);
+    border-color:var(--accent);
+    color:var(--paper);
+  }
+  button:focus-visible, input:focus-visible{
+    outline:2px solid var(--accent);
+    outline-offset:2px;
+  }
+
+  .formula{
+    font-family:'IBM Plex Mono', monospace;
+    font-size:.86rem;
+    color:var(--ink-soft);
+    border-top:1px solid var(--line);
+    padding-top:14px;
+    display:flex;
+    flex-wrap:wrap;
+    gap:6px 22px;
+  }
+  .formula b{ color:var(--ink); font-weight:600; }
+
+  footer{
+    font-size:.78rem;
+    color:var(--ink-soft);
+    text-align:center;
+  }
+
+  @media (prefers-reduced-motion: reduce){
+    * { scroll-behavior:auto !important; }
+  }
+</style>
+</head>
+<body>
+
+<main>
+  <header>
+    <h1>Corde de Melde</h1>
+    <p>Un vibreur impose une extrémité fixe, une masse suspendue tend la corde. Règle la fréquence et la masse : la corde n'entre en résonance — ondes stationnaires nettes, "fuseaux" bien formés — que pour certains couples de valeurs.</p>
+  </header>
+
+  <section class="scene">
+    <div class="scene-top">
+      <strong style="font-family:'Fraunces',serif;font-weight:600;">Corde tendue, L = <span id="lLabel">1,00</span> m</strong>
+      <span id="status" class="status ok">Résonance</span>
+    </div>
+    <canvas id="stage" width="1600" height="560" aria-label="Simulation de la corde de Melde. Fais glisser le vibreur pour changer la longueur de corde."></canvas>
+    <p style="margin:0;font-size:.78rem;color:var(--ink-soft);">Fais glisser le vibreur (à gauche) le long de la règle pour changer la longueur de corde utile.</p>
+    <div class="readouts">
+      <div class="readout">
+        <span class="label">Fuseaux (n)</span>
+        <span class="value" id="rn">—</span>
+      </div>
+      <div class="readout">
+        <span class="label">Célérité c</span>
+        <span class="value" id="rc">—</span>
+      </div>
+      <div class="readout">
+        <span class="label">Longueur d'onde λ</span>
+        <span class="value" id="rlambda">—</span>
+      </div>
+      <div class="readout">
+        <span class="label">Tension F</span>
+        <span class="value" id="rf">—</span>
+      </div>
+    </div>
+  </section>
+
+  <section class="panel">
+    <div class="control">
+      <div class="row">
+        <label for="freq">Fréquence du vibreur</label>
+        <span class="num" id="freqVal">10.7 Hz</span>
+      </div>
+      <input type="range" id="freq" min="1" max="25" step="0.1" value="10.7">
+    </div>
+    <div class="control">
+      <div class="row">
+        <label for="mass">Masse suspendue</label>
+        <span class="num" id="massVal">36 g</span>
+      </div>
+      <input type="range" id="mass" min="5" max="150" step="1" value="36">
+    </div>
+
+    <div class="buttons">
+      <button class="primary" id="snap">Caler sur la résonance la plus proche</button>
+      <button id="toggle">Mettre en pause</button>
+    </div>
+
+    <div class="formula">
+      <span>c&nbsp;=&nbsp;<b>√(F&nbsp;/&nbsp;μ)</b></span>
+      <span>λ&nbsp;=&nbsp;<b>c&nbsp;/&nbsp;f</b></span>
+      <span>n&nbsp;=&nbsp;<b>2L&nbsp;/&nbsp;λ</b></span>
+      <span>F&nbsp;=&nbsp;<b>m·g</b></span>
+      <span>μ&nbsp;=&nbsp;3,0 g/m (fixe)</span>
+    </div>
+  </section>
+
+  <footer>Modèle pédagogique : μ fixée à 3 g/m, g = 9,8 m/s², L = 1,00 m — reproduit les ordres de grandeur de la vidéo (f ≈ 10,7 Hz, m ≈ 36 g → 2 fuseaux).</footer>
+</main>
+
+<script>
+(function(){
+  const canvas = document.getElementById('stage');
+  const ctx = canvas.getContext('2d');
+  const freqInput = document.getElementById('freq');
+  const massInput = document.getElementById('mass');
+  const freqVal = document.getElementById('freqVal');
+  const massVal = document.getElementById('massVal');
+  const snapBtn = document.getElementById('snap');
+  const toggleBtn = document.getElementById('toggle');
+  const statusEl = document.getElementById('status');
+  const rn = document.getElementById('rn');
+  const rc = document.getElementById('rc');
+  const rlambda = document.getElementById('rlambda');
+  const rf = document.getElementById('rf');
+  const lLabel = document.getElementById('lLabel');
+
+  const MU = 0.003; // kg/m
+  const G = 9.8;
+  const VIB_MIN_CM = 0, VIB_MAX_CM = 88; // keep at least 12 cm of string
+
+  // fixed canvas geometry (canvas internal resolution)
+  const GEOM = { marginL0: 90, marginR: 140, rulerY: 560*0.62 };
+
+  let state = { freq: parseFloat(freqInput.value), mass: parseFloat(massInput.value), vibCm: 0 };
+  let playing = true;
+  let t0 = performance.now();
+  let elapsed = 0;
+  let dragging = false;
+
+  function css(varName){
+    return getComputedStyle(document.documentElement).getPropertyValue(varName).trim();
+  }
+
+  function geom(){
+    const w = canvas.width;
+    const stringSpanFull = w - GEOM.marginL0 - GEOM.marginR;
+    const pulX = GEOM.marginL0 + stringSpanFull;
+    const vibX = GEOM.marginL0 + stringSpanFull*(state.vibCm/100);
+    return { marginL0: GEOM.marginL0, stringSpanFull, pulX, vibX, rulerY: GEOM.rulerY };
+  }
+
+  function currentL(){
+    return (100 - state.vibCm)/100; // metres
+  }
+
+  function physics(){
+    const L = currentL();
+    const F = state.mass/1000 * G;
+    const c = Math.sqrt(F/MU);
+    const lambda = c/state.freq;
+    const nReal = (2*L)/lambda;
+    const nInt = Math.max(1, Math.round(nReal));
+    const fRes = nInt*c/(2*L);
+    const quality = Math.max(0, 1 - Math.min(1, Math.abs(state.freq - fRes)/fRes * 6));
+    return { L, F, c, lambda, nReal, nInt, fRes, quality };
+  }
+
+  function fmt(v, d){ return v.toLocaleString('fr-FR', {minimumFractionDigits:d, maximumFractionDigits:d}); }
+
+  function updateReadouts(p){
+    lLabel.textContent = fmt(p.L,2);
+    rn.innerHTML = fmt(p.nReal,2) + ' <em>(&asymp; ' + p.nInt + ')</em>';
+    rc.textContent = fmt(p.c,2) + ' m/s';
+    rlambda.textContent = fmt(p.lambda*100,1) + ' cm';
+    rf.textContent = fmt(p.F,3) + ' N';
+
+    if (p.quality > 0.75){
+      statusEl.textContent = 'Résonance (n=' + p.nInt + ')';
+      statusEl.className = 'status ok';
+    } else {
+      statusEl.textContent = 'Hors résonance — essaie ' + fmt(p.fRes,1) + ' Hz';
+      statusEl.className = 'status off';
+    }
+  }
+
+  function draw(time){
+    const p = physics();
+    updateReadouts(p);
+
+    const w = canvas.width, h = canvas.height;
+    ctx.clearRect(0,0,w,h);
+
+    const g = geom();
+    const marginL = g.marginL0, stringSpanFull = g.stringSpanFull;
+    const rulerY = g.rulerY;
+    const vibX = g.vibX, pulX = g.pulX;
+    const stringSpan = pulX - vibX;
+    const ampMax = h*0.30;
+    const amp = ampMax * (0.18 + 0.82*p.quality);
+
+    const ink = css('--ink'), inkSoft = css('--ink-soft'), line = css('--line');
+    const wave = css('--wave'), waveGlow = css('--wave-glow');
+    const node = css('--node'), antinode = css('--antinode'), brass = css('--brass'), accent = css('--accent');
+
+    // ruler
+    ctx.strokeStyle = line;
+    ctx.fillStyle = inkSoft;
+    ctx.lineWidth = 1;
+    ctx.font = '15px "IBM Plex Mono", monospace';
+    ctx.textAlign = 'center';
+    ctx.beginPath();
+    ctx.moveTo(marginL, rulerY);
+    ctx.lineTo(marginL+stringSpanFull, rulerY);
+    ctx.stroke();
+    for(let cm=0; cm<=100; cm+=5){
+      const x = marginL + stringSpanFull*(cm/100);
+      const tall = cm % 10 === 0;
+      ctx.beginPath();
+      ctx.moveTo(x, rulerY);
+      ctx.lineTo(x, rulerY + (tall? 14:8));
+      ctx.stroke();
+      if (tall) ctx.fillText(String(cm), x, rulerY+32);
+    }
+    ctx.textAlign = 'left';
+    ctx.fillText('cm', marginL+stringSpanFull+18, rulerY+6);
+
+    // vibreur box (draggable)
+    const vibY = rulerY - 78;
+    ctx.fillStyle = dragging ? accent : ink;
+    ctx.fillRect(vibX-46, vibY-26, 92, 46);
+    ctx.fillStyle = css('--paper');
+    ctx.font = '13px "IBM Plex Sans", sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('vibreur', vibX, vibY+2);
+    // drag handle hint
+    ctx.fillStyle = css('--paper');
+    ctx.font = '11px "IBM Plex Sans", sans-serif';
+    ctx.fillText('◂ glisser ▸', vibX, vibY+16);
+    ctx.strokeStyle = ink;
+    ctx.beginPath();
+    ctx.moveTo(vibX, vibY+20);
+    ctx.lineTo(vibX, rulerY);
+    ctx.stroke();
+
+    // pulley — mounted right where the string leaves the table edge,
+    // at the same height as the string itself, on a small clamp stand.
+    const pulY = rulerY;
+    const clampTopY = rulerY - 60;
+    ctx.strokeStyle = inkSoft;
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.moveTo(pulX, clampTopY);
+    ctx.lineTo(pulX, pulY);
+    ctx.stroke();
+    ctx.fillStyle = inkSoft;
+    ctx.fillRect(pulX-16, clampTopY-10, 32, 10);
+
+    ctx.beginPath();
+    ctx.arc(pulX, pulY, 14, 0, Math.PI*2);
+    ctx.fillStyle = brass;
+    ctx.fill();
+    ctx.strokeStyle = css('--paper');
+    ctx.lineWidth = 2;
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.arc(pulX, pulY, 4, 0, Math.PI*2);
+    ctx.fillStyle = css('--paper');
+    ctx.fill();
+
+    // string wraps over the pulley and drops straight down to the mass
+    const massH = 20 + Math.min(46, state.mass*0.3);
+    const dropStartY = pulY + 14;
+    const dropEndY = pulY + 78;
+    ctx.strokeStyle = wave;
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(pulX, dropStartY);
+    ctx.lineTo(pulX, dropEndY);
+    ctx.stroke();
+
+    ctx.fillStyle = brass;
+    ctx.fillRect(pulX-14, dropEndY, 28, massH);
+    ctx.fillStyle = css('--paper');
+    ctx.font = '12px "IBM Plex Mono", monospace';
+    ctx.textAlign = 'center';
+    ctx.fillText(fmt(state.mass,0)+' g', pulX, dropEndY+massH/2+4);
+
+    // envelope (lens shape), like the video
+    const n = p.nInt;
+    ctx.fillStyle = waveGlow;
+    ctx.beginPath();
+    for(let i=0;i<=200;i++){
+      const xr = i/200;
+      const x = vibX + stringSpan*xr;
+      const env = Math.abs(Math.sin(n*Math.PI*xr));
+      const y = rulerY - env*amp;
+      if (i===0) ctx.moveTo(x,y); else ctx.lineTo(x,y);
+    }
+    for(let i=200;i>=0;i--){
+      const xr = i/200;
+      const x = vibX + stringSpan*xr;
+      const env = Math.abs(Math.sin(n*Math.PI*xr));
+      const y = rulerY + env*amp;
+      ctx.lineTo(x,y);
+    }
+    ctx.closePath();
+    ctx.fill();
+
+    // string itself, standing wave y(x,t)
+    const omega = 2*Math.PI*state.freq;
+    const phase = Math.cos(omega*elapsed);
+    ctx.strokeStyle = wave;
+    ctx.lineWidth = 2.5;
+    ctx.beginPath();
+    for(let i=0;i<=200;i++){
+      const xr = i/200;
+      const x = vibX + stringSpan*xr;
+      const y = rulerY - amp*Math.sin(n*Math.PI*xr)*phase;
+      if (i===0) ctx.moveTo(x,y); else ctx.lineTo(x,y);
+    }
+    ctx.stroke();
+
+    // nodes and antinodes
+    for(let k=0;k<=n;k++){
+      const xr = k/n;
+      const x = vibX + stringSpan*xr;
+      ctx.beginPath();
+      ctx.arc(x, rulerY, 4, 0, Math.PI*2);
+      ctx.fillStyle = node;
+      ctx.fill();
+    }
+    for(let k=0;k<n;k++){
+      const xr = (k+0.5)/n;
+      const x = vibX + stringSpan*xr;
+      const y = rulerY - amp*Math.sin(n*Math.PI*xr)*phase;
+      ctx.beginPath();
+      ctx.arc(x, y, 4, 0, Math.PI*2);
+      ctx.fillStyle = antinode;
+      ctx.fill();
+    }
+  }
+
+  function loop(now){
+    if (playing) elapsed += (now - t0)/1000;
+    t0 = now;
+    draw(now);
+    requestAnimationFrame(loop);
+  }
+
+  freqInput.addEventListener('input', ()=>{
+    state.freq = parseFloat(freqInput.value);
+    freqVal.textContent = state.freq.toFixed(1) + ' Hz';
+  });
+  massInput.addEventListener('input', ()=>{
+    state.mass = parseFloat(massInput.value);
+    massVal.textContent = state.mass.toFixed(0) + ' g';
+  });
+  snapBtn.addEventListener('click', ()=>{
+    const p = physics();
+    state.freq = Math.min(parseFloat(freqInput.max), Math.max(parseFloat(freqInput.min), p.fRes));
+    freqInput.value = state.freq.toFixed(1);
+    freqVal.textContent = state.freq.toFixed(1) + ' Hz';
+  });
+  toggleBtn.addEventListener('click', ()=>{
+    playing = !playing;
+    toggleBtn.textContent = playing ? 'Mettre en pause' : 'Reprendre';
+    t0 = performance.now();
+  });
+
+  // --- drag the vibreur along the ruler to change string length ---
+  function eventToCanvasX(evt){
+    const rect = canvas.getBoundingClientRect();
+    const clientX = evt.touches ? evt.touches[0].clientX : evt.clientX;
+    const scale = canvas.width / rect.width;
+    return (clientX - rect.left) * scale;
+  }
+
+  function nearVibreur(x, y){
+    const g = geom();
+    const vibY = g.rulerY - 78;
+    return x > g.vibX-50 && x < g.vibX+50 && y > vibY-30 && y < g.rulerY+10;
+  }
+
+  function eventToCanvasY(evt){
+    const rect = canvas.getBoundingClientRect();
+    const clientY = evt.touches ? evt.touches[0].clientY : evt.clientY;
+    const scale = canvas.height / rect.height;
+    return (clientY - rect.top) * scale;
+  }
+
+  function setVibFromX(x){
+    const g = geom();
+    let cm = ((x - g.marginL0) / g.stringSpanFull) * 100;
+    cm = Math.max(VIB_MIN_CM, Math.min(VIB_MAX_CM, cm));
+    state.vibCm = cm;
+  }
+
+  function onPointerDown(evt){
+    const x = eventToCanvasX(evt);
+    const y = eventToCanvasY(evt);
+    if (nearVibreur(x, y)){
+      dragging = true;
+      canvas.classList.add('dragging');
+      evt.preventDefault();
+    }
+  }
+  function onPointerMove(evt){
+    if (!dragging) return;
+    setVibFromX(eventToCanvasX(evt));
+    evt.preventDefault();
+  }
+  function onPointerUp(){
+    dragging = false;
+    canvas.classList.remove('dragging');
+  }
+
+  canvas.addEventListener('mousedown', onPointerDown);
+  window.addEventListener('mousemove', onPointerMove);
+  window.addEventListener('mouseup', onPointerUp);
+  canvas.addEventListener('touchstart', onPointerDown, {passive:false});
+  window.addEventListener('touchmove', onPointerMove, {passive:false});
+  window.addEventListener('touchend', onPointerUp);
+
+  requestAnimationFrame(loop);
+})();
+</script>
+</body>
+</html>

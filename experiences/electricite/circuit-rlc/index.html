@@ -1,0 +1,552 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Circuit RLC</title>
+<style>
+  /* ---------- Thème (clair / sombre automatique) ---------- */
+  :root{
+    --bg:#f3ede1;
+    --paper:#fbf8f0;
+    --ink:#22242e;
+    --ink-soft:#5b5a52;
+    --line:#d9d0ba;
+    --wave:#b8362b;
+    --wave-glow:rgba(184,54,43,.14);
+    --accent:#2f6f4f;
+    --blue:#2c5f8a;
+    --brass:#a9793f;
+    --ok:#2f6f4f;
+    --warn:#b8362b;
+    --serif:"Iowan Old Style","Palatino Linotype",Palatino,Georgia,serif;
+    --sans:system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+    --mono:ui-monospace,"Cascadia Mono","SF Mono",Consolas,Menlo,monospace;
+    color-scheme: light dark;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{
+      --bg:#171a21;
+      --paper:#1e222b;
+      --ink:#eae6da;
+      --ink-soft:#9a9689;
+      --line:#33384a;
+      --wave:#ff8a72;
+      --wave-glow:rgba(255,138,114,.14);
+      --accent:#79d6a3;
+      --blue:#7fb4e0;
+      --brass:#c99a5b;
+      --ok:#79d6a3;
+      --warn:#ff8a72;
+    }
+  }
+
+  /* ---------- Mise en page ---------- */
+  *{box-sizing:border-box;}
+  html, body{ margin:0; padding:0; }
+  body{
+    background:var(--bg);
+    color:var(--ink);
+    font-family:var(--sans);
+    padding:28px 16px;
+    display:flex;
+    justify-content:center;
+  }
+  main{
+    width:100%;
+    max-width:920px;
+    display:flex;
+    flex-direction:column;
+    gap:20px;
+  }
+  header{ display:flex; flex-direction:column; gap:4px; }
+  .kicker{
+    font-size:.72rem;
+    text-transform:uppercase;
+    letter-spacing:.08em;
+    color:var(--ink-soft);
+  }
+  h1{
+    font-family:var(--serif);
+    font-weight:600;
+    font-size:clamp(1.5rem, 1.1rem + 1.6vw, 2.2rem);
+    margin:0;
+    text-wrap:balance;
+  }
+  header p{
+    margin:0;
+    color:var(--ink-soft);
+    font-size:.92rem;
+    max-width:66ch;
+  }
+
+  /* ---------- Zone de simulation ---------- */
+  .scene{
+    background:var(--paper);
+    border:1px solid var(--line);
+    border-radius:14px;
+    padding:20px clamp(12px,3vw,28px) 8px;
+    display:flex;
+    flex-direction:column;
+    gap:6px;
+  }
+  .scene-top{
+    display:flex;
+    justify-content:space-between;
+    align-items:baseline;
+    gap:12px;
+    flex-wrap:wrap;
+  }
+  .scene-title{ font-family:var(--serif); font-weight:600; }
+  .status{
+    font-family:var(--mono);
+    font-size:.82rem;
+    padding:3px 10px;
+    border-radius:999px;
+    border:1px solid var(--line);
+    color:var(--ink-soft);
+  }
+  .status.ok{ color:var(--ok); border-color:var(--ok); }
+  .status.off{ color:var(--warn); border-color:var(--warn); }
+  canvas{
+    width:100%;
+    height:auto;
+    display:block;
+  }
+  canvas.draggable{ touch-action:none; cursor:grab; }
+  canvas.dragging{ cursor:grabbing; }
+  .hint{ margin:0; font-size:.78rem; color:var(--ink-soft); }
+
+  /* ---------- Mesures ---------- */
+  .readouts{
+    display:grid;
+    grid-template-columns:repeat(auto-fit,minmax(150px,1fr));
+    gap:10px 18px;
+    padding-block:10px;
+    border-top:1px solid var(--line);
+    margin-top:6px;
+  }
+  .readout{ display:flex; flex-direction:column; gap:2px; }
+  .readout .label{
+    font-size:.78rem;
+    color:var(--ink-soft);
+  }
+  .readout .value{
+    font-family:var(--mono);
+    font-variant-numeric:tabular-nums;
+    font-size:1.05rem;
+    font-weight:500;
+  }
+  .readout .value em{ color:var(--blue); font-style:normal; font-size:.9rem; }
+
+  /* ---------- Contrôles ---------- */
+  .panel{
+    background:var(--paper);
+    border:1px solid var(--line);
+    border-radius:14px;
+    padding:18px clamp(14px,3vw,26px);
+    display:flex;
+    flex-direction:column;
+    gap:18px;
+  }
+  .controls{
+    display:grid;
+    grid-template-columns:repeat(auto-fit,minmax(240px,1fr));
+    gap:18px 32px;
+  }
+  .control{ display:flex; flex-direction:column; gap:6px; }
+  .control .row{
+    display:flex;
+    justify-content:space-between;
+    align-items:baseline;
+    gap:10px;
+  }
+  .control label{ font-size:.86rem; font-weight:500; }
+  .control .num{
+    font-family:var(--mono);
+    font-variant-numeric:tabular-nums;
+    color:var(--wave);
+    font-size:.92rem;
+  }
+  input[type=range]{
+    -webkit-appearance:none;
+    appearance:none;
+    width:100%;
+    height:4px;
+    margin:8px 0;
+    border-radius:999px;
+    background:var(--line);
+    outline:none;
+  }
+  input[type=range]::-webkit-slider-thumb{
+    -webkit-appearance:none;
+    width:20px; height:20px;
+    border-radius:50%;
+    background:var(--wave);
+    border:2px solid var(--paper);
+    box-shadow:0 0 0 1px var(--line);
+    cursor:pointer;
+  }
+  input[type=range]::-moz-range-thumb{
+    width:18px; height:18px;
+    border-radius:50%;
+    background:var(--wave);
+    border:2px solid var(--paper);
+    box-shadow:0 0 0 1px var(--line);
+    cursor:pointer;
+  }
+  select{
+    font-family:var(--sans);
+    font-size:.86rem;
+    padding:7px 10px;
+    border-radius:8px;
+    border:1px solid var(--line);
+    background:var(--paper);
+    color:var(--ink);
+    width:100%;
+  }
+  .check{
+    display:flex;
+    align-items:center;
+    gap:8px;
+    font-size:.86rem;
+    font-weight:500;
+    cursor:pointer;
+  }
+  .check input{ width:18px; height:18px; accent-color:var(--accent); margin:0; }
+  .buttons{ display:flex; gap:10px; flex-wrap:wrap; }
+  button{
+    font-family:var(--sans);
+    font-size:.86rem;
+    font-weight:500;
+    padding:9px 16px;
+    border-radius:8px;
+    border:1px solid var(--line);
+    background:transparent;
+    color:var(--ink);
+    cursor:pointer;
+  }
+  button.primary{
+    background:var(--accent);
+    border-color:var(--accent);
+    color:var(--paper);
+  }
+  button:focus-visible, input:focus-visible, select:focus-visible{
+    outline:2px solid var(--accent);
+    outline-offset:2px;
+  }
+
+  /* ---------- Formules ---------- */
+  .formula{
+    font-family:var(--mono);
+    font-size:.86rem;
+    color:var(--ink-soft);
+    border-top:1px solid var(--line);
+    padding-top:14px;
+    display:flex;
+    flex-wrap:wrap;
+    gap:6px 22px;
+  }
+  .formula b{ color:var(--ink); font-weight:600; }
+  footer{
+    font-size:.78rem;
+    color:var(--ink-soft);
+    text-align:center;
+    text-wrap:balance;
+  }
+</style>
+</head>
+<body>
+
+<main>
+  <header>
+    <span class="kicker">Électricité</span>
+    <h1>Circuit RLC</h1>
+    <p>Un condensateur chargé se décharge dans une bobine : l'énergie fait des allers-retours entre le condensateur et la bobine, et la tension oscille. La résistance du circuit dissipe peu à peu cette énergie — jusqu'à supprimer les oscillations.</p>
+  </header>
+
+  <section class="scene">
+    <div class="scene-top">
+      <strong class="scene-title">Période propre T₀ = <span id="t0Label">14,0</span> ms</strong>
+      <span id="status" class="status">—</span>
+    </div>
+    <canvas id="stage" style="aspect-ratio:1000/440" aria-label="Tension aux bornes du condensateur en fonction du temps, avec les barres d'énergie du condensateur et de la bobine."></canvas>
+    <p class="hint">Le condensateur est chargé sous 5 V à t = 0. L'animation est très ralentie : une période propre par seconde.</p>
+    <div class="readouts">
+      <div class="readout"><span class="label">Période propre T₀</span><span class="value" id="rT0">—</span></div>
+      <div class="readout"><span class="label">Pseudo-période</span><span class="value" id="rT">—</span></div>
+      <div class="readout"><span class="label">Résistance critique</span><span class="value" id="rRc">—</span></div>
+      <div class="readout"><span class="label">Tension u<sub>C</sub></span><span class="value" id="rU">—</span></div>
+      <div class="readout"><span class="label">Intensité i</span><span class="value" id="rI">—</span></div>
+      <div class="readout"><span class="label">Énergie totale</span><span class="value" id="rE">—</span></div>
+    </div>
+  </section>
+
+  <section class="panel">
+    <div class="controls">
+      <div class="control">
+        <div class="row"><label for="ind">Inductance L</label><span class="num" id="indVal"></span></div>
+        <input type="range" id="ind" min="100" max="1000" step="10" value="500">
+      </div>
+      <div class="control">
+        <div class="row"><label for="cap">Capacité C</label><span class="num" id="capVal"></span></div>
+        <input type="range" id="cap" min="1" max="100" step="1" value="10">
+      </div>
+      <div class="control">
+        <div class="row"><label for="res">Résistance R</label><span class="num" id="resVal"></span></div>
+        <input type="range" id="res" min="0" max="600" step="5" value="20">
+      </div>
+    </div>
+
+    <div class="buttons">
+      <button class="primary" id="restart">Relancer la décharge</button>
+      <button id="toggle">Mettre en pause</button>
+    </div>
+
+    <div class="formula">
+      <span>T₀&nbsp;=&nbsp;<b>2π·√(L·C)</b></span>
+      <span>E<sub>C</sub>&nbsp;=&nbsp;<b>½·C·u<sub>C</sub>²</b></span>
+      <span>E<sub>L</sub>&nbsp;=&nbsp;<b>½·L·i²</b></span>
+      <span>R<sub>c</sub>&nbsp;=&nbsp;<b>2·√(L&nbsp;/&nbsp;C)</b></span>
+    </div>
+  </section>
+
+  <footer>Décharge d'un condensateur dans un circuit RLC série (solution exacte de l'équation différentielle). Avec R = 0 l'énergie totale se conserve ; en dessous de la résistance critique le régime est pseudo-périodique, au-dessus il est apériodique.</footer>
+</main>
+
+<script>
+(function(){
+  // ---------- Utilitaires ----------
+  const $ = id => document.getElementById(id);
+  const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
+  const fmt = (v, d) => Number.isFinite(v)
+    ? v.toLocaleString('fr-FR', {minimumFractionDigits:d, maximumFractionDigits:d})
+    : '—';
+  const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const MONO = 'ui-monospace, "Cascadia Mono", "SF Mono", Consolas, Menlo, monospace';
+  const SANS = 'system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif';
+
+  // Couleurs du thème, relues si le système bascule clair/sombre
+  const C = {};
+  function readColors(){
+    const s = getComputedStyle(document.documentElement);
+    for (const n of ['bg','paper','ink','ink-soft','line','wave','wave-glow','accent','blue','brass']){
+      C[n.replace(/-(.)/g, (_, c) => c.toUpperCase())] = s.getPropertyValue('--' + n).trim();
+    }
+  }
+  readColors();
+  window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', readColors);
+
+  // Canvas net sur tout écran : on dessine toujours dans un repère logique W × H
+  function setupCanvas(canvas, W, H){
+    const ctx = canvas.getContext('2d');
+    function fit(){
+      const dpr = Math.min(window.devicePixelRatio || 1, 3);
+      const cw = canvas.clientWidth || W;
+      canvas.width = Math.max(1, Math.round(cw * dpr));
+      canvas.height = Math.max(1, Math.round(cw * H / W * dpr));
+      ctx.setTransform(canvas.width / W, 0, 0, canvas.height / H, 0, 0);
+    }
+    window.addEventListener('resize', fit);
+    fit();
+    return ctx;
+  }
+  // Position du pointeur (souris ou doigt) dans le repère logique
+  function pointerPos(canvas, evt, W, H){
+    const r = canvas.getBoundingClientRect();
+    return { x: (evt.clientX - r.left) * W / r.width, y: (evt.clientY - r.top) * H / r.height };
+  }
+  function arrow(ctx, x1, y1, x2, y2, color, width){
+    const len = Math.hypot(x2 - x1, y2 - y1);
+    if (len < 3) return;
+    const a = Math.atan2(y2 - y1, x2 - x1), h = Math.min(10, len * 0.5);
+    ctx.strokeStyle = color; ctx.fillStyle = color; ctx.lineWidth = width || 2.5;
+    ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2 - Math.cos(a) * h * 0.8, y2 - Math.sin(a) * h * 0.8); ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(x2, y2);
+    ctx.lineTo(x2 - h * Math.cos(a - 0.42), y2 - h * Math.sin(a - 0.42));
+    ctx.lineTo(x2 - h * Math.cos(a + 0.42), y2 - h * Math.sin(a + 0.42));
+    ctx.closePath(); ctx.fill();
+  }
+  // Pas "rond" (1, 2, 5 × 10^n) pour graduer un axe
+  function niceStep(x){
+    if (!(x > 0)) return 1;
+    const p = Math.pow(10, Math.floor(Math.log10(x))), m = x / p;
+    return (m < 1.5 ? 1 : m < 3.5 ? 2 : m < 7.5 ? 5 : 10) * p;
+  }
+
+  // Relie un curseur, une liste ou une case à cocher à un paramètre (et affiche sa valeur)
+  function bind(id, onChange, format){
+    const el = $(id), label = $(id + 'Val');
+    const val = () => el.type === 'checkbox' ? el.checked : parseFloat(el.value);
+    const show = () => { if (label && format) label.textContent = format(val()); };
+    el.addEventListener(el.type === 'range' ? 'input' : 'change', () => { onChange(val()); show(); });
+    show();
+  }
+  const out = (id, text) => { $(id).textContent = text; };
+  function setStatus(text, cls){
+    const s = $('status');
+    s.textContent = text; s.className = 'status' + (cls ? ' ' + cls : '');
+  }
+  // Repère gradué dans le rectangle g ; renvoie les conversions X(x) et Y(y)
+  function axes(ctx, g, o){
+    const xMin = o.xMin || 0, yMin = o.yMin || 0;
+    const X = x => g.x + g.w * (x - xMin) / (o.xMax - xMin);
+    const Y = y => g.y + g.h - g.h * (y - yMin) / (o.yMax - yMin);
+    const ink = o.ink || C.ink, soft = o.soft || C.inkSoft, line = o.line || C.line;
+    const sx = niceStep((o.xMax - xMin) / (o.xTicks || 6)), sy = niceStep((o.yMax - yMin) / (o.yTicks || 4));
+    const dec = s => s >= 1 ? 0 : Math.min(4, Math.ceil(-Math.log10(s) - 1e-9));
+    ctx.save();
+    ctx.font = '13px ' + MONO; ctx.lineWidth = 1; ctx.textAlign = 'center';
+    for (let k = Math.ceil(xMin / sx - 1e-9); k * sx <= o.xMax + sx * 1e-6; k++){
+      ctx.strokeStyle = line; ctx.globalAlpha = 0.55;
+      ctx.beginPath(); ctx.moveTo(X(k * sx), g.y); ctx.lineTo(X(k * sx), g.y + g.h); ctx.stroke();
+      ctx.globalAlpha = 1; ctx.fillStyle = soft;
+      ctx.fillText(fmt(k * sx + 0, dec(sx)), X(k * sx), g.y + g.h + 18);
+    }
+    ctx.textAlign = 'right';
+    for (let k = Math.ceil(yMin / sy - 1e-9); k * sy <= o.yMax + sy * 1e-6; k++){
+      ctx.strokeStyle = line; ctx.globalAlpha = 0.55;
+      ctx.beginPath(); ctx.moveTo(g.x, Y(k * sy)); ctx.lineTo(g.x + g.w, Y(k * sy)); ctx.stroke();
+      ctx.globalAlpha = 1; ctx.fillStyle = soft;
+      ctx.fillText(fmt(k * sy + 0, dec(sy)), g.x - 8, Y(k * sy) + 4);
+    }
+    const y0 = yMin < 0 ? Y(0) : g.y + g.h;
+    ctx.strokeStyle = soft; ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.moveTo(g.x, g.y); ctx.lineTo(g.x, g.y + g.h); ctx.moveTo(g.x, y0); ctx.lineTo(g.x + g.w, y0); ctx.stroke();
+    ctx.fillStyle = ink; ctx.textAlign = 'left'; ctx.font = '14px ' + SANS;
+    if (o.title) ctx.fillText(o.title, g.x + 8, g.y - 10);
+    ctx.fillStyle = soft; ctx.textAlign = 'right'; ctx.font = '13px ' + MONO;
+    if (o.xLabel) ctx.fillText(o.xLabel, g.x + g.w, g.y + g.h + 36);
+    ctx.restore();
+    return { X, Y };
+  }
+  // Trace y = fn(x) entre x0 et x1 dans un repère créé par axes()
+  function curve(ctx, G, fn, x0, x1, color, width, dash){
+    if (!(x1 > x0)) return;
+    ctx.save();
+    ctx.strokeStyle = color; ctx.lineWidth = width || 2.5; ctx.lineJoin = 'round';
+    if (dash) ctx.setLineDash(dash);
+    ctx.beginPath();
+    let pen = false;
+    for (let i = 0; i <= 160; i++){
+      const x = x0 + (x1 - x0) * i / 160, y = fn(x);
+      if (!Number.isFinite(y)){ pen = false; continue; }
+      if (pen) ctx.lineTo(G.X(x), G.Y(y)); else { ctx.moveTo(G.X(x), G.Y(y)); pen = true; }
+    }
+    ctx.stroke();
+    ctx.restore();
+  }
+  // Couleur approchée d'une radiation visible (longueur d'onde en nm)
+  function waveRGB(nm){
+    let r = 0, g = 0, b = 0;
+    if (nm < 440){ r = (440 - nm) / 60; b = 1; }
+    else if (nm < 490){ g = (nm - 440) / 50; b = 1; }
+    else if (nm < 510){ g = 1; b = (510 - nm) / 20; }
+    else if (nm < 580){ r = (nm - 510) / 70; g = 1; }
+    else if (nm < 645){ r = 1; g = (645 - nm) / 65; }
+    else { r = 1; }
+    const k = nm < 420 ? 0.35 + 0.65 * (nm - 380) / 40 : nm > 700 ? 0.35 + 0.65 * (780 - nm) / 80 : 1;
+    return [r, g, b].map(v => Math.round(255 * clamp(v * k, 0, 1)));
+  }
+
+  // ---------- Constantes ----------
+  const W = 1000, H = 440;
+  const E0 = 5;                              // tension initiale du condensateur (V)
+  const GRAPH = { x: 70, y: 50, w: 650, h: 320 };
+  const N_PERIODS = 8;                       // durée affichée, en périodes propres
+
+  // ---------- État ----------
+  const canvas = $('stage');
+  const ctx = setupCanvas(canvas, W, H);
+  const P = { L: 0.5, C: 10e-6, R: 20 };     // H, F, Ω
+  let t = 0, playing = true;
+  let last = performance.now();
+
+  // ---------- Physique : L·C·u″ + R·C·u′ + u = 0, u(0) = E0, i(0) = 0 ----------
+  const T0 = () => 2 * Math.PI * Math.sqrt(P.L * P.C);
+  const Rc = () => 2 * Math.sqrt(P.L / P.C);
+  function solution(time){
+    const lam = P.R / (2 * P.L), w02 = 1 / (P.L * P.C), d = w02 - lam * lam;
+    if (d > 1e-6 * w02){                                               // pseudo-périodique
+      const w = Math.sqrt(d), e = Math.exp(-lam * time);
+      return { u: E0 * e * (Math.cos(w * time) + lam / w * Math.sin(w * time)), i: -P.C * E0 * w02 / w * e * Math.sin(w * time) };
+    }
+    if (d < -1e-6 * w02){                                              // apériodique
+      const q = Math.sqrt(-d), s1 = -lam + q, s2 = -lam - q;
+      const e1 = Math.exp(s1 * time), e2 = Math.exp(s2 * time);
+      return { u: E0 * (s1 * e2 - s2 * e1) / (s1 - s2), i: P.C * E0 * s1 * s2 * (e2 - e1) / (s1 - s2) };
+    }
+    const e = Math.exp(-lam * time);                                   // critique
+    return { u: E0 * e * (1 + lam * time), i: -P.C * E0 * lam * lam * time * e };
+  }
+  const pseudoPeriod = () => { const d = 1 / (P.L * P.C) - Math.pow(P.R / (2 * P.L), 2); return d > 0 ? 2 * Math.PI / Math.sqrt(d) : null; };
+
+  // ---------- Affichage des mesures ----------
+  function updateReadouts(s){
+    const eC = 0.5 * P.C * s.u * s.u, eL = 0.5 * P.L * s.i * s.i, T = pseudoPeriod();
+    out('t0Label', fmt(T0() * 1000, 1));
+    out('rT0', fmt(T0() * 1000, 1) + ' ms');
+    out('rT', T && P.R < Rc() ? fmt(T * 1000, 1) + ' ms' : 'pas d\'oscillation');
+    out('rRc', fmt(Rc(), 0) + ' Ω');
+    out('rU', fmt(s.u, 2) + ' V');
+    out('rI', fmt(s.i * 1000, 1) + ' mA');
+    out('rE', fmt((eC + eL) * 1e6, 0) + ' µJ');
+    if (P.R === 0) setStatus('Oscillations non amorties (cas idéal)', 'ok');
+    else if (P.R < Rc()) setStatus('Régime pseudo-périodique', 'ok');
+    else setStatus('Régime apériodique : plus d\'oscillation', 'off');
+    return { eC, eL };
+  }
+
+  // ---------- Rendu ----------
+  function draw(){
+    const s = solution(t), e = updateReadouts(s);
+    ctx.clearRect(0, 0, W, H);
+    const tw = N_PERIODS * T0() * 1000;                                // ms
+    const G = axes(ctx, GRAPH, { xMax: tw, xTicks: 8, yMin: -6, yMax: 6, yTicks: 6, title: 'Tension uC aux bornes du condensateur (V)', xLabel: 't (ms)' });
+    curve(ctx, G, x => solution(x / 1000).u, 0, tw, C.wave, 1.2, [4, 6]);
+    curve(ctx, G, x => solution(x / 1000).u, 0, t * 1000, C.wave, 3);
+    ctx.fillStyle = C.wave;
+    ctx.beginPath(); ctx.arc(G.X(t * 1000), G.Y(s.u), 5, 0, Math.PI * 2); ctx.fill();
+
+    // barres d'énergie
+    const Emax = 0.5 * P.C * E0 * E0;
+    const bars = [{ label: 'cond.', value: e.eC, color: C.wave }, { label: 'bobine', value: e.eL, color: C.blue }, { label: 'total', value: e.eC + e.eL, color: C.ink }];
+    const baseY = GRAPH.y + GRAPH.h, maxH = 280, bw = 40;
+    ctx.font = '14px ' + SANS; ctx.textAlign = 'left'; ctx.fillStyle = C.inkSoft;
+    ctx.fillText('Énergies', 790, baseY - maxH - 16);
+    ctx.textAlign = 'center';
+    bars.forEach((b, k) => {
+      const x = 790 + k * 60, h = clamp(b.value / Emax, 0, 1.02) * maxH;
+      ctx.strokeStyle = C.line; ctx.lineWidth = 1; ctx.strokeRect(x, baseY - maxH, bw, maxH);
+      ctx.fillStyle = b.color; ctx.fillRect(x, baseY - h, bw, h);
+      ctx.fillStyle = C.inkSoft; ctx.font = '13px ' + MONO;
+      ctx.fillText(b.label, x + bw / 2, baseY + 20);
+    });
+    ctx.strokeStyle = C.inkSoft; ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.moveTo(780, baseY); ctx.lineTo(960, baseY); ctx.stroke();
+  }
+
+  // ---------- Interactions ----------
+  const restart = () => { t = 0; };
+  bind('ind', v => { P.L = v / 1000; restart(); }, v => fmt(v, 0) + ' mH');
+  bind('cap', v => { P.C = v * 1e-6; restart(); }, v => fmt(v, 0) + ' µF');
+  bind('res', v => { P.R = v; restart(); }, v => fmt(v, 0) + ' Ω');
+  $('restart').addEventListener('click', () => { restart(); playing = true; $('toggle').textContent = 'Mettre en pause'; });
+  $('toggle').addEventListener('click', () => { playing = !playing; $('toggle').textContent = playing ? 'Mettre en pause' : 'Reprendre'; });
+
+  // ---------- Boucle d'animation ----------
+  function loop(now){
+    const dt = Math.min((now - last) / 1000, 0.05);
+    last = now;
+    const tEnd = N_PERIODS * T0();
+    if (reduceMotion) t = tEnd;
+    else if (playing) t = Math.min(t + dt * T0(), tEnd);
+    draw();
+    requestAnimationFrame(loop);
+  }
+  requestAnimationFrame(loop);
+})();
+</script>
+</body>
+</html>

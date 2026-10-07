@@ -1,0 +1,568 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Loi de Beer-Lambert</title>
+<style>
+  /* ---------- Thème (clair / sombre automatique) ---------- */
+  :root{
+    --bg:#f3ede1;
+    --paper:#fbf8f0;
+    --ink:#22242e;
+    --ink-soft:#5b5a52;
+    --line:#d9d0ba;
+    --wave:#b8362b;
+    --wave-glow:rgba(184,54,43,.14);
+    --accent:#2f6f4f;
+    --blue:#2c5f8a;
+    --brass:#a9793f;
+    --ok:#2f6f4f;
+    --warn:#b8362b;
+    --serif:"Iowan Old Style","Palatino Linotype",Palatino,Georgia,serif;
+    --sans:system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+    --mono:ui-monospace,"Cascadia Mono","SF Mono",Consolas,Menlo,monospace;
+    color-scheme: light dark;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{
+      --bg:#171a21;
+      --paper:#1e222b;
+      --ink:#eae6da;
+      --ink-soft:#9a9689;
+      --line:#33384a;
+      --wave:#ff8a72;
+      --wave-glow:rgba(255,138,114,.14);
+      --accent:#79d6a3;
+      --blue:#7fb4e0;
+      --brass:#c99a5b;
+      --ok:#79d6a3;
+      --warn:#ff8a72;
+    }
+  }
+
+  /* ---------- Mise en page ---------- */
+  *{box-sizing:border-box;}
+  html, body{ margin:0; padding:0; }
+  body{
+    background:var(--bg);
+    color:var(--ink);
+    font-family:var(--sans);
+    padding:28px 16px;
+    display:flex;
+    justify-content:center;
+  }
+  main{
+    width:100%;
+    max-width:920px;
+    display:flex;
+    flex-direction:column;
+    gap:20px;
+  }
+  header{ display:flex; flex-direction:column; gap:4px; }
+  .kicker{
+    font-size:.72rem;
+    text-transform:uppercase;
+    letter-spacing:.08em;
+    color:var(--ink-soft);
+  }
+  h1{
+    font-family:var(--serif);
+    font-weight:600;
+    font-size:clamp(1.5rem, 1.1rem + 1.6vw, 2.2rem);
+    margin:0;
+    text-wrap:balance;
+  }
+  header p{
+    margin:0;
+    color:var(--ink-soft);
+    font-size:.92rem;
+    max-width:66ch;
+  }
+
+  /* ---------- Zone de simulation ---------- */
+  .scene{
+    background:var(--paper);
+    border:1px solid var(--line);
+    border-radius:14px;
+    padding:20px clamp(12px,3vw,28px) 8px;
+    display:flex;
+    flex-direction:column;
+    gap:6px;
+  }
+  .scene-top{
+    display:flex;
+    justify-content:space-between;
+    align-items:baseline;
+    gap:12px;
+    flex-wrap:wrap;
+  }
+  .scene-title{ font-family:var(--serif); font-weight:600; }
+  .status{
+    font-family:var(--mono);
+    font-size:.82rem;
+    padding:3px 10px;
+    border-radius:999px;
+    border:1px solid var(--line);
+    color:var(--ink-soft);
+  }
+  .status.ok{ color:var(--ok); border-color:var(--ok); }
+  .status.off{ color:var(--warn); border-color:var(--warn); }
+  canvas{
+    width:100%;
+    height:auto;
+    display:block;
+  }
+  canvas.draggable{ touch-action:none; cursor:grab; }
+  canvas.dragging{ cursor:grabbing; }
+  .hint{ margin:0; font-size:.78rem; color:var(--ink-soft); }
+
+  /* ---------- Mesures ---------- */
+  .readouts{
+    display:grid;
+    grid-template-columns:repeat(auto-fit,minmax(150px,1fr));
+    gap:10px 18px;
+    padding-block:10px;
+    border-top:1px solid var(--line);
+    margin-top:6px;
+  }
+  .readout{ display:flex; flex-direction:column; gap:2px; }
+  .readout .label{
+    font-size:.78rem;
+    color:var(--ink-soft);
+  }
+  .readout .value{
+    font-family:var(--mono);
+    font-variant-numeric:tabular-nums;
+    font-size:1.05rem;
+    font-weight:500;
+  }
+  .readout .value em{ color:var(--blue); font-style:normal; font-size:.9rem; }
+
+  /* ---------- Contrôles ---------- */
+  .panel{
+    background:var(--paper);
+    border:1px solid var(--line);
+    border-radius:14px;
+    padding:18px clamp(14px,3vw,26px);
+    display:flex;
+    flex-direction:column;
+    gap:18px;
+  }
+  .controls{
+    display:grid;
+    grid-template-columns:repeat(auto-fit,minmax(240px,1fr));
+    gap:18px 32px;
+  }
+  .control{ display:flex; flex-direction:column; gap:6px; }
+  .control .row{
+    display:flex;
+    justify-content:space-between;
+    align-items:baseline;
+    gap:10px;
+  }
+  .control label{ font-size:.86rem; font-weight:500; }
+  .control .num{
+    font-family:var(--mono);
+    font-variant-numeric:tabular-nums;
+    color:var(--wave);
+    font-size:.92rem;
+  }
+  input[type=range]{
+    -webkit-appearance:none;
+    appearance:none;
+    width:100%;
+    height:4px;
+    margin:8px 0;
+    border-radius:999px;
+    background:var(--line);
+    outline:none;
+  }
+  input[type=range]::-webkit-slider-thumb{
+    -webkit-appearance:none;
+    width:20px; height:20px;
+    border-radius:50%;
+    background:var(--wave);
+    border:2px solid var(--paper);
+    box-shadow:0 0 0 1px var(--line);
+    cursor:pointer;
+  }
+  input[type=range]::-moz-range-thumb{
+    width:18px; height:18px;
+    border-radius:50%;
+    background:var(--wave);
+    border:2px solid var(--paper);
+    box-shadow:0 0 0 1px var(--line);
+    cursor:pointer;
+  }
+  select{
+    font-family:var(--sans);
+    font-size:.86rem;
+    padding:7px 10px;
+    border-radius:8px;
+    border:1px solid var(--line);
+    background:var(--paper);
+    color:var(--ink);
+    width:100%;
+  }
+  .check{
+    display:flex;
+    align-items:center;
+    gap:8px;
+    font-size:.86rem;
+    font-weight:500;
+    cursor:pointer;
+  }
+  .check input{ width:18px; height:18px; accent-color:var(--accent); margin:0; }
+  .buttons{ display:flex; gap:10px; flex-wrap:wrap; }
+  button{
+    font-family:var(--sans);
+    font-size:.86rem;
+    font-weight:500;
+    padding:9px 16px;
+    border-radius:8px;
+    border:1px solid var(--line);
+    background:transparent;
+    color:var(--ink);
+    cursor:pointer;
+  }
+  button.primary{
+    background:var(--accent);
+    border-color:var(--accent);
+    color:var(--paper);
+  }
+  button:focus-visible, input:focus-visible, select:focus-visible{
+    outline:2px solid var(--accent);
+    outline-offset:2px;
+  }
+
+  /* ---------- Formules ---------- */
+  .formula{
+    font-family:var(--mono);
+    font-size:.86rem;
+    color:var(--ink-soft);
+    border-top:1px solid var(--line);
+    padding-top:14px;
+    display:flex;
+    flex-wrap:wrap;
+    gap:6px 22px;
+  }
+  .formula b{ color:var(--ink); font-weight:600; }
+  footer{
+    font-size:.78rem;
+    color:var(--ink-soft);
+    text-align:center;
+    text-wrap:balance;
+  }
+</style>
+</head>
+<body>
+
+<main>
+  <header>
+    <span class="kicker">Chimie</span>
+    <h1>Loi de Beer-Lambert</h1>
+    <p>Un spectrophotomètre mesure l'absorbance A d'une solution colorée de permanganate de potassium. Relève A pour plusieurs concentrations afin de tracer la droite d'étalonnage, puis sers-t'en pour déterminer la concentration d'une solution inconnue.</p>
+  </header>
+
+  <section class="scene">
+    <div class="scene-top">
+      <strong class="scene-title">Spectrophotomètre réglé sur λ = <span id="lamLabel">525</span> nm</strong>
+      <span id="status" class="status">—</span>
+    </div>
+    <canvas id="stage" style="aspect-ratio:1000/460" aria-label="En haut, le faisceau lumineux traverse la cuve et atteint le détecteur ; en bas, le spectre d'absorption et la droite d'étalonnage."></canvas>
+    <p class="hint">Change la concentration puis « Relever ce point » (deux points au moins pour tracer la droite). Les points sont effacés si tu modifies λ ou l'épaisseur de la cuve.</p>
+    <div class="readouts">
+      <div class="readout"><span class="label">Absorbance A</span><span class="value" id="rA">—</span></div>
+      <div class="readout"><span class="label">Lumière transmise</span><span class="value" id="rT">—</span></div>
+      <div class="readout"><span class="label">Coefficient ε(λ)</span><span class="value" id="rEps">—</span></div>
+      <div class="readout"><span class="label">Pente de la droite k</span><span class="value" id="rK">—</span></div>
+      <div class="readout"><span class="label">Absorbance inconnue</span><span class="value" id="rAx">—</span></div>
+      <div class="readout"><span class="label">Concentration inconnue</span><span class="value" id="rCx">—</span></div>
+    </div>
+  </section>
+
+  <section class="panel">
+    <div class="controls">
+      <div class="control">
+        <div class="row"><label for="conc">Concentration C</label><span class="num" id="concVal"></span></div>
+        <input type="range" id="conc" min="0" max="0.5" step="0.01" value="0.2">
+      </div>
+      <div class="control">
+        <div class="row"><label for="lam">Longueur d'onde λ</label><span class="num" id="lamVal"></span></div>
+        <input type="range" id="lam" min="400" max="700" step="5" value="525">
+      </div>
+      <div class="control">
+        <div class="row"><label for="len">Épaisseur de la cuve ℓ</label><span class="num" id="lenVal"></span></div>
+        <input type="range" id="len" min="0.5" max="2" step="0.5" value="1">
+      </div>
+      <div class="control" style="justify-content:center">
+        <label class="check"><input type="checkbox" id="unknown"> Mesurer la solution inconnue</label>
+      </div>
+    </div>
+
+    <div class="buttons">
+      <button class="primary" id="add">Relever ce point</button>
+      <button id="clear">Effacer les points</button>
+    </div>
+
+    <div class="formula">
+      <span>A&nbsp;=&nbsp;<b>ε·ℓ·C</b></span>
+      <span>A&nbsp;=&nbsp;<b>k·C</b></span>
+      <span>A&nbsp;=&nbsp;<b>−log(I&nbsp;/&nbsp;I₀)</b></span>
+      <span>C<sub>inconnue</sub>&nbsp;=&nbsp;<b>A<sub>inconnue</sub>&nbsp;/&nbsp;k</b></span>
+    </div>
+  </section>
+
+  <footer>Modèle : solution de permanganate de potassium, ε = 2 200 L·mol⁻¹·cm⁻¹ au maximum d'absorption (525 nm), spectre approché par une courbe en cloche. La loi n'est fiable que pour des solutions diluées (A < 2 environ).</footer>
+</main>
+
+<script>
+(function(){
+  // ---------- Utilitaires ----------
+  const $ = id => document.getElementById(id);
+  const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
+  const fmt = (v, d) => Number.isFinite(v)
+    ? v.toLocaleString('fr-FR', {minimumFractionDigits:d, maximumFractionDigits:d})
+    : '—';
+  const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const MONO = 'ui-monospace, "Cascadia Mono", "SF Mono", Consolas, Menlo, monospace';
+  const SANS = 'system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif';
+
+  // Couleurs du thème, relues si le système bascule clair/sombre
+  const C = {};
+  function readColors(){
+    const s = getComputedStyle(document.documentElement);
+    for (const n of ['bg','paper','ink','ink-soft','line','wave','wave-glow','accent','blue','brass']){
+      C[n.replace(/-(.)/g, (_, c) => c.toUpperCase())] = s.getPropertyValue('--' + n).trim();
+    }
+  }
+  readColors();
+  window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', readColors);
+
+  // Canvas net sur tout écran : on dessine toujours dans un repère logique W × H
+  function setupCanvas(canvas, W, H){
+    const ctx = canvas.getContext('2d');
+    function fit(){
+      const dpr = Math.min(window.devicePixelRatio || 1, 3);
+      const cw = canvas.clientWidth || W;
+      canvas.width = Math.max(1, Math.round(cw * dpr));
+      canvas.height = Math.max(1, Math.round(cw * H / W * dpr));
+      ctx.setTransform(canvas.width / W, 0, 0, canvas.height / H, 0, 0);
+    }
+    window.addEventListener('resize', fit);
+    fit();
+    return ctx;
+  }
+  // Position du pointeur (souris ou doigt) dans le repère logique
+  function pointerPos(canvas, evt, W, H){
+    const r = canvas.getBoundingClientRect();
+    return { x: (evt.clientX - r.left) * W / r.width, y: (evt.clientY - r.top) * H / r.height };
+  }
+  function arrow(ctx, x1, y1, x2, y2, color, width){
+    const len = Math.hypot(x2 - x1, y2 - y1);
+    if (len < 3) return;
+    const a = Math.atan2(y2 - y1, x2 - x1), h = Math.min(10, len * 0.5);
+    ctx.strokeStyle = color; ctx.fillStyle = color; ctx.lineWidth = width || 2.5;
+    ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2 - Math.cos(a) * h * 0.8, y2 - Math.sin(a) * h * 0.8); ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(x2, y2);
+    ctx.lineTo(x2 - h * Math.cos(a - 0.42), y2 - h * Math.sin(a - 0.42));
+    ctx.lineTo(x2 - h * Math.cos(a + 0.42), y2 - h * Math.sin(a + 0.42));
+    ctx.closePath(); ctx.fill();
+  }
+  // Pas "rond" (1, 2, 5 × 10^n) pour graduer un axe
+  function niceStep(x){
+    if (!(x > 0)) return 1;
+    const p = Math.pow(10, Math.floor(Math.log10(x))), m = x / p;
+    return (m < 1.5 ? 1 : m < 3.5 ? 2 : m < 7.5 ? 5 : 10) * p;
+  }
+
+  // Relie un curseur, une liste ou une case à cocher à un paramètre (et affiche sa valeur)
+  function bind(id, onChange, format){
+    const el = $(id), label = $(id + 'Val');
+    const val = () => el.type === 'checkbox' ? el.checked : parseFloat(el.value);
+    const show = () => { if (label && format) label.textContent = format(val()); };
+    el.addEventListener(el.type === 'range' ? 'input' : 'change', () => { onChange(val()); show(); });
+    show();
+  }
+  const out = (id, text) => { $(id).textContent = text; };
+  function setStatus(text, cls){
+    const s = $('status');
+    s.textContent = text; s.className = 'status' + (cls ? ' ' + cls : '');
+  }
+  // Repère gradué dans le rectangle g ; renvoie les conversions X(x) et Y(y)
+  function axes(ctx, g, o){
+    const xMin = o.xMin || 0, yMin = o.yMin || 0;
+    const X = x => g.x + g.w * (x - xMin) / (o.xMax - xMin);
+    const Y = y => g.y + g.h - g.h * (y - yMin) / (o.yMax - yMin);
+    const ink = o.ink || C.ink, soft = o.soft || C.inkSoft, line = o.line || C.line;
+    const sx = niceStep((o.xMax - xMin) / (o.xTicks || 6)), sy = niceStep((o.yMax - yMin) / (o.yTicks || 4));
+    const dec = s => s >= 1 ? 0 : Math.min(4, Math.ceil(-Math.log10(s) - 1e-9));
+    ctx.save();
+    ctx.font = '13px ' + MONO; ctx.lineWidth = 1; ctx.textAlign = 'center';
+    for (let k = Math.ceil(xMin / sx - 1e-9); k * sx <= o.xMax + sx * 1e-6; k++){
+      ctx.strokeStyle = line; ctx.globalAlpha = 0.55;
+      ctx.beginPath(); ctx.moveTo(X(k * sx), g.y); ctx.lineTo(X(k * sx), g.y + g.h); ctx.stroke();
+      ctx.globalAlpha = 1; ctx.fillStyle = soft;
+      ctx.fillText(fmt(k * sx + 0, dec(sx)), X(k * sx), g.y + g.h + 18);
+    }
+    ctx.textAlign = 'right';
+    for (let k = Math.ceil(yMin / sy - 1e-9); k * sy <= o.yMax + sy * 1e-6; k++){
+      ctx.strokeStyle = line; ctx.globalAlpha = 0.55;
+      ctx.beginPath(); ctx.moveTo(g.x, Y(k * sy)); ctx.lineTo(g.x + g.w, Y(k * sy)); ctx.stroke();
+      ctx.globalAlpha = 1; ctx.fillStyle = soft;
+      ctx.fillText(fmt(k * sy + 0, dec(sy)), g.x - 8, Y(k * sy) + 4);
+    }
+    const y0 = yMin < 0 ? Y(0) : g.y + g.h;
+    ctx.strokeStyle = soft; ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.moveTo(g.x, g.y); ctx.lineTo(g.x, g.y + g.h); ctx.moveTo(g.x, y0); ctx.lineTo(g.x + g.w, y0); ctx.stroke();
+    ctx.fillStyle = ink; ctx.textAlign = 'left'; ctx.font = '14px ' + SANS;
+    if (o.title) ctx.fillText(o.title, g.x + 8, g.y - 10);
+    ctx.fillStyle = soft; ctx.textAlign = 'right'; ctx.font = '13px ' + MONO;
+    if (o.xLabel) ctx.fillText(o.xLabel, g.x + g.w, g.y + g.h + 36);
+    ctx.restore();
+    return { X, Y };
+  }
+  // Trace y = fn(x) entre x0 et x1 dans un repère créé par axes()
+  function curve(ctx, G, fn, x0, x1, color, width, dash){
+    if (!(x1 > x0)) return;
+    ctx.save();
+    ctx.strokeStyle = color; ctx.lineWidth = width || 2.5; ctx.lineJoin = 'round';
+    if (dash) ctx.setLineDash(dash);
+    ctx.beginPath();
+    let pen = false;
+    for (let i = 0; i <= 160; i++){
+      const x = x0 + (x1 - x0) * i / 160, y = fn(x);
+      if (!Number.isFinite(y)){ pen = false; continue; }
+      if (pen) ctx.lineTo(G.X(x), G.Y(y)); else { ctx.moveTo(G.X(x), G.Y(y)); pen = true; }
+    }
+    ctx.stroke();
+    ctx.restore();
+  }
+  // Couleur approchée d'une radiation visible (longueur d'onde en nm)
+  function waveRGB(nm){
+    let r = 0, g = 0, b = 0;
+    if (nm < 440){ r = (440 - nm) / 60; b = 1; }
+    else if (nm < 490){ g = (nm - 440) / 50; b = 1; }
+    else if (nm < 510){ g = 1; b = (510 - nm) / 20; }
+    else if (nm < 580){ r = (nm - 510) / 70; g = 1; }
+    else if (nm < 645){ r = 1; g = (645 - nm) / 65; }
+    else { r = 1; }
+    const k = nm < 420 ? 0.35 + 0.65 * (nm - 380) / 40 : nm > 700 ? 0.35 + 0.65 * (780 - nm) / 80 : 1;
+    return [r, g, b].map(v => Math.round(255 * clamp(v * k, 0, 1)));
+  }
+
+  // ---------- Constantes ----------
+  const W = 1000, H = 460;
+  const EPS_MAX = 2200, LAM_MAX = 525, WIDTH = 45;   // L/(mol·cm), nm, nm
+  const C_UNKNOWN = 0.27;                            // mmol/L (à retrouver par l'élève)
+  const SPEC = { x: 60, y: 270, w: 380, h: 130 };
+  const CAL = { x: 560, y: 270, w: 400, h: 130 };
+
+  // ---------- État ----------
+  const canvas = $('stage');
+  const ctx = setupCanvas(canvas, W, H);
+  const P = { c: 0.2, lam: 525, len: 1, unknown: false };   // mmol/L, nm, cm
+  let points = [];                                   // étalonnage : {c, A}
+
+  // ---------- Chimie ----------
+  const epsilon = nm => EPS_MAX * Math.exp(-Math.pow((nm - LAM_MAX) / WIDTH, 2));
+  const absorbance = c => epsilon(P.lam) * P.len * c * 1e-3;          // c en mmol/L
+  // pente de la droite d'étalonnage passant par l'origine (moindres carrés)
+  function slope(){
+    const sxx = points.reduce((s, p) => s + p.c * p.c, 0), sxy = points.reduce((s, p) => s + p.c * p.A, 0);
+    return points.length >= 2 && sxx > 0 ? sxy / sxx : null;
+  }
+
+  // ---------- Affichage des mesures ----------
+  function updateReadouts(A, k){
+    out('lamLabel', fmt(P.lam, 0));
+    out('rA', fmt(A, 3));
+    out('rT', fmt(Math.pow(10, -A) * 100, 1) + ' %');
+    out('rEps', fmt(epsilon(P.lam), 0) + ' L/(mol·cm)');
+    out('rK', k ? fmt(k, 2) + ' L/mmol' : '—');
+    out('rAx', P.unknown ? fmt(A, 3) : '—');
+    out('rCx', P.unknown && k ? fmt(A / k, 3) + ' mmol/L' : '—');
+    if (A > 2) setStatus('A > 2 : trop peu de lumière transmise, mesure peu fiable', 'off');
+    else if (epsilon(P.lam) < 0.5 * EPS_MAX) setStatus('Loin du maximum d\'absorption : mesure peu sensible');
+    else setStatus('Mesure au voisinage du maximum d\'absorption', 'ok');
+  }
+
+  // ---------- Rendu ----------
+  function draw(){
+    const c = P.unknown ? C_UNKNOWN : P.c;
+    const A = absorbance(c), k = slope();
+    updateReadouts(A, k);
+    ctx.clearRect(0, 0, W, H);
+    const [r, g, b] = waveRGB(P.lam), beam = 'rgb(' + r + ',' + g + ',' + b + ')';
+    const yb = 120, cx0 = 430, cw = 60 * P.len;
+
+    // source, faisceau incident, cuve, faisceau transmis, détecteur
+    ctx.fillStyle = C.inkSoft; ctx.fillRect(50, yb - 30, 90, 60);
+    ctx.fillStyle = C.paper; ctx.font = '13px ' + SANS; ctx.textAlign = 'center';
+    ctx.fillText('source', 95, yb + 5);
+    ctx.strokeStyle = beam; ctx.lineWidth = 14;
+    ctx.beginPath(); ctx.moveTo(140, yb); ctx.lineTo(cx0, yb); ctx.stroke();
+    ctx.globalAlpha = Math.max(0.04, Math.pow(10, -A));
+    ctx.beginPath(); ctx.moveTo(cx0 + cw, yb); ctx.lineTo(780, yb); ctx.stroke();
+    ctx.globalAlpha = 1;
+    ctx.fillStyle = 'rgba(150,40,150,' + (1 - Math.exp(-5 * c)).toFixed(3) + ')';
+    ctx.fillRect(cx0, yb - 55, cw, 110);
+    ctx.strokeStyle = C.ink; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.moveTo(cx0, yb - 70); ctx.lineTo(cx0, yb + 55); ctx.lineTo(cx0 + cw, yb + 55); ctx.lineTo(cx0 + cw, yb - 70); ctx.stroke();
+    ctx.fillStyle = C.ink; ctx.fillRect(780, yb - 34, 170, 68);
+    ctx.fillStyle = C.paper; ctx.font = '12px ' + SANS;
+    ctx.fillText('détecteur', 865, yb - 14);
+    ctx.font = '600 20px ' + MONO; ctx.fillText('A = ' + fmt(A, 3), 865, yb + 16);
+    ctx.fillStyle = C.inkSoft; ctx.font = '13px ' + MONO;
+    ctx.fillText('I₀', 290, yb - 18); ctx.fillText('I', (cx0 + cw + 780) / 2, yb - 18);
+    ctx.fillText('ℓ = ' + fmt(P.len, 1) + ' cm', cx0 + cw / 2, yb + 76);
+    ctx.fillText(P.unknown ? 'solution inconnue' : 'C = ' + fmt(P.c, 2) + ' mmol/L', cx0 + cw / 2, yb - 80);
+
+    // spectre d'absorption de la solution
+    const S = axes(ctx, SPEC, { xMin: 400, xMax: 700, yMax: 2400, yTicks: 3, title: 'Spectre : ε en L/(mol·cm)', xLabel: 'λ (nm)' });
+    curve(ctx, S, epsilon, 400, 700, C.wave, 2.5);
+    ctx.setLineDash([5, 6]); ctx.strokeStyle = beam; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.moveTo(S.X(P.lam), SPEC.y); ctx.lineTo(S.X(P.lam), SPEC.y + SPEC.h); ctx.stroke();
+    ctx.setLineDash([]);
+
+    // droite d'étalonnage
+    const aMax = Math.max(0.1, absorbance(0.5) * 1.1);
+    const G = axes(ctx, CAL, { xMax: 0.5, xTicks: 5, yMax: aMax, yTicks: 3, title: 'Étalonnage : absorbance A', xLabel: 'C (mmol/L)' });
+    if (k) curve(ctx, G, x => k * x, 0, 0.5, C.inkSoft, 1.5);
+    ctx.strokeStyle = C.blue; ctx.lineWidth = 2.5;
+    for (const p of points){
+      ctx.beginPath(); ctx.moveTo(G.X(p.c) - 6, G.Y(p.A)); ctx.lineTo(G.X(p.c) + 6, G.Y(p.A));
+      ctx.moveTo(G.X(p.c), G.Y(p.A) - 6); ctx.lineTo(G.X(p.c), G.Y(p.A) + 6); ctx.stroke();
+    }
+    if (P.unknown){
+      // lecture graphique : A mesurée → concentration
+      ctx.setLineDash([5, 6]); ctx.strokeStyle = C.accent; ctx.lineWidth = 1.8;
+      ctx.beginPath(); ctx.moveTo(CAL.x, G.Y(A)); ctx.lineTo(k ? G.X(A / k) : CAL.x + CAL.w, G.Y(A));
+      if (k) ctx.lineTo(G.X(A / k), CAL.y + CAL.h);
+      ctx.stroke(); ctx.setLineDash([]);
+    } else {
+      ctx.fillStyle = C.wave; ctx.strokeStyle = C.paper; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.arc(G.X(P.c), G.Y(A), 6, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+    }
+  }
+
+  // ---------- Interactions ----------
+  bind('conc', v => { P.c = v; }, v => fmt(v, 2) + ' mmol/L');
+  bind('lam', v => { P.lam = v; points = []; }, v => fmt(v, 0) + ' nm');
+  bind('len', v => { P.len = v; points = []; }, v => fmt(v, 1) + ' cm');
+  bind('unknown', v => { P.unknown = v; });
+  $('add').addEventListener('click', () => {
+    if (P.unknown || points.some(p => Math.abs(p.c - P.c) < 1e-9)) return;
+    points.push({ c: P.c, A: absorbance(P.c) });
+  });
+  $('clear').addEventListener('click', () => { points = []; });
+
+  // ---------- Boucle de rendu ----------
+  function loop(){ draw(); requestAnimationFrame(loop); }
+  requestAnimationFrame(loop);
+})();
+</script>
+</body>
+</html>

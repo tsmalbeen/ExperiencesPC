@@ -1,0 +1,587 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Interférences de deux ondes</title>
+<style>
+  /* ---------- Thème (clair / sombre automatique) ---------- */
+  :root{
+    --bg:#f3ede1;
+    --paper:#fbf8f0;
+    --ink:#22242e;
+    --ink-soft:#5b5a52;
+    --line:#d9d0ba;
+    --wave:#b8362b;
+    --wave-glow:rgba(184,54,43,.14);
+    --accent:#2f6f4f;
+    --blue:#2c5f8a;
+    --brass:#a9793f;
+    --ok:#2f6f4f;
+    --warn:#b8362b;
+    --serif:"Iowan Old Style","Palatino Linotype",Palatino,Georgia,serif;
+    --sans:system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+    --mono:ui-monospace,"Cascadia Mono","SF Mono",Consolas,Menlo,monospace;
+    color-scheme: light dark;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{
+      --bg:#171a21;
+      --paper:#1e222b;
+      --ink:#eae6da;
+      --ink-soft:#9a9689;
+      --line:#33384a;
+      --wave:#ff8a72;
+      --wave-glow:rgba(255,138,114,.14);
+      --accent:#79d6a3;
+      --blue:#7fb4e0;
+      --brass:#c99a5b;
+      --ok:#79d6a3;
+      --warn:#ff8a72;
+    }
+  }
+
+  /* ---------- Mise en page ---------- */
+  *{box-sizing:border-box;}
+  html, body{ margin:0; padding:0; }
+  body{
+    background:var(--bg);
+    color:var(--ink);
+    font-family:var(--sans);
+    padding:28px 16px;
+    display:flex;
+    justify-content:center;
+  }
+  main{
+    width:100%;
+    max-width:920px;
+    display:flex;
+    flex-direction:column;
+    gap:20px;
+  }
+  header{ display:flex; flex-direction:column; gap:4px; }
+  .kicker{
+    font-size:.72rem;
+    text-transform:uppercase;
+    letter-spacing:.08em;
+    color:var(--ink-soft);
+  }
+  h1{
+    font-family:var(--serif);
+    font-weight:600;
+    font-size:clamp(1.5rem, 1.1rem + 1.6vw, 2.2rem);
+    margin:0;
+    text-wrap:balance;
+  }
+  header p{
+    margin:0;
+    color:var(--ink-soft);
+    font-size:.92rem;
+    max-width:66ch;
+  }
+
+  /* ---------- Zone de simulation ---------- */
+  .scene{
+    background:var(--paper);
+    border:1px solid var(--line);
+    border-radius:14px;
+    padding:20px clamp(12px,3vw,28px) 8px;
+    display:flex;
+    flex-direction:column;
+    gap:6px;
+  }
+  .scene-top{
+    display:flex;
+    justify-content:space-between;
+    align-items:baseline;
+    gap:12px;
+    flex-wrap:wrap;
+  }
+  .scene-title{ font-family:var(--serif); font-weight:600; }
+  .status{
+    font-family:var(--mono);
+    font-size:.82rem;
+    padding:3px 10px;
+    border-radius:999px;
+    border:1px solid var(--line);
+    color:var(--ink-soft);
+  }
+  .status.ok{ color:var(--ok); border-color:var(--ok); }
+  .status.off{ color:var(--warn); border-color:var(--warn); }
+  canvas{
+    width:100%;
+    height:auto;
+    display:block;
+  }
+  canvas.draggable{ touch-action:none; cursor:grab; }
+  canvas.dragging{ cursor:grabbing; }
+  .hint{ margin:0; font-size:.78rem; color:var(--ink-soft); }
+
+  /* ---------- Mesures ---------- */
+  .readouts{
+    display:grid;
+    grid-template-columns:repeat(auto-fit,minmax(150px,1fr));
+    gap:10px 18px;
+    padding-block:10px;
+    border-top:1px solid var(--line);
+    margin-top:6px;
+  }
+  .readout{ display:flex; flex-direction:column; gap:2px; }
+  .readout .label{
+    font-size:.78rem;
+    color:var(--ink-soft);
+  }
+  .readout .value{
+    font-family:var(--mono);
+    font-variant-numeric:tabular-nums;
+    font-size:1.05rem;
+    font-weight:500;
+  }
+  .readout .value em{ color:var(--blue); font-style:normal; font-size:.9rem; }
+
+  /* ---------- Contrôles ---------- */
+  .panel{
+    background:var(--paper);
+    border:1px solid var(--line);
+    border-radius:14px;
+    padding:18px clamp(14px,3vw,26px);
+    display:flex;
+    flex-direction:column;
+    gap:18px;
+  }
+  .controls{
+    display:grid;
+    grid-template-columns:repeat(auto-fit,minmax(240px,1fr));
+    gap:18px 32px;
+  }
+  .control{ display:flex; flex-direction:column; gap:6px; }
+  .control .row{
+    display:flex;
+    justify-content:space-between;
+    align-items:baseline;
+    gap:10px;
+  }
+  .control label{ font-size:.86rem; font-weight:500; }
+  .control .num{
+    font-family:var(--mono);
+    font-variant-numeric:tabular-nums;
+    color:var(--wave);
+    font-size:.92rem;
+  }
+  input[type=range]{
+    -webkit-appearance:none;
+    appearance:none;
+    width:100%;
+    height:4px;
+    margin:8px 0;
+    border-radius:999px;
+    background:var(--line);
+    outline:none;
+  }
+  input[type=range]::-webkit-slider-thumb{
+    -webkit-appearance:none;
+    width:20px; height:20px;
+    border-radius:50%;
+    background:var(--wave);
+    border:2px solid var(--paper);
+    box-shadow:0 0 0 1px var(--line);
+    cursor:pointer;
+  }
+  input[type=range]::-moz-range-thumb{
+    width:18px; height:18px;
+    border-radius:50%;
+    background:var(--wave);
+    border:2px solid var(--paper);
+    box-shadow:0 0 0 1px var(--line);
+    cursor:pointer;
+  }
+  select{
+    font-family:var(--sans);
+    font-size:.86rem;
+    padding:7px 10px;
+    border-radius:8px;
+    border:1px solid var(--line);
+    background:var(--paper);
+    color:var(--ink);
+    width:100%;
+  }
+  .check{
+    display:flex;
+    align-items:center;
+    gap:8px;
+    font-size:.86rem;
+    font-weight:500;
+    cursor:pointer;
+  }
+  .check input{ width:18px; height:18px; accent-color:var(--accent); margin:0; }
+  .buttons{ display:flex; gap:10px; flex-wrap:wrap; }
+  button{
+    font-family:var(--sans);
+    font-size:.86rem;
+    font-weight:500;
+    padding:9px 16px;
+    border-radius:8px;
+    border:1px solid var(--line);
+    background:transparent;
+    color:var(--ink);
+    cursor:pointer;
+  }
+  button.primary{
+    background:var(--accent);
+    border-color:var(--accent);
+    color:var(--paper);
+  }
+  button:focus-visible, input:focus-visible, select:focus-visible{
+    outline:2px solid var(--accent);
+    outline-offset:2px;
+  }
+
+  /* ---------- Formules ---------- */
+  .formula{
+    font-family:var(--mono);
+    font-size:.86rem;
+    color:var(--ink-soft);
+    border-top:1px solid var(--line);
+    padding-top:14px;
+    display:flex;
+    flex-wrap:wrap;
+    gap:6px 22px;
+  }
+  .formula b{ color:var(--ink); font-weight:600; }
+  footer{
+    font-size:.78rem;
+    color:var(--ink-soft);
+    text-align:center;
+    text-wrap:balance;
+  }
+</style>
+</head>
+<body>
+
+<main>
+  <header>
+    <span class="kicker">Ondes</span>
+    <h1>Interférences de deux ondes</h1>
+    <p>Deux pointes vibrent en phase à la surface d'une cuve à ondes. Là où leurs ondes se rencontrent, elles se renforcent ou s'annulent selon la différence de marche. Déplace le point M et compare δ à la longueur d'onde λ.</p>
+  </header>
+
+  <section class="scene">
+    <div class="scene-top">
+      <strong class="scene-title">Cuve à ondes, λ = <span id="lamLabel">2,50</span> cm</strong>
+      <span id="status" class="status">—</span>
+    </div>
+    <canvas id="stage" class="draggable" style="aspect-ratio:1000/520;border-radius:8px" aria-label="Vue de dessus de la cuve à ondes avec les deux sources S1 et S2. Fais glisser le point M pour mesurer la différence de marche."></canvas>
+    <p class="hint">Touche ou fais glisser n'importe où dans la cuve pour déplacer le point M. Animation ralentie 20 fois.</p>
+    <div class="readouts">
+      <div class="readout"><span class="label">Longueur d'onde λ</span><span class="value" id="rLam">—</span></div>
+      <div class="readout"><span class="label">Distance S₁M</span><span class="value" id="rD1">—</span></div>
+      <div class="readout"><span class="label">Distance S₂M</span><span class="value" id="rD2">—</span></div>
+      <div class="readout"><span class="label">Différence de marche δ</span><span class="value" id="rDelta">—</span></div>
+      <div class="readout"><span class="label">Rapport δ / λ</span><span class="value" id="rRatio">—</span></div>
+      <div class="readout"><span class="label">Amplitude en M</span><span class="value" id="rAmp">—</span></div>
+    </div>
+  </section>
+
+  <section class="panel">
+    <div class="controls">
+      <div class="control">
+        <div class="row"><label for="freq">Fréquence des sources f</label><span class="num" id="freqVal"></span></div>
+        <input type="range" id="freq" min="5" max="25" step="0.5" value="10">
+      </div>
+      <div class="control">
+        <div class="row"><label for="cel">Célérité de l'onde c</label><span class="num" id="celVal"></span></div>
+        <input type="range" id="cel" min="15" max="40" step="1" value="25">
+      </div>
+      <div class="control">
+        <div class="row"><label for="sep">Distance entre les sources S₁S₂</label><span class="num" id="sepVal"></span></div>
+        <input type="range" id="sep" min="1" max="8" step="0.1" value="5">
+      </div>
+      <div class="control" style="justify-content:center">
+        <label class="check"><input type="checkbox" id="ampView"> Afficher l'amplitude (franges d'interférence)</label>
+      </div>
+    </div>
+
+    <div class="buttons">
+      <button class="primary" id="toggle">Mettre en pause</button>
+      <button id="snapMax">Placer M sur un maximum</button>
+      <button id="snapMin">Placer M sur un minimum</button>
+    </div>
+
+    <div class="formula">
+      <span>λ&nbsp;=&nbsp;<b>c&nbsp;/&nbsp;f</b></span>
+      <span>δ&nbsp;=&nbsp;<b>S₂M&nbsp;−&nbsp;S₁M</b></span>
+      <span>constructives&nbsp;: δ&nbsp;=&nbsp;<b>k·λ</b></span>
+      <span>destructives&nbsp;: δ&nbsp;=&nbsp;<b>(k&nbsp;+&nbsp;½)·λ</b></span>
+      <span>k entier</span>
+    </div>
+  </section>
+
+  <footer>Modèle : deux sources ponctuelles synchrones, de même fréquence et en phase ; l'atténuation des ondes avec la distance est négligée, si bien que l'amplitude en M vaut 2a·|cos(π·δ/λ)|, où a est l'amplitude d'une onde seule.</footer>
+</main>
+
+<script>
+(function(){
+  // ---------- Utilitaires ----------
+  const $ = id => document.getElementById(id);
+  const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
+  const fmt = (v, d) => Number.isFinite(v)
+    ? v.toLocaleString('fr-FR', {minimumFractionDigits:d, maximumFractionDigits:d})
+    : '—';
+  const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const MONO = 'ui-monospace, "Cascadia Mono", "SF Mono", Consolas, Menlo, monospace';
+  const SANS = 'system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif';
+
+  // Couleurs du thème, relues si le système bascule clair/sombre
+  const C = {};
+  function readColors(){
+    const s = getComputedStyle(document.documentElement);
+    for (const n of ['bg','paper','ink','ink-soft','line','wave','wave-glow','accent','blue','brass']){
+      C[n.replace(/-(.)/g, (_, c) => c.toUpperCase())] = s.getPropertyValue('--' + n).trim();
+    }
+  }
+  readColors();
+  window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', readColors);
+
+  // Canvas net sur tout écran : on dessine toujours dans un repère logique W × H
+  function setupCanvas(canvas, W, H){
+    const ctx = canvas.getContext('2d');
+    function fit(){
+      const dpr = Math.min(window.devicePixelRatio || 1, 3);
+      const cw = canvas.clientWidth || W;
+      canvas.width = Math.max(1, Math.round(cw * dpr));
+      canvas.height = Math.max(1, Math.round(cw * H / W * dpr));
+      ctx.setTransform(canvas.width / W, 0, 0, canvas.height / H, 0, 0);
+    }
+    window.addEventListener('resize', fit);
+    fit();
+    return ctx;
+  }
+  // Position du pointeur (souris ou doigt) dans le repère logique
+  function pointerPos(canvas, evt, W, H){
+    const r = canvas.getBoundingClientRect();
+    return { x: (evt.clientX - r.left) * W / r.width, y: (evt.clientY - r.top) * H / r.height };
+  }
+  function arrow(ctx, x1, y1, x2, y2, color, width){
+    const len = Math.hypot(x2 - x1, y2 - y1);
+    if (len < 3) return;
+    const a = Math.atan2(y2 - y1, x2 - x1), h = Math.min(10, len * 0.5);
+    ctx.strokeStyle = color; ctx.fillStyle = color; ctx.lineWidth = width || 2.5;
+    ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2 - Math.cos(a) * h * 0.8, y2 - Math.sin(a) * h * 0.8); ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(x2, y2);
+    ctx.lineTo(x2 - h * Math.cos(a - 0.42), y2 - h * Math.sin(a - 0.42));
+    ctx.lineTo(x2 - h * Math.cos(a + 0.42), y2 - h * Math.sin(a + 0.42));
+    ctx.closePath(); ctx.fill();
+  }
+  // Pas "rond" (1, 2, 5 × 10^n) pour graduer un axe
+  function niceStep(x){
+    if (!(x > 0)) return 1;
+    const p = Math.pow(10, Math.floor(Math.log10(x))), m = x / p;
+    return (m < 1.5 ? 1 : m < 3.5 ? 2 : m < 7.5 ? 5 : 10) * p;
+  }
+
+  // ---------- Constantes ----------
+  const W = 1000, H = 520;
+  const TANK_W = 25, TANK_H = 13;          // dimensions de la cuve (cm)
+  const PPC = W / TANK_W;                  // pixels logiques par cm
+  const GW = 500, GH = 260;                // grille de calcul du champ
+  const SLOW = 20;                         // facteur de ralenti
+  const SRC_X = 4;                         // abscisse des sources (cm)
+  const TOL = 0.05;                        // tolérance sur δ/λ pour annoncer max / min
+
+  // ---------- État ----------
+  const canvas = $('stage');
+  const ctx = setupCanvas(canvas, W, H);
+  const P = { f: 10, c: 25, a: 5, amp: false };
+  const M = { x: 17, y: 3.6 };             // point d'observation (cm)
+  let playing = !reduceMotion, dragging = false;
+  let tAnim = 0;
+  let last = performance.now();
+
+  // Champ précalculé : s(t) = Cc·cos ωt + Ss·sin ωt en chaque point de la grille
+  const off = document.createElement('canvas');
+  off.width = GW; off.height = GH;
+  const octx = off.getContext('2d');
+  const img = octx.createImageData(GW, GH);
+  const Cc = new Float32Array(GW * GH), Ss = new Float32Array(GW * GH);
+
+  // ---------- Physique ----------
+  const lambda = () => P.c / P.f;                                   // cm
+  const sources = () => [{ x: SRC_X, y: TANK_H / 2 - P.a / 2 }, { x: SRC_X, y: TANK_H / 2 + P.a / 2 }];
+  function atM(){
+    const [s1, s2] = sources();
+    const d1 = Math.hypot(M.x - s1.x, M.y - s1.y), d2 = Math.hypot(M.x - s2.x, M.y - s2.y);
+    const delta = d2 - d1, ratio = delta / lambda();
+    return { d1, d2, delta, ratio, amp: 2 * Math.abs(Math.cos(Math.PI * ratio)) };
+  }
+  function computeField(){
+    const [s1, s2] = sources(), k = 2 * Math.PI / lambda();
+    for (let j = 0; j < GH; j++){
+      const y = (j + 0.5) * TANK_H / GH;
+      for (let i = 0; i < GW; i++){
+        const x = (i + 0.5) * TANK_W / GW;
+        const p1 = k * Math.hypot(x - s1.x, y - s1.y), p2 = k * Math.hypot(x - s2.x, y - s2.y);
+        Cc[j * GW + i] = Math.cos(p1) + Math.cos(p2);
+        Ss[j * GW + i] = Math.sin(p1) + Math.sin(p2);
+      }
+    }
+  }
+
+  // ---------- Affichage des mesures ----------
+  function updateReadouts(m){
+    $('lamLabel').textContent = fmt(lambda(), 2);
+    $('rLam').textContent = fmt(lambda(), 2) + ' cm';
+    $('rD1').textContent = fmt(m.d1, 2) + ' cm';
+    $('rD2').textContent = fmt(m.d2, 2) + ' cm';
+    $('rDelta').textContent = fmt(m.delta, 2) + ' cm';
+    $('rRatio').textContent = fmt(m.ratio, 2);
+    $('rAmp').textContent = fmt(m.amp, 2) + ' × a';
+
+    const st = $('status'), k = Math.round(m.ratio), kh = Math.floor(m.ratio);
+    if (Math.abs(m.ratio - k) < TOL){
+      st.textContent = 'Constructives en M : δ ≈ ' + (k === 0 ? '0' : k + '·λ');
+      st.className = 'status ok';
+    } else if (Math.abs(m.ratio - kh - 0.5) < TOL){
+      st.textContent = 'Destructives en M : δ ≈ ' + fmt(kh + 0.5, 1) + '·λ';
+      st.className = 'status off';
+    } else {
+      st.textContent = 'Cas intermédiaire en M';
+      st.className = 'status';
+    }
+  }
+
+  // ---------- Rendu ----------
+  const rgb = hex => { const n = parseInt(hex.slice(1), 16); return [(n >> 16) & 255, (n >> 8) & 255, n & 255]; };
+
+  function drawField(){
+    const d = img.data, n = GW * GH;
+    if (P.amp){
+      // amplitude résultante : 0 (repos) → 2a (maximum)
+      const lo = rgb(C.paper), hi = rgb(C.wave);
+      for (let i = 0; i < n; i++){
+        const u = Math.min(1, Math.hypot(Cc[i], Ss[i]) / 2), o = i * 4;
+        d[o] = lo[0] + (hi[0] - lo[0]) * u; d[o+1] = lo[1] + (hi[1] - lo[1]) * u; d[o+2] = lo[2] + (hi[2] - lo[2]) * u; d[o+3] = 255;
+      }
+    } else {
+      // élongation instantanée : creux → crête
+      const lo = rgb(C.blue), hi = rgb(C.paper);
+      const w = 2 * Math.PI * P.f * tAnim / SLOW, cw = Math.cos(w), sw = Math.sin(w);
+      for (let i = 0; i < n; i++){
+        const u = (Cc[i] * cw + Ss[i] * sw + 2) / 4, o = i * 4;
+        d[o] = lo[0] + (hi[0] - lo[0]) * u; d[o+1] = lo[1] + (hi[1] - lo[1]) * u; d[o+2] = lo[2] + (hi[2] - lo[2]) * u; d[o+3] = 255;
+      }
+    }
+    octx.putImageData(img, 0, 0);
+    ctx.imageSmoothingEnabled = true;
+    ctx.drawImage(off, 0, 0, W, H);
+  }
+  function tag(text, x, y, color){
+    ctx.font = '600 15px ' + MONO; ctx.textAlign = 'center';
+    const tw = ctx.measureText(text).width + 12;
+    ctx.fillStyle = C.paper; ctx.globalAlpha = 0.88;
+    ctx.fillRect(x - tw / 2, y - 15, tw, 21);
+    ctx.globalAlpha = 1; ctx.fillStyle = color;
+    ctx.fillText(text, x, y);
+  }
+
+  function draw(){
+    const m = atM();
+    updateReadouts(m);
+    drawField();
+    const [s1, s2] = sources();
+    const px = p => ({ x: p.x * PPC, y: p.y * PPC });
+    const a = px(s1), b = px(s2), q = px(M);
+
+    // trajets S₁M et S₂M
+    for (const [s, col] of [[a, C.accent], [b, C.brass]]){
+      ctx.strokeStyle = C.paper; ctx.lineWidth = 5; ctx.globalAlpha = 0.7;
+      ctx.beginPath(); ctx.moveTo(s.x, s.y); ctx.lineTo(q.x, q.y); ctx.stroke();
+      ctx.globalAlpha = 1; ctx.strokeStyle = col; ctx.lineWidth = 2.5;
+      ctx.beginPath(); ctx.moveTo(s.x, s.y); ctx.lineTo(q.x, q.y); ctx.stroke();
+    }
+    tag(fmt(m.d1, 1) + ' cm', (a.x + q.x) / 2, (a.y + q.y) / 2 - 12, C.accent);
+    tag(fmt(m.d2, 1) + ' cm', (b.x + q.x) / 2, (b.y + q.y) / 2 + 26, C.brass);
+
+    // sources
+    for (const [s, name] of [[a, 'S₁'], [b, 'S₂']]){
+      ctx.fillStyle = C.ink; ctx.strokeStyle = C.paper; ctx.lineWidth = 2.5;
+      ctx.beginPath(); ctx.arc(s.x, s.y, 7, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+      tag(name, s.x - 34, s.y + 5, C.ink);
+    }
+
+    // point M
+    ctx.fillStyle = C.paper; ctx.strokeStyle = C.ink; ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.arc(q.x, q.y, dragging ? 12 : 9, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+    tag('M', q.x + 26, q.y - 12, C.ink);
+
+    // échelle
+    ctx.fillStyle = C.paper; ctx.globalAlpha = 0.88;
+    ctx.fillRect(W - 5 * PPC - 34, H - 46, 5 * PPC + 20, 34);
+    ctx.globalAlpha = 1; ctx.strokeStyle = C.ink; ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(W - 5 * PPC - 24, H - 20); ctx.lineTo(W - 24, H - 20);
+    ctx.moveTo(W - 5 * PPC - 24, H - 26); ctx.lineTo(W - 5 * PPC - 24, H - 14);
+    ctx.moveTo(W - 24, H - 26); ctx.lineTo(W - 24, H - 14);
+    ctx.stroke();
+    ctx.fillStyle = C.ink; ctx.font = '13px ' + MONO; ctx.textAlign = 'center';
+    ctx.fillText('5 cm', W - 24 - 2.5 * PPC, H - 28);
+  }
+
+  // ---------- Interactions ----------
+  function syncLabels(){
+    $('freqVal').textContent = fmt(P.f, 1) + ' Hz';
+    $('celVal').textContent = fmt(P.c, 0) + ' cm/s';
+    $('sepVal').textContent = fmt(P.a, 1) + ' cm';
+    $('toggle').textContent = playing ? 'Mettre en pause' : 'Animer';
+  }
+  function paramChanged(){ computeField(); syncLabels(); }
+  $('freq').addEventListener('input', e => { P.f = parseFloat(e.target.value); paramChanged(); });
+  $('cel').addEventListener('input', e => { P.c = parseFloat(e.target.value); paramChanged(); });
+  $('sep').addEventListener('input', e => { P.a = parseFloat(e.target.value); paramChanged(); });
+  $('ampView').addEventListener('change', e => { P.amp = e.target.checked; });
+  $('toggle').addEventListener('click', () => { playing = !playing; syncLabels(); });
+
+  // Déplace M verticalement jusqu'au maximum (ou minimum) d'amplitude le plus proche
+  function snap(wantMax){
+    let best = null;
+    for (let y = 0.3; y <= TANK_H - 0.3; y += 0.005){
+      const s = sources();
+      const r = (Math.hypot(M.x - s[1].x, y - s[1].y) - Math.hypot(M.x - s[0].x, y - s[0].y)) / lambda();
+      const err = wantMax ? Math.abs(r - Math.round(r)) : Math.abs(r - Math.floor(r) - 0.5);
+      if (err < 0.004 && (best === null || Math.abs(y - M.y) < Math.abs(best - M.y))) best = y;
+    }
+    if (best !== null) M.y = best;
+  }
+  $('snapMax').addEventListener('click', () => snap(true));
+  $('snapMin').addEventListener('click', () => snap(false));
+
+  function moveM(evt){
+    const p = pointerPos(canvas, evt, W, H);
+    M.x = clamp(p.x / PPC, 0.3, TANK_W - 0.3);
+    M.y = clamp(p.y / PPC, 0.3, TANK_H - 0.3);
+  }
+  canvas.addEventListener('pointerdown', evt => {
+    dragging = true; canvas.classList.add('dragging');
+    canvas.setPointerCapture(evt.pointerId);
+    moveM(evt); evt.preventDefault();
+  });
+  canvas.addEventListener('pointermove', evt => { if (dragging) moveM(evt); });
+  function endDrag(){ dragging = false; canvas.classList.remove('dragging'); }
+  canvas.addEventListener('pointerup', endDrag);
+  canvas.addEventListener('pointercancel', endDrag);
+
+  // ---------- Boucle d'animation ----------
+  function loop(now){
+    const dt = Math.min((now - last) / 1000, 0.05);
+    last = now;
+    if (playing) tAnim += dt;
+    draw();
+    requestAnimationFrame(loop);
+  }
+  computeField();
+  syncLabels();
+  requestAnimationFrame(loop);
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,567 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Dispersion par un prisme</title>
+<style>
+  /* ---------- Thème (clair / sombre automatique) ---------- */
+  :root{
+    --bg:#f3ede1;
+    --paper:#fbf8f0;
+    --ink:#22242e;
+    --ink-soft:#5b5a52;
+    --line:#d9d0ba;
+    --wave:#b8362b;
+    --wave-glow:rgba(184,54,43,.14);
+    --accent:#2f6f4f;
+    --blue:#2c5f8a;
+    --brass:#a9793f;
+    --ok:#2f6f4f;
+    --warn:#b8362b;
+    --serif:"Iowan Old Style","Palatino Linotype",Palatino,Georgia,serif;
+    --sans:system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+    --mono:ui-monospace,"Cascadia Mono","SF Mono",Consolas,Menlo,monospace;
+    color-scheme: light dark;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{
+      --bg:#171a21;
+      --paper:#1e222b;
+      --ink:#eae6da;
+      --ink-soft:#9a9689;
+      --line:#33384a;
+      --wave:#ff8a72;
+      --wave-glow:rgba(255,138,114,.14);
+      --accent:#79d6a3;
+      --blue:#7fb4e0;
+      --brass:#c99a5b;
+      --ok:#79d6a3;
+      --warn:#ff8a72;
+    }
+  }
+
+  /* ---------- Mise en page ---------- */
+  *{box-sizing:border-box;}
+  html, body{ margin:0; padding:0; }
+  body{
+    background:var(--bg);
+    color:var(--ink);
+    font-family:var(--sans);
+    padding:28px 16px;
+    display:flex;
+    justify-content:center;
+  }
+  main{
+    width:100%;
+    max-width:920px;
+    display:flex;
+    flex-direction:column;
+    gap:20px;
+  }
+  header{ display:flex; flex-direction:column; gap:4px; }
+  .kicker{
+    font-size:.72rem;
+    text-transform:uppercase;
+    letter-spacing:.08em;
+    color:var(--ink-soft);
+  }
+  h1{
+    font-family:var(--serif);
+    font-weight:600;
+    font-size:clamp(1.5rem, 1.1rem + 1.6vw, 2.2rem);
+    margin:0;
+    text-wrap:balance;
+  }
+  header p{
+    margin:0;
+    color:var(--ink-soft);
+    font-size:.92rem;
+    max-width:66ch;
+  }
+
+  /* ---------- Zone de simulation ---------- */
+  .scene{
+    background:var(--paper);
+    border:1px solid var(--line);
+    border-radius:14px;
+    padding:20px clamp(12px,3vw,28px) 8px;
+    display:flex;
+    flex-direction:column;
+    gap:6px;
+  }
+  .scene-top{
+    display:flex;
+    justify-content:space-between;
+    align-items:baseline;
+    gap:12px;
+    flex-wrap:wrap;
+  }
+  .scene-title{ font-family:var(--serif); font-weight:600; }
+  .status{
+    font-family:var(--mono);
+    font-size:.82rem;
+    padding:3px 10px;
+    border-radius:999px;
+    border:1px solid var(--line);
+    color:var(--ink-soft);
+  }
+  .status.ok{ color:var(--ok); border-color:var(--ok); }
+  .status.off{ color:var(--warn); border-color:var(--warn); }
+  canvas{
+    width:100%;
+    height:auto;
+    display:block;
+  }
+  canvas.draggable{ touch-action:none; cursor:grab; }
+  canvas.dragging{ cursor:grabbing; }
+  .hint{ margin:0; font-size:.78rem; color:var(--ink-soft); }
+
+  /* ---------- Mesures ---------- */
+  .readouts{
+    display:grid;
+    grid-template-columns:repeat(auto-fit,minmax(150px,1fr));
+    gap:10px 18px;
+    padding-block:10px;
+    border-top:1px solid var(--line);
+    margin-top:6px;
+  }
+  .readout{ display:flex; flex-direction:column; gap:2px; }
+  .readout .label{
+    font-size:.78rem;
+    color:var(--ink-soft);
+  }
+  .readout .value{
+    font-family:var(--mono);
+    font-variant-numeric:tabular-nums;
+    font-size:1.05rem;
+    font-weight:500;
+  }
+  .readout .value em{ color:var(--blue); font-style:normal; font-size:.9rem; }
+
+  /* ---------- Contrôles ---------- */
+  .panel{
+    background:var(--paper);
+    border:1px solid var(--line);
+    border-radius:14px;
+    padding:18px clamp(14px,3vw,26px);
+    display:flex;
+    flex-direction:column;
+    gap:18px;
+  }
+  .controls{
+    display:grid;
+    grid-template-columns:repeat(auto-fit,minmax(240px,1fr));
+    gap:18px 32px;
+  }
+  .control{ display:flex; flex-direction:column; gap:6px; }
+  .control .row{
+    display:flex;
+    justify-content:space-between;
+    align-items:baseline;
+    gap:10px;
+  }
+  .control label{ font-size:.86rem; font-weight:500; }
+  .control .num{
+    font-family:var(--mono);
+    font-variant-numeric:tabular-nums;
+    color:var(--wave);
+    font-size:.92rem;
+  }
+  input[type=range]{
+    -webkit-appearance:none;
+    appearance:none;
+    width:100%;
+    height:4px;
+    margin:8px 0;
+    border-radius:999px;
+    background:var(--line);
+    outline:none;
+  }
+  input[type=range]::-webkit-slider-thumb{
+    -webkit-appearance:none;
+    width:20px; height:20px;
+    border-radius:50%;
+    background:var(--wave);
+    border:2px solid var(--paper);
+    box-shadow:0 0 0 1px var(--line);
+    cursor:pointer;
+  }
+  input[type=range]::-moz-range-thumb{
+    width:18px; height:18px;
+    border-radius:50%;
+    background:var(--wave);
+    border:2px solid var(--paper);
+    box-shadow:0 0 0 1px var(--line);
+    cursor:pointer;
+  }
+  select{
+    font-family:var(--sans);
+    font-size:.86rem;
+    padding:7px 10px;
+    border-radius:8px;
+    border:1px solid var(--line);
+    background:var(--paper);
+    color:var(--ink);
+    width:100%;
+  }
+  .check{
+    display:flex;
+    align-items:center;
+    gap:8px;
+    font-size:.86rem;
+    font-weight:500;
+    cursor:pointer;
+  }
+  .check input{ width:18px; height:18px; accent-color:var(--accent); margin:0; }
+  .buttons{ display:flex; gap:10px; flex-wrap:wrap; }
+  button{
+    font-family:var(--sans);
+    font-size:.86rem;
+    font-weight:500;
+    padding:9px 16px;
+    border-radius:8px;
+    border:1px solid var(--line);
+    background:transparent;
+    color:var(--ink);
+    cursor:pointer;
+  }
+  button.primary{
+    background:var(--accent);
+    border-color:var(--accent);
+    color:var(--paper);
+  }
+  button:focus-visible, input:focus-visible, select:focus-visible{
+    outline:2px solid var(--accent);
+    outline-offset:2px;
+  }
+
+  /* ---------- Formules ---------- */
+  .formula{
+    font-family:var(--mono);
+    font-size:.86rem;
+    color:var(--ink-soft);
+    border-top:1px solid var(--line);
+    padding-top:14px;
+    display:flex;
+    flex-wrap:wrap;
+    gap:6px 22px;
+  }
+  .formula b{ color:var(--ink); font-weight:600; }
+  footer{
+    font-size:.78rem;
+    color:var(--ink-soft);
+    text-align:center;
+    text-wrap:balance;
+  }
+</style>
+</head>
+<body>
+
+<main>
+  <header>
+    <span class="kicker">Optique</span>
+    <h1>Dispersion par un prisme</h1>
+    <p>Un faisceau de lumière blanche traverse un prisme de verre. L'indice du verre n'est pas le même pour toutes les couleurs : chaque radiation est déviée différemment et le faisceau s'étale en un spectre.</p>
+  </header>
+
+  <section class="scene">
+    <div class="scene-top">
+      <strong class="scene-title">Prisme d'angle au sommet A = <span id="aLabel">60</span>°</strong>
+      <span id="status" class="status">—</span>
+    </div>
+    <canvas id="stage" style="aspect-ratio:1000/460;background:#14161c;border-radius:8px" aria-label="Un rayon de lumière blanche entre dans un prisme et en ressort décomposé en rayons colorés, du rouge au violet."></canvas>
+    <p class="hint">Chaque rayon coloré obéit à la loi de Snell-Descartes sur les deux faces, avec son propre indice.</p>
+    <div class="readouts">
+      <div class="readout"><span class="label">Indice pour le rouge (700 nm)</span><span class="value" id="rNr">—</span></div>
+      <div class="readout"><span class="label">Indice pour le violet (400 nm)</span><span class="value" id="rNv">—</span></div>
+      <div class="readout"><span class="label">Déviation du rouge</span><span class="value" id="rDr">—</span></div>
+      <div class="readout"><span class="label">Déviation du violet</span><span class="value" id="rDv">—</span></div>
+      <div class="readout"><span class="label">Étalement du spectre</span><span class="value" id="rGap">—</span></div>
+    </div>
+  </section>
+
+  <section class="panel">
+    <div class="controls">
+      <div class="control">
+        <div class="row"><label for="inc">Angle d'incidence i</label><span class="num" id="incVal"></span></div>
+        <input type="range" id="inc" min="20" max="80" step="0.5" value="50">
+      </div>
+      <div class="control">
+        <div class="row"><label for="apex">Angle du prisme A</label><span class="num" id="apexVal"></span></div>
+        <input type="range" id="apex" min="30" max="70" step="1" value="60">
+      </div>
+      <div class="control">
+        <div class="row"><label for="glass">Verre du prisme</label></div>
+        <select id="glass">
+          <option value="crown">Crown (peu dispersif)</option>
+          <option value="flint" selected>Flint (très dispersif)</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="formula">
+      <span>sin&nbsp;i&nbsp;=&nbsp;<b>n(λ)·sin&nbsp;r</b></span>
+      <span>n&nbsp;<b>augmente quand λ diminue</b></span>
+      <span>n<sub>violet</sub>&nbsp;&gt;&nbsp;n<sub>rouge</sub>&nbsp;⇒&nbsp;<b>violet plus dévié</b></span>
+    </div>
+  </section>
+
+  <footer>Modèle : indice donné par la loi de Cauchy n = A + B/λ² (crown : 1,505 + 0,0042/λ² ; flint : 1,600 + 0,0100/λ², λ en µm), prisme dans l'air. La déviation est l'angle entre le rayon incident et le rayon émergent.</footer>
+</main>
+
+<script>
+(function(){
+  // ---------- Utilitaires ----------
+  const $ = id => document.getElementById(id);
+  const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
+  const fmt = (v, d) => Number.isFinite(v)
+    ? v.toLocaleString('fr-FR', {minimumFractionDigits:d, maximumFractionDigits:d})
+    : '—';
+  const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const MONO = 'ui-monospace, "Cascadia Mono", "SF Mono", Consolas, Menlo, monospace';
+  const SANS = 'system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif';
+
+  // Couleurs du thème, relues si le système bascule clair/sombre
+  const C = {};
+  function readColors(){
+    const s = getComputedStyle(document.documentElement);
+    for (const n of ['bg','paper','ink','ink-soft','line','wave','wave-glow','accent','blue','brass']){
+      C[n.replace(/-(.)/g, (_, c) => c.toUpperCase())] = s.getPropertyValue('--' + n).trim();
+    }
+  }
+  readColors();
+  window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', readColors);
+
+  // Canvas net sur tout écran : on dessine toujours dans un repère logique W × H
+  function setupCanvas(canvas, W, H){
+    const ctx = canvas.getContext('2d');
+    function fit(){
+      const dpr = Math.min(window.devicePixelRatio || 1, 3);
+      const cw = canvas.clientWidth || W;
+      canvas.width = Math.max(1, Math.round(cw * dpr));
+      canvas.height = Math.max(1, Math.round(cw * H / W * dpr));
+      ctx.setTransform(canvas.width / W, 0, 0, canvas.height / H, 0, 0);
+    }
+    window.addEventListener('resize', fit);
+    fit();
+    return ctx;
+  }
+  // Position du pointeur (souris ou doigt) dans le repère logique
+  function pointerPos(canvas, evt, W, H){
+    const r = canvas.getBoundingClientRect();
+    return { x: (evt.clientX - r.left) * W / r.width, y: (evt.clientY - r.top) * H / r.height };
+  }
+  function arrow(ctx, x1, y1, x2, y2, color, width){
+    const len = Math.hypot(x2 - x1, y2 - y1);
+    if (len < 3) return;
+    const a = Math.atan2(y2 - y1, x2 - x1), h = Math.min(10, len * 0.5);
+    ctx.strokeStyle = color; ctx.fillStyle = color; ctx.lineWidth = width || 2.5;
+    ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2 - Math.cos(a) * h * 0.8, y2 - Math.sin(a) * h * 0.8); ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(x2, y2);
+    ctx.lineTo(x2 - h * Math.cos(a - 0.42), y2 - h * Math.sin(a - 0.42));
+    ctx.lineTo(x2 - h * Math.cos(a + 0.42), y2 - h * Math.sin(a + 0.42));
+    ctx.closePath(); ctx.fill();
+  }
+  // Pas "rond" (1, 2, 5 × 10^n) pour graduer un axe
+  function niceStep(x){
+    if (!(x > 0)) return 1;
+    const p = Math.pow(10, Math.floor(Math.log10(x))), m = x / p;
+    return (m < 1.5 ? 1 : m < 3.5 ? 2 : m < 7.5 ? 5 : 10) * p;
+  }
+
+  // Relie un curseur, une liste ou une case à cocher à un paramètre (et affiche sa valeur)
+  function bind(id, onChange, format){
+    const el = $(id), label = $(id + 'Val');
+    const val = () => el.type === 'checkbox' ? el.checked : parseFloat(el.value);
+    const show = () => { if (label && format) label.textContent = format(val()); };
+    el.addEventListener(el.type === 'range' ? 'input' : 'change', () => { onChange(val()); show(); });
+    show();
+  }
+  const out = (id, text) => { $(id).textContent = text; };
+  function setStatus(text, cls){
+    const s = $('status');
+    s.textContent = text; s.className = 'status' + (cls ? ' ' + cls : '');
+  }
+  // Repère gradué dans le rectangle g ; renvoie les conversions X(x) et Y(y)
+  function axes(ctx, g, o){
+    const xMin = o.xMin || 0, yMin = o.yMin || 0;
+    const X = x => g.x + g.w * (x - xMin) / (o.xMax - xMin);
+    const Y = y => g.y + g.h - g.h * (y - yMin) / (o.yMax - yMin);
+    const ink = o.ink || C.ink, soft = o.soft || C.inkSoft, line = o.line || C.line;
+    const sx = niceStep((o.xMax - xMin) / (o.xTicks || 6)), sy = niceStep((o.yMax - yMin) / (o.yTicks || 4));
+    const dec = s => s >= 1 ? 0 : Math.min(4, Math.ceil(-Math.log10(s) - 1e-9));
+    ctx.save();
+    ctx.font = '13px ' + MONO; ctx.lineWidth = 1; ctx.textAlign = 'center';
+    for (let k = Math.ceil(xMin / sx - 1e-9); k * sx <= o.xMax + sx * 1e-6; k++){
+      ctx.strokeStyle = line; ctx.globalAlpha = 0.55;
+      ctx.beginPath(); ctx.moveTo(X(k * sx), g.y); ctx.lineTo(X(k * sx), g.y + g.h); ctx.stroke();
+      ctx.globalAlpha = 1; ctx.fillStyle = soft;
+      ctx.fillText(fmt(k * sx + 0, dec(sx)), X(k * sx), g.y + g.h + 18);
+    }
+    ctx.textAlign = 'right';
+    for (let k = Math.ceil(yMin / sy - 1e-9); k * sy <= o.yMax + sy * 1e-6; k++){
+      ctx.strokeStyle = line; ctx.globalAlpha = 0.55;
+      ctx.beginPath(); ctx.moveTo(g.x, Y(k * sy)); ctx.lineTo(g.x + g.w, Y(k * sy)); ctx.stroke();
+      ctx.globalAlpha = 1; ctx.fillStyle = soft;
+      ctx.fillText(fmt(k * sy + 0, dec(sy)), g.x - 8, Y(k * sy) + 4);
+    }
+    const y0 = yMin < 0 ? Y(0) : g.y + g.h;
+    ctx.strokeStyle = soft; ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.moveTo(g.x, g.y); ctx.lineTo(g.x, g.y + g.h); ctx.moveTo(g.x, y0); ctx.lineTo(g.x + g.w, y0); ctx.stroke();
+    ctx.fillStyle = ink; ctx.textAlign = 'left'; ctx.font = '14px ' + SANS;
+    if (o.title) ctx.fillText(o.title, g.x + 8, g.y - 10);
+    ctx.fillStyle = soft; ctx.textAlign = 'right'; ctx.font = '13px ' + MONO;
+    if (o.xLabel) ctx.fillText(o.xLabel, g.x + g.w, g.y + g.h + 36);
+    ctx.restore();
+    return { X, Y };
+  }
+  // Trace y = fn(x) entre x0 et x1 dans un repère créé par axes()
+  function curve(ctx, G, fn, x0, x1, color, width, dash){
+    if (!(x1 > x0)) return;
+    ctx.save();
+    ctx.strokeStyle = color; ctx.lineWidth = width || 2.5; ctx.lineJoin = 'round';
+    if (dash) ctx.setLineDash(dash);
+    ctx.beginPath();
+    let pen = false;
+    for (let i = 0; i <= 160; i++){
+      const x = x0 + (x1 - x0) * i / 160, y = fn(x);
+      if (!Number.isFinite(y)){ pen = false; continue; }
+      if (pen) ctx.lineTo(G.X(x), G.Y(y)); else { ctx.moveTo(G.X(x), G.Y(y)); pen = true; }
+    }
+    ctx.stroke();
+    ctx.restore();
+  }
+  // Couleur approchée d'une radiation visible (longueur d'onde en nm)
+  function waveRGB(nm){
+    let r = 0, g = 0, b = 0;
+    if (nm < 440){ r = (440 - nm) / 60; b = 1; }
+    else if (nm < 490){ g = (nm - 440) / 50; b = 1; }
+    else if (nm < 510){ g = 1; b = (510 - nm) / 20; }
+    else if (nm < 580){ r = (nm - 510) / 70; g = 1; }
+    else if (nm < 645){ r = 1; g = (645 - nm) / 65; }
+    else { r = 1; }
+    const k = nm < 420 ? 0.35 + 0.65 * (nm - 380) / 40 : nm > 700 ? 0.35 + 0.65 * (780 - nm) / 80 : 1;
+    return [r, g, b].map(v => Math.round(255 * clamp(v * k, 0, 1)));
+  }
+
+  // ---------- Constantes ----------
+  const W = 1000, H = 460;
+  const DARK = { ink: '#eae6da', soft: '#9a9689', line: '#3a4054' };
+  const GLASS = { crown: [1.5046, 0.0042], flint: [1.6, 0.01] };   // loi de Cauchy, λ en µm
+  const APEX = { x: 470, y: 70 }, SIDE = 320, X_SCREEN = 950;
+  const DEG = Math.PI / 180;
+
+  // ---------- État ----------
+  const canvas = $('stage');
+  const ctx = setupCanvas(canvas, W, H);
+  const P = { i: 50, A: 60, glass: 'flint' };
+
+  // ---------- Physique ----------
+  const index = nm => { const [a, b] = GLASS[P.glass], um = nm / 1000; return a + b / (um * um); };
+  // Réfraction vectorielle : d direction incidente, n normale unitaire tournée vers le milieu d'où vient le rayon, eta = n₁/n₂
+  function refract(d, n, eta){
+    const cosi = -(d.x * n.x + d.y * n.y), k = 1 - eta * eta * (1 - cosi * cosi);
+    if (k < 0) return null;                                            // réflexion totale
+    const c = eta * cosi - Math.sqrt(k);
+    return { x: eta * d.x + c * n.x, y: eta * d.y + c * n.y };
+  }
+  function geometry(){
+    const h = P.A / 2 * DEG;
+    const left = { x: APEX.x - SIDE * Math.sin(h), y: APEX.y + SIDE * Math.cos(h) };
+    const right = { x: APEX.x + SIDE * Math.sin(h), y: APEX.y + SIDE * Math.cos(h) };
+    return {
+      left, right,
+      nL: { x: -Math.cos(h), y: -Math.sin(h) },                        // normales sortantes des faces
+      nR: { x: Math.cos(h), y: -Math.sin(h) },
+      entry: { x: (APEX.x + left.x) / 2, y: (APEX.y + left.y) / 2 },
+      dIn: { x: Math.cos(h - P.i * DEG), y: Math.sin(h - P.i * DEG) }  // rayon incident
+    };
+  }
+  // Trajet d'une radiation : point de sortie, direction émergente, déviation
+  function trace(g, nm){
+    const n = index(nm);
+    const d2 = refract(g.dIn, g.nL, 1 / n);
+    const ex = g.right.x - APEX.x, ey = g.right.y - APEX.y;            // face de sortie : APEX + s·(ex, ey)
+    const det = d2.x * (-ey) - d2.y * (-ex);
+    if (Math.abs(det) < 1e-9) return { n, d2, exit: null };
+    const bx = APEX.x - g.entry.x, by = APEX.y - g.entry.y;
+    const u = (bx * (-ey) - by * (-ex)) / det, s = (d2.x * by - d2.y * bx) / det;
+    if (u <= 0 || s < 0 || s > 1) return { n, d2, exit: null };        // le rayon atteint la base
+    const exit = { x: g.entry.x + u * d2.x, y: g.entry.y + u * d2.y };
+    const d3 = refract(d2, { x: -g.nR.x, y: -g.nR.y }, n);
+    if (!d3) return { n, d2, exit, d3: null };
+    const dev = Math.acos(clamp(g.dIn.x * d3.x + g.dIn.y * d3.y, -1, 1)) / DEG;
+    return { n, d2, exit, d3, dev };
+  }
+
+  // ---------- Affichage des mesures ----------
+  function updateReadouts(red, vio, lost){
+    out('aLabel', fmt(P.A, 0));
+    out('rNr', fmt(red.n, 3)); out('rNv', fmt(vio.n, 3));
+    out('rDr', red.d3 ? fmt(red.dev, 1) + ' °' : '—');
+    out('rDv', vio.d3 ? fmt(vio.dev, 1) + ' °' : '—');
+    out('rGap', red.d3 && vio.d3 ? fmt(vio.dev - red.dev, 1) + ' °' : '—');
+    if (lost) setStatus('Une partie du spectre ne ressort pas par la seconde face', 'off');
+    else setStatus('Le violet est plus dévié que le rouge', 'ok');
+  }
+
+  // ---------- Rendu ----------
+  function draw(){
+    const g = geometry();
+    const red = trace(g, 700), vio = trace(g, 400);
+    let lost = false;
+    ctx.clearRect(0, 0, W, H);
+
+    // prisme
+    ctx.fillStyle = 'rgba(160,190,230,0.13)'; ctx.strokeStyle = DARK.ink; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.moveTo(APEX.x, APEX.y); ctx.lineTo(g.left.x, g.left.y); ctx.lineTo(g.right.x, g.right.y); ctx.closePath();
+    ctx.fill(); ctx.stroke();
+    ctx.fillStyle = DARK.soft; ctx.font = '14px ' + MONO; ctx.textAlign = 'center';
+    ctx.fillText('A', APEX.x, APEX.y - 10);
+
+    // écran
+    ctx.strokeStyle = DARK.soft; ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.moveTo(X_SCREEN, 20); ctx.lineTo(X_SCREEN, H - 20); ctx.stroke();
+    ctx.font = '13px ' + SANS; ctx.textAlign = 'right';
+    ctx.fillText('écran', X_SCREEN - 10, 32);
+
+    // normale et rayon incident
+    ctx.setLineDash([5, 6]); ctx.strokeStyle = DARK.soft; ctx.lineWidth = 1.2;
+    ctx.beginPath(); ctx.moveTo(g.entry.x + 90 * g.nL.x, g.entry.y + 90 * g.nL.y); ctx.lineTo(g.entry.x - 60 * g.nL.x, g.entry.y - 60 * g.nL.y); ctx.stroke();
+    ctx.setLineDash([]);
+    const start = { x: g.entry.x - 420 * g.dIn.x, y: g.entry.y - 420 * g.dIn.y };
+    ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 4;
+    ctx.beginPath(); ctx.moveTo(start.x, start.y); ctx.lineTo(g.entry.x, g.entry.y); ctx.stroke();
+    ctx.fillStyle = DARK.ink; ctx.font = '13px ' + SANS; ctx.textAlign = 'center';
+    ctx.fillText('lumière blanche', start.x + 230 * g.dIn.x + 26 * g.dIn.y, start.y + 230 * g.dIn.y - 26 * g.dIn.x);
+
+    // rayons colorés, du rouge au violet
+    ctx.globalCompositeOperation = 'lighter'; ctx.lineWidth = 2.2;
+    for (let nm = 700; nm >= 400; nm -= 12.5){
+      const q = trace(g, nm), [r, gr, b] = waveRGB(nm);
+      ctx.strokeStyle = 'rgb(' + r + ',' + gr + ',' + b + ')';
+      ctx.beginPath(); ctx.moveTo(g.entry.x, g.entry.y);
+      if (!q.exit){ ctx.lineTo(g.entry.x + 400 * q.d2.x, g.entry.y + 400 * q.d2.y); ctx.stroke(); lost = true; continue; }
+      ctx.lineTo(q.exit.x, q.exit.y);
+      if (!q.d3){ ctx.stroke(); lost = true; continue; }
+      const len = q.d3.x > 0.05 ? (X_SCREEN - q.exit.x) / q.d3.x : 700;
+      ctx.lineTo(q.exit.x + len * q.d3.x, q.exit.y + len * q.d3.y); ctx.stroke();
+    }
+    ctx.globalCompositeOperation = 'source-over';
+    updateReadouts(red, vio, lost);
+  }
+
+  // ---------- Interactions ----------
+  bind('inc', v => { P.i = v; }, v => fmt(v, 1) + ' °');
+  bind('apex', v => { P.A = v; }, v => fmt(v, 0) + ' °');
+  $('glass').addEventListener('change', e => { P.glass = e.target.value; });
+
+  // ---------- Boucle de rendu ----------
+  function loop(){ draw(); requestAnimationFrame(loop); }
+  requestAnimationFrame(loop);
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,588 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Pile Daniell</title>
+<style>
+  /* ---------- Thème (clair / sombre automatique) ---------- */
+  :root{
+    --bg:#f3ede1;
+    --paper:#fbf8f0;
+    --ink:#22242e;
+    --ink-soft:#5b5a52;
+    --line:#d9d0ba;
+    --wave:#b8362b;
+    --wave-glow:rgba(184,54,43,.14);
+    --accent:#2f6f4f;
+    --blue:#2c5f8a;
+    --brass:#a9793f;
+    --ok:#2f6f4f;
+    --warn:#b8362b;
+    --serif:"Iowan Old Style","Palatino Linotype",Palatino,Georgia,serif;
+    --sans:system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+    --mono:ui-monospace,"Cascadia Mono","SF Mono",Consolas,Menlo,monospace;
+    color-scheme: light dark;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{
+      --bg:#171a21;
+      --paper:#1e222b;
+      --ink:#eae6da;
+      --ink-soft:#9a9689;
+      --line:#33384a;
+      --wave:#ff8a72;
+      --wave-glow:rgba(255,138,114,.14);
+      --accent:#79d6a3;
+      --blue:#7fb4e0;
+      --brass:#c99a5b;
+      --ok:#79d6a3;
+      --warn:#ff8a72;
+    }
+  }
+
+  /* ---------- Mise en page ---------- */
+  *{box-sizing:border-box;}
+  html, body{ margin:0; padding:0; }
+  body{
+    background:var(--bg);
+    color:var(--ink);
+    font-family:var(--sans);
+    padding:28px 16px;
+    display:flex;
+    justify-content:center;
+  }
+  main{
+    width:100%;
+    max-width:920px;
+    display:flex;
+    flex-direction:column;
+    gap:20px;
+  }
+  header{ display:flex; flex-direction:column; gap:4px; }
+  .kicker{
+    font-size:.72rem;
+    text-transform:uppercase;
+    letter-spacing:.08em;
+    color:var(--ink-soft);
+  }
+  h1{
+    font-family:var(--serif);
+    font-weight:600;
+    font-size:clamp(1.5rem, 1.1rem + 1.6vw, 2.2rem);
+    margin:0;
+    text-wrap:balance;
+  }
+  header p{
+    margin:0;
+    color:var(--ink-soft);
+    font-size:.92rem;
+    max-width:66ch;
+  }
+
+  /* ---------- Zone de simulation ---------- */
+  .scene{
+    background:var(--paper);
+    border:1px solid var(--line);
+    border-radius:14px;
+    padding:20px clamp(12px,3vw,28px) 8px;
+    display:flex;
+    flex-direction:column;
+    gap:6px;
+  }
+  .scene-top{
+    display:flex;
+    justify-content:space-between;
+    align-items:baseline;
+    gap:12px;
+    flex-wrap:wrap;
+  }
+  .scene-title{ font-family:var(--serif); font-weight:600; }
+  .status{
+    font-family:var(--mono);
+    font-size:.82rem;
+    padding:3px 10px;
+    border-radius:999px;
+    border:1px solid var(--line);
+    color:var(--ink-soft);
+  }
+  .status.ok{ color:var(--ok); border-color:var(--ok); }
+  .status.off{ color:var(--warn); border-color:var(--warn); }
+  canvas{
+    width:100%;
+    height:auto;
+    display:block;
+  }
+  canvas.draggable{ touch-action:none; cursor:grab; }
+  canvas.dragging{ cursor:grabbing; }
+  .hint{ margin:0; font-size:.78rem; color:var(--ink-soft); }
+
+  /* ---------- Mesures ---------- */
+  .readouts{
+    display:grid;
+    grid-template-columns:repeat(auto-fit,minmax(150px,1fr));
+    gap:10px 18px;
+    padding-block:10px;
+    border-top:1px solid var(--line);
+    margin-top:6px;
+  }
+  .readout{ display:flex; flex-direction:column; gap:2px; }
+  .readout .label{
+    font-size:.78rem;
+    color:var(--ink-soft);
+  }
+  .readout .value{
+    font-family:var(--mono);
+    font-variant-numeric:tabular-nums;
+    font-size:1.05rem;
+    font-weight:500;
+  }
+  .readout .value em{ color:var(--blue); font-style:normal; font-size:.9rem; }
+
+  /* ---------- Contrôles ---------- */
+  .panel{
+    background:var(--paper);
+    border:1px solid var(--line);
+    border-radius:14px;
+    padding:18px clamp(14px,3vw,26px);
+    display:flex;
+    flex-direction:column;
+    gap:18px;
+  }
+  .controls{
+    display:grid;
+    grid-template-columns:repeat(auto-fit,minmax(240px,1fr));
+    gap:18px 32px;
+  }
+  .control{ display:flex; flex-direction:column; gap:6px; }
+  .control .row{
+    display:flex;
+    justify-content:space-between;
+    align-items:baseline;
+    gap:10px;
+  }
+  .control label{ font-size:.86rem; font-weight:500; }
+  .control .num{
+    font-family:var(--mono);
+    font-variant-numeric:tabular-nums;
+    color:var(--wave);
+    font-size:.92rem;
+  }
+  input[type=range]{
+    -webkit-appearance:none;
+    appearance:none;
+    width:100%;
+    height:4px;
+    margin:8px 0;
+    border-radius:999px;
+    background:var(--line);
+    outline:none;
+  }
+  input[type=range]::-webkit-slider-thumb{
+    -webkit-appearance:none;
+    width:20px; height:20px;
+    border-radius:50%;
+    background:var(--wave);
+    border:2px solid var(--paper);
+    box-shadow:0 0 0 1px var(--line);
+    cursor:pointer;
+  }
+  input[type=range]::-moz-range-thumb{
+    width:18px; height:18px;
+    border-radius:50%;
+    background:var(--wave);
+    border:2px solid var(--paper);
+    box-shadow:0 0 0 1px var(--line);
+    cursor:pointer;
+  }
+  select{
+    font-family:var(--sans);
+    font-size:.86rem;
+    padding:7px 10px;
+    border-radius:8px;
+    border:1px solid var(--line);
+    background:var(--paper);
+    color:var(--ink);
+    width:100%;
+  }
+  .check{
+    display:flex;
+    align-items:center;
+    gap:8px;
+    font-size:.86rem;
+    font-weight:500;
+    cursor:pointer;
+  }
+  .check input{ width:18px; height:18px; accent-color:var(--accent); margin:0; }
+  .buttons{ display:flex; gap:10px; flex-wrap:wrap; }
+  button{
+    font-family:var(--sans);
+    font-size:.86rem;
+    font-weight:500;
+    padding:9px 16px;
+    border-radius:8px;
+    border:1px solid var(--line);
+    background:transparent;
+    color:var(--ink);
+    cursor:pointer;
+  }
+  button.primary{
+    background:var(--accent);
+    border-color:var(--accent);
+    color:var(--paper);
+  }
+  button:focus-visible, input:focus-visible, select:focus-visible{
+    outline:2px solid var(--accent);
+    outline-offset:2px;
+  }
+
+  /* ---------- Formules ---------- */
+  .formula{
+    font-family:var(--mono);
+    font-size:.86rem;
+    color:var(--ink-soft);
+    border-top:1px solid var(--line);
+    padding-top:14px;
+    display:flex;
+    flex-wrap:wrap;
+    gap:6px 22px;
+  }
+  .formula b{ color:var(--ink); font-weight:600; }
+  footer{
+    font-size:.78rem;
+    color:var(--ink-soft);
+    text-align:center;
+    text-wrap:balance;
+  }
+</style>
+</head>
+<body>
+
+<main>
+  <header>
+    <span class="kicker">Chimie</span>
+    <h1>Pile Daniell</h1>
+    <p>Une lame de zinc et une lame de cuivre plongent chacune dans une solution de leurs ions, reliées par un pont salin. Ferme le circuit : les électrons circulent du zinc vers le cuivre. Le zinc se consomme, le cuivre se dépose, jusqu'à l'usure de la pile.</p>
+  </header>
+
+  <section class="scene">
+    <div class="scene-top">
+      <strong class="scene-title">Pile zinc-cuivre, tension à vide 1,10 V</strong>
+      <span id="status" class="status">—</span>
+    </div>
+    <canvas id="stage" style="aspect-ratio:1000/440" aria-label="Les deux demi-piles zinc et cuivre reliées par un pont salin et par un circuit extérieur comportant une résistance et un ampèremètre."></canvas>
+    <p class="hint">Le temps est fortement accéléré : la durée de vie complète de la pile défile en 20 s environ.</p>
+    <div class="readouts">
+      <div class="readout"><span class="label">Intensité I</span><span class="value" id="rI">—</span></div>
+      <div class="readout"><span class="label">Durée de fonctionnement</span><span class="value" id="rT">—</span></div>
+      <div class="readout"><span class="label">Charge débitée Q</span><span class="value" id="rQ">—</span></div>
+      <div class="readout"><span class="label">Masse de zinc restante</span><span class="value" id="rZn">—</span></div>
+      <div class="readout"><span class="label">Masse de cuivre déposée</span><span class="value" id="rCu">—</span></div>
+      <div class="readout"><span class="label">Concentration [Cu²⁺]</span><span class="value" id="rC">—</span></div>
+      <div class="readout"><span class="label">Capacité de la pile</span><span class="value" id="rQmax">—</span></div>
+      <div class="readout"><span class="label">Durée de vie</span><span class="value" id="rLife">—</span></div>
+    </div>
+  </section>
+
+  <section class="panel">
+    <div class="controls">
+      <div class="control">
+        <div class="row"><label for="res">Résistance du circuit R</label><span class="num" id="resVal"></span></div>
+        <input type="range" id="res" min="5" max="100" step="1" value="20">
+      </div>
+      <div class="control">
+        <div class="row"><label for="mzn">Masse initiale de zinc</label><span class="num" id="mznVal"></span></div>
+        <input type="range" id="mzn" min="0.5" max="10" step="0.5" value="5">
+      </div>
+      <div class="control">
+        <div class="row"><label for="ccu">[Cu²⁺] initiale</label><span class="num" id="ccuVal"></span></div>
+        <input type="range" id="ccu" min="0.1" max="1" step="0.05" value="0.5">
+      </div>
+    </div>
+
+    <div class="buttons">
+      <button class="primary" id="toggle">Fermer le circuit</button>
+      <button id="reset">Pile neuve</button>
+    </div>
+
+    <div class="formula">
+      <span>Zn&nbsp;→&nbsp;<b>Zn²⁺&nbsp;+&nbsp;2&nbsp;e⁻</b></span>
+      <span>Cu²⁺&nbsp;+&nbsp;2&nbsp;e⁻&nbsp;→&nbsp;<b>Cu</b></span>
+      <span>Q&nbsp;=&nbsp;<b>I·Δt&nbsp;=&nbsp;n(e⁻)·F</b></span>
+      <span>F&nbsp;=&nbsp;96&nbsp;500&nbsp;C/mol</span>
+    </div>
+  </section>
+
+  <footer>Modèle : tension à vide 1,10 V et résistance interne 2 Ω supposées constantes, 100 mL de solution dans chaque bécher. La pile est usée quand le réactif limitant (zinc ou ions cuivre) est épuisé.</footer>
+</main>
+
+<script>
+(function(){
+  // ---------- Utilitaires ----------
+  const $ = id => document.getElementById(id);
+  const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
+  const fmt = (v, d) => Number.isFinite(v)
+    ? v.toLocaleString('fr-FR', {minimumFractionDigits:d, maximumFractionDigits:d})
+    : '—';
+  const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const MONO = 'ui-monospace, "Cascadia Mono", "SF Mono", Consolas, Menlo, monospace';
+  const SANS = 'system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif';
+
+  // Couleurs du thème, relues si le système bascule clair/sombre
+  const C = {};
+  function readColors(){
+    const s = getComputedStyle(document.documentElement);
+    for (const n of ['bg','paper','ink','ink-soft','line','wave','wave-glow','accent','blue','brass']){
+      C[n.replace(/-(.)/g, (_, c) => c.toUpperCase())] = s.getPropertyValue('--' + n).trim();
+    }
+  }
+  readColors();
+  window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', readColors);
+
+  // Canvas net sur tout écran : on dessine toujours dans un repère logique W × H
+  function setupCanvas(canvas, W, H){
+    const ctx = canvas.getContext('2d');
+    function fit(){
+      const dpr = Math.min(window.devicePixelRatio || 1, 3);
+      const cw = canvas.clientWidth || W;
+      canvas.width = Math.max(1, Math.round(cw * dpr));
+      canvas.height = Math.max(1, Math.round(cw * H / W * dpr));
+      ctx.setTransform(canvas.width / W, 0, 0, canvas.height / H, 0, 0);
+    }
+    window.addEventListener('resize', fit);
+    fit();
+    return ctx;
+  }
+  // Position du pointeur (souris ou doigt) dans le repère logique
+  function pointerPos(canvas, evt, W, H){
+    const r = canvas.getBoundingClientRect();
+    return { x: (evt.clientX - r.left) * W / r.width, y: (evt.clientY - r.top) * H / r.height };
+  }
+  function arrow(ctx, x1, y1, x2, y2, color, width){
+    const len = Math.hypot(x2 - x1, y2 - y1);
+    if (len < 3) return;
+    const a = Math.atan2(y2 - y1, x2 - x1), h = Math.min(10, len * 0.5);
+    ctx.strokeStyle = color; ctx.fillStyle = color; ctx.lineWidth = width || 2.5;
+    ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2 - Math.cos(a) * h * 0.8, y2 - Math.sin(a) * h * 0.8); ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(x2, y2);
+    ctx.lineTo(x2 - h * Math.cos(a - 0.42), y2 - h * Math.sin(a - 0.42));
+    ctx.lineTo(x2 - h * Math.cos(a + 0.42), y2 - h * Math.sin(a + 0.42));
+    ctx.closePath(); ctx.fill();
+  }
+  // Pas "rond" (1, 2, 5 × 10^n) pour graduer un axe
+  function niceStep(x){
+    if (!(x > 0)) return 1;
+    const p = Math.pow(10, Math.floor(Math.log10(x))), m = x / p;
+    return (m < 1.5 ? 1 : m < 3.5 ? 2 : m < 7.5 ? 5 : 10) * p;
+  }
+
+  // Relie un curseur, une liste ou une case à cocher à un paramètre (et affiche sa valeur)
+  function bind(id, onChange, format){
+    const el = $(id), label = $(id + 'Val');
+    const val = () => el.type === 'checkbox' ? el.checked : parseFloat(el.value);
+    const show = () => { if (label && format) label.textContent = format(val()); };
+    el.addEventListener(el.type === 'range' ? 'input' : 'change', () => { onChange(val()); show(); });
+    show();
+  }
+  const out = (id, text) => { $(id).textContent = text; };
+  function setStatus(text, cls){
+    const s = $('status');
+    s.textContent = text; s.className = 'status' + (cls ? ' ' + cls : '');
+  }
+  // Repère gradué dans le rectangle g ; renvoie les conversions X(x) et Y(y)
+  function axes(ctx, g, o){
+    const xMin = o.xMin || 0, yMin = o.yMin || 0;
+    const X = x => g.x + g.w * (x - xMin) / (o.xMax - xMin);
+    const Y = y => g.y + g.h - g.h * (y - yMin) / (o.yMax - yMin);
+    const ink = o.ink || C.ink, soft = o.soft || C.inkSoft, line = o.line || C.line;
+    const sx = niceStep((o.xMax - xMin) / (o.xTicks || 6)), sy = niceStep((o.yMax - yMin) / (o.yTicks || 4));
+    const dec = s => s >= 1 ? 0 : Math.min(4, Math.ceil(-Math.log10(s) - 1e-9));
+    ctx.save();
+    ctx.font = '13px ' + MONO; ctx.lineWidth = 1; ctx.textAlign = 'center';
+    for (let k = Math.ceil(xMin / sx - 1e-9); k * sx <= o.xMax + sx * 1e-6; k++){
+      ctx.strokeStyle = line; ctx.globalAlpha = 0.55;
+      ctx.beginPath(); ctx.moveTo(X(k * sx), g.y); ctx.lineTo(X(k * sx), g.y + g.h); ctx.stroke();
+      ctx.globalAlpha = 1; ctx.fillStyle = soft;
+      ctx.fillText(fmt(k * sx + 0, dec(sx)), X(k * sx), g.y + g.h + 18);
+    }
+    ctx.textAlign = 'right';
+    for (let k = Math.ceil(yMin / sy - 1e-9); k * sy <= o.yMax + sy * 1e-6; k++){
+      ctx.strokeStyle = line; ctx.globalAlpha = 0.55;
+      ctx.beginPath(); ctx.moveTo(g.x, Y(k * sy)); ctx.lineTo(g.x + g.w, Y(k * sy)); ctx.stroke();
+      ctx.globalAlpha = 1; ctx.fillStyle = soft;
+      ctx.fillText(fmt(k * sy + 0, dec(sy)), g.x - 8, Y(k * sy) + 4);
+    }
+    const y0 = yMin < 0 ? Y(0) : g.y + g.h;
+    ctx.strokeStyle = soft; ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.moveTo(g.x, g.y); ctx.lineTo(g.x, g.y + g.h); ctx.moveTo(g.x, y0); ctx.lineTo(g.x + g.w, y0); ctx.stroke();
+    ctx.fillStyle = ink; ctx.textAlign = 'left'; ctx.font = '14px ' + SANS;
+    if (o.title) ctx.fillText(o.title, g.x + 8, g.y - 10);
+    ctx.fillStyle = soft; ctx.textAlign = 'right'; ctx.font = '13px ' + MONO;
+    if (o.xLabel) ctx.fillText(o.xLabel, g.x + g.w, g.y + g.h + 36);
+    ctx.restore();
+    return { X, Y };
+  }
+  // Trace y = fn(x) entre x0 et x1 dans un repère créé par axes()
+  function curve(ctx, G, fn, x0, x1, color, width, dash){
+    if (!(x1 > x0)) return;
+    ctx.save();
+    ctx.strokeStyle = color; ctx.lineWidth = width || 2.5; ctx.lineJoin = 'round';
+    if (dash) ctx.setLineDash(dash);
+    ctx.beginPath();
+    let pen = false;
+    for (let i = 0; i <= 160; i++){
+      const x = x0 + (x1 - x0) * i / 160, y = fn(x);
+      if (!Number.isFinite(y)){ pen = false; continue; }
+      if (pen) ctx.lineTo(G.X(x), G.Y(y)); else { ctx.moveTo(G.X(x), G.Y(y)); pen = true; }
+    }
+    ctx.stroke();
+    ctx.restore();
+  }
+  // Couleur approchée d'une radiation visible (longueur d'onde en nm)
+  function waveRGB(nm){
+    let r = 0, g = 0, b = 0;
+    if (nm < 440){ r = (440 - nm) / 60; b = 1; }
+    else if (nm < 490){ g = (nm - 440) / 50; b = 1; }
+    else if (nm < 510){ g = 1; b = (510 - nm) / 20; }
+    else if (nm < 580){ r = (nm - 510) / 70; g = 1; }
+    else if (nm < 645){ r = 1; g = (645 - nm) / 65; }
+    else { r = 1; }
+    const k = nm < 420 ? 0.35 + 0.65 * (nm - 380) / 40 : nm > 700 ? 0.35 + 0.65 * (780 - nm) / 80 : 1;
+    return [r, g, b].map(v => Math.round(255 * clamp(v * k, 0, 1)));
+  }
+
+  // ---------- Constantes ----------
+  const W = 1000, H = 440;
+  const E_PILE = 1.10, R_INT = 2;            // V, Ω
+  const FARADAY = 96500;                     // C/mol
+  const M_ZN = 65.4, M_CU = 63.5;            // g/mol
+  const VOL = 0.1;                           // L de solution par bécher
+  const LIFE_ANIM = 20;                      // durée de vie à l'écran (s)
+  const ZN = { x: 250, top: 150 }, CU = { x: 750, top: 150 };
+  // trajet des électrons dans le circuit extérieur (du zinc vers le cuivre)
+  const WIRE = [[ZN.x, 150], [ZN.x, 60], [CU.x, 60], [CU.x, 150]];
+
+  // ---------- État ----------
+  const canvas = $('stage');
+  const ctx = setupCanvas(canvas, W, H);
+  const P = { R: 20, mZn: 5, cCu: 0.5 };
+  let t = 0, charge = 0;                     // durée de fonctionnement (s), charge débitée (C)
+  let closed = false, drift = 0;
+  let last = performance.now();
+
+  // ---------- Chimie et électricité ----------
+  const current = () => E_PILE / (P.R + R_INT);
+  const xMax = () => Math.min(P.mZn / M_ZN, P.cCu * VOL);            // avancement maximal (mol)
+  const lifetime = () => 2 * xMax() * FARADAY / current();            // s
+  const advancement = () => Math.min(xMax(), charge / (2 * FARADAY));
+  const fmtDuration = s => s < 3600 ? fmt(s / 60, 0) + ' min' : fmt(s / 3600, 1) + ' h';
+
+  // ---------- Affichage des mesures ----------
+  function updateReadouts(x, dead){
+    out('rI', fmt(current() * 1000, 1) + ' mA');
+    out('rT', fmtDuration(t));
+    out('rQ', fmt(2 * x * FARADAY, 0) + ' C');
+    out('rZn', fmt(P.mZn - x * M_ZN, 2) + ' g');
+    out('rCu', fmt(x * M_CU, 2) + ' g');
+    out('rC', fmt(P.cCu - x / VOL, 3) + ' mol/L');
+    out('rQmax', fmt(2 * xMax() * FARADAY, 0) + ' C');
+    out('rLife', fmtDuration(lifetime()));
+    if (dead) setStatus('Pile usée : ' + (P.mZn / M_ZN < P.cCu * VOL ? 'le zinc' : 'les ions Cu²⁺') + ' sont épuisés', 'off');
+    else if (closed) setStatus('La pile débite ' + fmt(current() * 1000, 1) + ' mA', 'ok');
+    else setStatus('Circuit ouvert');
+  }
+
+  // ---------- Rendu ----------
+  function beaker(cx, color, label, sub){
+    const x = cx - 130, y = 200, w = 260, h = 190;
+    ctx.fillStyle = 'rgba(150,160,175,0.18)'; ctx.fillRect(x, y + 40, w, h - 40);
+    ctx.fillStyle = color; ctx.fillRect(x, y + 40, w, h - 40);
+    ctx.strokeStyle = C.ink; ctx.lineWidth = 2.5; ctx.lineJoin = 'round';
+    ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x, y + h); ctx.lineTo(x + w, y + h); ctx.lineTo(x + w, y); ctx.stroke();
+    ctx.fillStyle = C.ink; ctx.font = '14px ' + SANS; ctx.textAlign = 'center';
+    ctx.fillText(label, cx, y + h + 22);
+    ctx.fillStyle = C.inkSoft; ctx.font = '13px ' + MONO;
+    ctx.fillText(sub, cx, y + h + 40);
+  }
+  function draw(){
+    const x = advancement(), dead = x >= xMax() - 1e-12 && t > 0;
+    updateReadouts(x, dead);
+    ctx.clearRect(0, 0, W, H);
+
+    // demi-piles : la teinte bleue suit la concentration en ions cuivre
+    beaker(ZN.x, 'rgba(0,0,0,0)', 'Lame de zinc — borne −', 'oxydation : Zn → Zn²⁺ + 2 e⁻');
+    beaker(CU.x, 'rgba(38,110,205,' + (1 - Math.exp(-3.2 * (P.cCu - x / VOL))).toFixed(3) + ')', 'Lame de cuivre — borne +', 'réduction : Cu²⁺ + 2 e⁻ → Cu');
+
+    // pont salin
+    ctx.strokeStyle = C.line; ctx.lineWidth = 22; ctx.lineJoin = 'round';
+    ctx.beginPath(); ctx.moveTo(350, 330); ctx.lineTo(350, 185); ctx.lineTo(650, 185); ctx.lineTo(650, 330); ctx.stroke();
+    ctx.strokeStyle = C.inkSoft; ctx.lineWidth = 1;
+    ctx.fillStyle = C.inkSoft; ctx.font = '13px ' + SANS; ctx.textAlign = 'center';
+    ctx.fillText('pont salin', 500, 216);
+
+    // électrodes : le zinc s'amincit, le cuivre s'épaissit
+    const wZn = 8 + 30 * (P.mZn - x * M_ZN) / 10, wCu = 22 + 30 * x * M_CU / 10;
+    ctx.fillStyle = '#9aa3ad'; ctx.fillRect(ZN.x - wZn / 2, ZN.top, wZn, 210);
+    ctx.fillStyle = C.brass; ctx.fillRect(CU.x - wCu / 2, CU.top, wCu, 210);
+
+    // circuit extérieur : résistance et ampèremètre
+    ctx.strokeStyle = C.ink; ctx.lineWidth = 2; ctx.lineJoin = 'round';
+    ctx.beginPath(); WIRE.forEach((p, k) => k ? ctx.lineTo(p[0], p[1]) : ctx.moveTo(p[0], p[1])); ctx.stroke();
+    ctx.fillStyle = C.paper; ctx.fillRect(390, 48, 80, 24); ctx.strokeRect(390, 48, 80, 24);
+    ctx.fillStyle = C.ink; ctx.font = '600 14px ' + MONO; ctx.textAlign = 'center';
+    ctx.fillText('R', 430, 65);
+    ctx.fillStyle = C.paper; ctx.beginPath(); ctx.arc(590, 60, 19, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = C.ink; ctx.fillText('A', 590, 65);
+    ctx.fillStyle = C.wave; ctx.font = '14px ' + MONO;
+    ctx.fillText((closed && !dead ? fmt(current() * 1000, 1) : '0,0') + ' mA', 590, 28);
+    ctx.fillStyle = C.inkSoft; ctx.font = '13px ' + MONO;
+    ctx.fillText(fmt(P.R, 0) + ' Ω', 430, 34);
+
+    // électrons en mouvement
+    if (closed && !dead){
+      const per = 90 + 500 + 90, n = 14;
+      ctx.fillStyle = C.accent;
+      for (let k = 0; k < n; k++){
+        const s = ((k / n) * per + drift) % per;
+        const px = s < 90 ? ZN.x : s < 590 ? ZN.x + (s - 90) : CU.x;
+        const py = s < 90 ? 150 - s : s < 590 ? 60 : 60 + (s - 590);
+        ctx.beginPath(); ctx.arc(px, py, 4, 0, Math.PI * 2); ctx.fill();
+      }
+      ctx.font = '13px ' + SANS; ctx.textAlign = 'center';
+      ctx.fillText('électrons →', 300, 50);
+      ctx.fillStyle = C.brass; ctx.fillText('← courant I', 700, 50);
+    }
+  }
+
+  // ---------- Interactions ----------
+  function setClosed(v){ closed = v; $('toggle').textContent = closed ? 'Ouvrir le circuit' : 'Fermer le circuit'; }
+  const fresh = () => { t = 0; charge = 0; setClosed(false); };
+  bind('res', v => { P.R = v; }, v => fmt(v, 0) + ' Ω');
+  bind('mzn', v => { P.mZn = v; fresh(); }, v => fmt(v, 1) + ' g');
+  bind('ccu', v => { P.cCu = v; fresh(); }, v => fmt(v, 2) + ' mol/L');
+  $('toggle').addEventListener('click', () => {
+    if (advancement() >= xMax() - 1e-12 && t > 0){ t = 0; charge = 0; }   // pile usée : on repart d'une pile neuve
+    setClosed(!closed); last = performance.now();
+  });
+  $('reset').addEventListener('click', fresh);
+
+  // ---------- Boucle d'animation ----------
+  function loop(now){
+    const dt = Math.min((now - last) / 1000, 0.05);
+    last = now;
+    if (closed){
+      const qMax = 2 * xMax() * FARADAY;
+      const step = Math.min(reduceMotion ? Infinity : dt * lifetime() / LIFE_ANIM, (qMax - charge) / current());
+      t += step; charge += current() * step;
+      drift += dt * 120;
+      if (charge >= qMax - 1e-9) setClosed(false);
+    }
+    draw();
+    requestAnimationFrame(loop);
+  }
+  requestAnimationFrame(loop);
+})();
+</script>
+</body>
+</html>

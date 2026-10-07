@@ -1,0 +1,603 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Pendule simple</title>
+<style>
+  /* ---------- Thème (clair / sombre automatique) ---------- */
+  :root{
+    --bg:#f3ede1;
+    --paper:#fbf8f0;
+    --ink:#22242e;
+    --ink-soft:#5b5a52;
+    --line:#d9d0ba;
+    --wave:#b8362b;
+    --wave-glow:rgba(184,54,43,.14);
+    --accent:#2f6f4f;
+    --blue:#2c5f8a;
+    --brass:#a9793f;
+    --ok:#2f6f4f;
+    --warn:#b8362b;
+    --serif:"Iowan Old Style","Palatino Linotype",Palatino,Georgia,serif;
+    --sans:system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+    --mono:ui-monospace,"Cascadia Mono","SF Mono",Consolas,Menlo,monospace;
+    color-scheme: light dark;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{
+      --bg:#171a21;
+      --paper:#1e222b;
+      --ink:#eae6da;
+      --ink-soft:#9a9689;
+      --line:#33384a;
+      --wave:#ff8a72;
+      --wave-glow:rgba(255,138,114,.14);
+      --accent:#79d6a3;
+      --blue:#7fb4e0;
+      --brass:#c99a5b;
+      --ok:#79d6a3;
+      --warn:#ff8a72;
+    }
+  }
+
+  /* ---------- Mise en page ---------- */
+  *{box-sizing:border-box;}
+  html, body{ margin:0; padding:0; }
+  body{
+    background:var(--bg);
+    color:var(--ink);
+    font-family:var(--sans);
+    padding:28px 16px;
+    display:flex;
+    justify-content:center;
+  }
+  main{
+    width:100%;
+    max-width:920px;
+    display:flex;
+    flex-direction:column;
+    gap:20px;
+  }
+  header{ display:flex; flex-direction:column; gap:4px; }
+  .kicker{
+    font-size:.72rem;
+    text-transform:uppercase;
+    letter-spacing:.08em;
+    color:var(--ink-soft);
+  }
+  h1{
+    font-family:var(--serif);
+    font-weight:600;
+    font-size:clamp(1.5rem, 1.1rem + 1.6vw, 2.2rem);
+    margin:0;
+    text-wrap:balance;
+  }
+  header p{
+    margin:0;
+    color:var(--ink-soft);
+    font-size:.92rem;
+    max-width:66ch;
+  }
+
+  /* ---------- Zone de simulation ---------- */
+  .scene{
+    background:var(--paper);
+    border:1px solid var(--line);
+    border-radius:14px;
+    padding:20px clamp(12px,3vw,28px) 8px;
+    display:flex;
+    flex-direction:column;
+    gap:6px;
+  }
+  .scene-top{
+    display:flex;
+    justify-content:space-between;
+    align-items:baseline;
+    gap:12px;
+    flex-wrap:wrap;
+  }
+  .scene-title{ font-family:var(--serif); font-weight:600; }
+  .status{
+    font-family:var(--mono);
+    font-size:.82rem;
+    padding:3px 10px;
+    border-radius:999px;
+    border:1px solid var(--line);
+    color:var(--ink-soft);
+  }
+  .status.ok{ color:var(--ok); border-color:var(--ok); }
+  .status.off{ color:var(--warn); border-color:var(--warn); }
+  canvas{
+    width:100%;
+    height:auto;
+    display:block;
+  }
+  canvas.draggable{ touch-action:none; cursor:grab; }
+  canvas.dragging{ cursor:grabbing; }
+  .hint{ margin:0; font-size:.78rem; color:var(--ink-soft); }
+
+  /* ---------- Mesures ---------- */
+  .readouts{
+    display:grid;
+    grid-template-columns:repeat(auto-fit,minmax(150px,1fr));
+    gap:10px 18px;
+    padding-block:10px;
+    border-top:1px solid var(--line);
+    margin-top:6px;
+  }
+  .readout{ display:flex; flex-direction:column; gap:2px; }
+  .readout .label{
+    font-size:.78rem;
+    color:var(--ink-soft);
+  }
+  .readout .value{
+    font-family:var(--mono);
+    font-variant-numeric:tabular-nums;
+    font-size:1.05rem;
+    font-weight:500;
+  }
+  .readout .value em{ color:var(--blue); font-style:normal; font-size:.9rem; }
+
+  /* ---------- Contrôles ---------- */
+  .panel{
+    background:var(--paper);
+    border:1px solid var(--line);
+    border-radius:14px;
+    padding:18px clamp(14px,3vw,26px);
+    display:flex;
+    flex-direction:column;
+    gap:18px;
+  }
+  .controls{
+    display:grid;
+    grid-template-columns:repeat(auto-fit,minmax(240px,1fr));
+    gap:18px 32px;
+  }
+  .control{ display:flex; flex-direction:column; gap:6px; }
+  .control .row{
+    display:flex;
+    justify-content:space-between;
+    align-items:baseline;
+    gap:10px;
+  }
+  .control label{ font-size:.86rem; font-weight:500; }
+  .control .num{
+    font-family:var(--mono);
+    font-variant-numeric:tabular-nums;
+    color:var(--wave);
+    font-size:.92rem;
+  }
+  input[type=range]{
+    -webkit-appearance:none;
+    appearance:none;
+    width:100%;
+    height:4px;
+    margin:8px 0;
+    border-radius:999px;
+    background:var(--line);
+    outline:none;
+  }
+  input[type=range]::-webkit-slider-thumb{
+    -webkit-appearance:none;
+    width:20px; height:20px;
+    border-radius:50%;
+    background:var(--wave);
+    border:2px solid var(--paper);
+    box-shadow:0 0 0 1px var(--line);
+    cursor:pointer;
+  }
+  input[type=range]::-moz-range-thumb{
+    width:18px; height:18px;
+    border-radius:50%;
+    background:var(--wave);
+    border:2px solid var(--paper);
+    box-shadow:0 0 0 1px var(--line);
+    cursor:pointer;
+  }
+  select{
+    font-family:var(--sans);
+    font-size:.86rem;
+    padding:7px 10px;
+    border-radius:8px;
+    border:1px solid var(--line);
+    background:var(--paper);
+    color:var(--ink);
+    width:100%;
+  }
+  .check{
+    display:flex;
+    align-items:center;
+    gap:8px;
+    font-size:.86rem;
+    font-weight:500;
+    cursor:pointer;
+  }
+  .check input{ width:18px; height:18px; accent-color:var(--accent); margin:0; }
+  .buttons{ display:flex; gap:10px; flex-wrap:wrap; }
+  button{
+    font-family:var(--sans);
+    font-size:.86rem;
+    font-weight:500;
+    padding:9px 16px;
+    border-radius:8px;
+    border:1px solid var(--line);
+    background:transparent;
+    color:var(--ink);
+    cursor:pointer;
+  }
+  button.primary{
+    background:var(--accent);
+    border-color:var(--accent);
+    color:var(--paper);
+  }
+  button:focus-visible, input:focus-visible, select:focus-visible{
+    outline:2px solid var(--accent);
+    outline-offset:2px;
+  }
+
+  /* ---------- Formules ---------- */
+  .formula{
+    font-family:var(--mono);
+    font-size:.86rem;
+    color:var(--ink-soft);
+    border-top:1px solid var(--line);
+    padding-top:14px;
+    display:flex;
+    flex-wrap:wrap;
+    gap:6px 22px;
+  }
+  .formula b{ color:var(--ink); font-weight:600; }
+  footer{
+    font-size:.78rem;
+    color:var(--ink-soft);
+    text-align:center;
+    text-wrap:balance;
+  }
+</style>
+</head>
+<body>
+
+<main>
+  <header>
+    <span class="kicker">Mécanique</span>
+    <h1>Pendule simple</h1>
+    <p>Une masse suspendue à un fil oscille sans frottement. Change la longueur, la masse, l'angle de départ ou la pesanteur : de quoi la période dépend-elle vraiment ? Observe aussi l'échange permanent entre énergie cinétique et énergie potentielle.</p>
+  </header>
+
+  <section class="scene">
+    <div class="scene-top">
+      <strong class="scene-title">Fil de longueur L = <span id="lLabel">1,00</span> m</strong>
+      <span id="status" class="status ok">Petites oscillations</span>
+    </div>
+    <canvas id="stage" class="draggable" style="aspect-ratio:1000/500" aria-label="Animation du pendule. Fais glisser la masse pour choisir l'angle de départ."></canvas>
+    <p class="hint">Fais glisser la masse pour l'écarter de la verticale, puis relâche-la.</p>
+    <div class="readouts">
+      <div class="readout"><span class="label">Période théorique T₀</span><span class="value" id="rT0">—</span></div>
+      <div class="readout"><span class="label">Période mesurée</span><span class="value" id="rTm">—</span></div>
+      <div class="readout"><span class="label">Fréquence f</span><span class="value" id="rF">—</span></div>
+      <div class="readout"><span class="label">Angle θ</span><span class="value" id="rTheta">—</span></div>
+      <div class="readout"><span class="label">Vitesse v</span><span class="value" id="rV">—</span></div>
+      <div class="readout"><span class="label">Énergie cinétique</span><span class="value" id="rEc">—</span></div>
+      <div class="readout"><span class="label">Énergie potentielle</span><span class="value" id="rEp">—</span></div>
+      <div class="readout"><span class="label">Énergie mécanique</span><span class="value" id="rEm">—</span></div>
+    </div>
+  </section>
+
+  <section class="panel">
+    <div class="controls">
+      <div class="control">
+        <div class="row"><label for="len">Longueur du fil L</label><span class="num" id="lenVal"></span></div>
+        <input type="range" id="len" min="0.2" max="2" step="0.01" value="1">
+      </div>
+      <div class="control">
+        <div class="row"><label for="mass">Masse m</label><span class="num" id="massVal"></span></div>
+        <input type="range" id="mass" min="50" max="500" step="10" value="200">
+      </div>
+      <div class="control">
+        <div class="row"><label for="angle">Angle initial θ₀</label><span class="num" id="angleVal"></span></div>
+        <input type="range" id="angle" min="1" max="80" step="1" value="15">
+      </div>
+      <div class="control">
+        <div class="row"><label for="grav">Pesanteur g</label><span class="num" id="gravVal"></span></div>
+        <select id="grav">
+          <option value="9.81">Terre — 9,81 m/s²</option>
+          <option value="1.62">Lune — 1,62 m/s²</option>
+          <option value="3.71">Mars — 3,71 m/s²</option>
+          <option value="24.8">Jupiter — 24,8 m/s²</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="buttons">
+      <button class="primary" id="toggle">Mettre en pause</button>
+      <button id="reset">Revenir à θ₀</button>
+    </div>
+
+    <div class="formula">
+      <span>T₀&nbsp;=&nbsp;<b>2π·√(L&nbsp;/&nbsp;g)</b></span>
+      <span>f&nbsp;=&nbsp;<b>1&nbsp;/&nbsp;T</b></span>
+      <span>E<sub>c</sub>&nbsp;=&nbsp;<b>½·m·v²</b></span>
+      <span>E<sub>pp</sub>&nbsp;=&nbsp;<b>m·g·L·(1&nbsp;−&nbsp;cos&nbsp;θ)</b></span>
+      <span>E<sub>m</sub>&nbsp;=&nbsp;<b>E<sub>c</sub>&nbsp;+&nbsp;E<sub>pp</sub></b></span>
+    </div>
+  </section>
+
+  <footer>Modèle : fil inextensible sans masse, aucun frottement. Le mouvement est calculé sans approximation ; T₀ = 2π√(L/g) n'est valable que pour les petits angles (θ₀ ≲ 15°–20°). L'énergie potentielle est comptée à partir du point le plus bas.</footer>
+</main>
+
+<script>
+(function(){
+  // ---------- Utilitaires ----------
+  const $ = id => document.getElementById(id);
+  const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
+  const fmt = (v, d) => Number.isFinite(v)
+    ? v.toLocaleString('fr-FR', {minimumFractionDigits:d, maximumFractionDigits:d})
+    : '—';
+  const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const MONO = 'ui-monospace, "Cascadia Mono", "SF Mono", Consolas, Menlo, monospace';
+  const SANS = 'system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif';
+
+  // Couleurs du thème, relues si le système bascule clair/sombre
+  const C = {};
+  function readColors(){
+    const s = getComputedStyle(document.documentElement);
+    for (const n of ['bg','paper','ink','ink-soft','line','wave','wave-glow','accent','blue','brass']){
+      C[n.replace(/-(.)/g, (_, c) => c.toUpperCase())] = s.getPropertyValue('--' + n).trim();
+    }
+  }
+  readColors();
+  window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', readColors);
+
+  // Canvas net sur tout écran : on dessine toujours dans un repère logique W × H
+  function setupCanvas(canvas, W, H){
+    const ctx = canvas.getContext('2d');
+    function fit(){
+      const dpr = Math.min(window.devicePixelRatio || 1, 3);
+      const cw = canvas.clientWidth || W;
+      canvas.width = Math.max(1, Math.round(cw * dpr));
+      canvas.height = Math.max(1, Math.round(cw * H / W * dpr));
+      ctx.setTransform(canvas.width / W, 0, 0, canvas.height / H, 0, 0);
+    }
+    window.addEventListener('resize', fit);
+    fit();
+    return ctx;
+  }
+  // Position du pointeur (souris ou doigt) dans le repère logique
+  function pointerPos(canvas, evt, W, H){
+    const r = canvas.getBoundingClientRect();
+    return { x: (evt.clientX - r.left) * W / r.width, y: (evt.clientY - r.top) * H / r.height };
+  }
+  function arrow(ctx, x1, y1, x2, y2, color, width){
+    const len = Math.hypot(x2 - x1, y2 - y1);
+    if (len < 3) return;
+    const a = Math.atan2(y2 - y1, x2 - x1), h = Math.min(10, len * 0.5);
+    ctx.strokeStyle = color; ctx.fillStyle = color; ctx.lineWidth = width || 2.5;
+    ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2 - Math.cos(a) * h * 0.8, y2 - Math.sin(a) * h * 0.8); ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(x2, y2);
+    ctx.lineTo(x2 - h * Math.cos(a - 0.42), y2 - h * Math.sin(a - 0.42));
+    ctx.lineTo(x2 - h * Math.cos(a + 0.42), y2 - h * Math.sin(a + 0.42));
+    ctx.closePath(); ctx.fill();
+  }
+  // Pas "rond" (1, 2, 5 × 10^n) pour graduer un axe
+  function niceStep(x){
+    if (!(x > 0)) return 1;
+    const p = Math.pow(10, Math.floor(Math.log10(x))), m = x / p;
+    return (m < 1.5 ? 1 : m < 3.5 ? 2 : m < 7.5 ? 5 : 10) * p;
+  }
+
+  // ---------- Constantes ----------
+  const W = 1000, H = 500;
+  const PIVOT = { x: 400, y: 36 };
+  const PPM = 190;                       // pixels par mètre
+  const ANGLE_MAX = 80 * Math.PI / 180;
+
+  // ---------- État ----------
+  const canvas = $('stage');
+  const ctx = setupCanvas(canvas, W, H);
+  const P = { L: 1, m: 0.2, theta0: 15 * Math.PI / 180, g: 9.81 };
+  let theta = P.theta0, omega = 0, t = 0;
+  let playing = !reduceMotion, dragging = false;
+  let lastCross = null, Tmes = null;
+  let last = performance.now();
+
+  // ---------- Physique ----------
+  // Moyenne arithmético-géométrique : donne la période exacte à grand angle
+  function agm(a, b){ for (let i = 0; i < 12; i++){ const a2 = (a + b) / 2; b = Math.sqrt(a * b); a = a2; } return a; }
+  const T0 = () => 2 * Math.PI * Math.sqrt(P.L / P.g);
+  const Texact = () => T0() / agm(1, Math.cos(P.theta0 / 2));
+
+  // θ'' = −(g/L)·sin θ, intégré par Runge-Kutta d'ordre 4
+  function step(h){
+    const k = P.g / P.L, acc = th => -k * Math.sin(th);
+    const k1t = omega,             k1w = acc(theta);
+    const k2t = omega + h/2 * k1w, k2w = acc(theta + h/2 * k1t);
+    const k3t = omega + h/2 * k2w, k3w = acc(theta + h/2 * k2t);
+    const k4t = omega + h * k3w,   k4w = acc(theta + h * k3t);
+    const prev = theta;
+    theta += h / 6 * (k1t + 2*k2t + 2*k3t + k4t);
+    omega += h / 6 * (k1w + 2*k2w + 2*k3w + k4w);
+    t += h;
+    // Chronométrage : passages par la verticale dans le même sens
+    if (prev < 0 && theta >= 0){
+      const tc = t - h * theta / (theta - prev);
+      if (lastCross !== null) Tmes = tc - lastCross;
+      lastCross = tc;
+    }
+  }
+  function restart(){
+    theta = P.theta0; omega = 0; t = 0; lastCross = null; Tmes = null;
+  }
+
+  // ---------- Affichage des mesures ----------
+  function updateReadouts(){
+    const v = P.L * omega;
+    const Ec = 0.5 * P.m * v * v;
+    const Ep = P.m * P.g * P.L * (1 - Math.cos(theta));
+    $('lLabel').textContent = fmt(P.L, 2);
+    $('rT0').textContent = fmt(T0(), 3) + ' s';
+    $('rTm').textContent = Tmes ? fmt(Tmes, 3) + ' s' : '… 1 période';
+    $('rF').textContent = fmt(1 / (Tmes || T0()), 3) + ' Hz';
+    $('rTheta').textContent = fmt(theta * 180 / Math.PI, 1) + ' °';
+    $('rV').textContent = fmt(Math.abs(v), 2) + ' m/s';
+    $('rEc').textContent = fmt(Ec * 1000, 1) + ' mJ';
+    $('rEp').textContent = fmt(Ep * 1000, 1) + ' mJ';
+    $('rEm').textContent = fmt((Ec + Ep) * 1000, 1) + ' mJ';
+
+    const ecart = (Texact() / T0() - 1) * 100;
+    const st = $('status');
+    if (Math.abs(P.theta0) <= 15.5 * Math.PI / 180){
+      st.textContent = 'Petites oscillations : T ≈ T₀';
+      st.className = 'status ok';
+    } else {
+      st.textContent = 'Grand angle : T dépasse T₀ de ' + fmt(ecart, 1) + ' %';
+      st.className = 'status off';
+    }
+    return { v, Ec, Ep };
+  }
+
+  // ---------- Rendu ----------
+  function draw(){
+    const e = updateReadouts();
+    ctx.clearRect(0, 0, W, H);
+    const Lpx = P.L * PPM;
+    const bx = PIVOT.x + Lpx * Math.sin(theta), by = PIVOT.y + Lpx * Math.cos(theta);
+    const r = 9 + 13 * Math.cbrt(P.m / 0.5);
+
+    // support
+    ctx.fillStyle = C.inkSoft;
+    ctx.fillRect(PIVOT.x - 90, PIVOT.y - 12, 180, 8);
+    ctx.strokeStyle = C.line; ctx.lineWidth = 1;
+    for (let x = -84; x <= 84; x += 14){
+      ctx.beginPath(); ctx.moveTo(PIVOT.x + x, PIVOT.y - 12); ctx.lineTo(PIVOT.x + x + 8, PIVOT.y - 22); ctx.stroke();
+    }
+
+    // verticale et arc parcouru entre −θ₀ et +θ₀
+    ctx.setLineDash([5, 6]);
+    ctx.strokeStyle = C.line; ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.moveTo(PIVOT.x, PIVOT.y); ctx.lineTo(PIVOT.x, PIVOT.y + Lpx + 34); ctx.stroke();
+    const a0 = Math.abs(P.theta0);
+    ctx.beginPath(); ctx.arc(PIVOT.x, PIVOT.y, Lpx, Math.PI/2 - a0, Math.PI/2 + a0); ctx.stroke();
+    ctx.setLineDash([]);
+
+    // secteur angulaire θ
+    if (Math.abs(theta) > 0.01){
+      const ra = Math.min(60, Lpx * 0.45);
+      ctx.fillStyle = C.waveGlow;
+      ctx.beginPath(); ctx.moveTo(PIVOT.x, PIVOT.y);
+      ctx.arc(PIVOT.x, PIVOT.y, ra, Math.PI/2 - Math.max(theta, 0), Math.PI/2 - Math.min(theta, 0));
+      ctx.closePath(); ctx.fill();
+      ctx.fillStyle = C.wave; ctx.font = '15px ' + MONO; ctx.textAlign = 'center';
+      const am = Math.PI/2 - theta/2;
+      ctx.fillText('θ', PIVOT.x + (ra + 14) * Math.cos(am), PIVOT.y + (ra + 14) * Math.sin(am) + 5);
+    }
+
+    // fil
+    ctx.strokeStyle = C.ink; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.moveTo(PIVOT.x, PIVOT.y); ctx.lineTo(bx, by); ctx.stroke();
+    ctx.fillStyle = C.ink;
+    ctx.beginPath(); ctx.arc(PIVOT.x, PIVOT.y, 4, 0, Math.PI * 2); ctx.fill();
+
+    // vecteur vitesse (tangent à la trajectoire)
+    const vmax = Math.sqrt(2 * P.g * P.L * (1 - Math.cos(P.theta0)));
+    if (vmax > 1e-6 && !dragging){
+      const s = 90 * e.v / Math.max(vmax, 1e-6);
+      arrow(ctx, bx, by, bx + s * Math.cos(theta), by - s * Math.sin(theta), C.accent, 3);
+    }
+
+    // masse
+    ctx.fillStyle = dragging ? C.accent : C.brass;
+    ctx.beginPath(); ctx.arc(bx, by, r, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = C.paper; ctx.lineWidth = 2; ctx.stroke();
+
+    // barres d'énergie
+    const Emax = P.m * P.g * P.L * (1 - Math.cos(P.theta0));
+    const bars = [
+      { label: 'Ec', value: e.Ec, color: C.wave },
+      { label: 'Epp', value: e.Ep, color: C.blue },
+      { label: 'Em', value: e.Ec + e.Ep, color: C.ink }
+    ];
+    const baseY = 430, maxH = 320, bw = 38;
+    ctx.font = '14px ' + SANS; ctx.textAlign = 'left'; ctx.fillStyle = C.inkSoft;
+    ctx.fillText('Énergies', 838, baseY - maxH - 22);
+    ctx.textAlign = 'center';
+    bars.forEach((b, i) => {
+      const x = 838 + i * 52;
+      const hgt = Emax > 1e-9 ? clamp(b.value / Emax, 0, 1.05) * maxH : 0;
+      ctx.strokeStyle = C.line; ctx.lineWidth = 1;
+      ctx.strokeRect(x, baseY - maxH, bw, maxH);
+      ctx.fillStyle = b.color;
+      ctx.fillRect(x, baseY - hgt, bw, hgt);
+      ctx.fillStyle = C.inkSoft; ctx.font = '14px ' + MONO;
+      ctx.fillText(b.label, x + bw / 2, baseY + 22);
+    });
+    ctx.strokeStyle = C.inkSoft; ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.moveTo(828, baseY); ctx.lineTo(990, baseY); ctx.stroke();
+
+    // légende
+    ctx.textAlign = 'left'; ctx.font = '13px ' + SANS; ctx.fillStyle = C.accent;
+    ctx.fillText('→ vitesse', 24, H - 18);
+    ctx.fillStyle = C.inkSoft; ctx.font = '13px ' + MONO;
+    ctx.fillText('t = ' + fmt(t, 1) + ' s', 24, 30);
+  }
+
+  // ---------- Interactions ----------
+  function syncLabels(){
+    $('lenVal').textContent = fmt(P.L, 2) + ' m';
+    $('massVal').textContent = fmt(P.m * 1000, 0) + ' g';
+    $('angleVal').textContent = fmt(P.theta0 * 180 / Math.PI, 0) + ' °';
+    $('gravVal').textContent = fmt(P.g, 2) + ' m/s²';
+    $('toggle').textContent = playing ? 'Mettre en pause' : 'Lancer';
+  }
+  $('len').addEventListener('input', e => { P.L = parseFloat(e.target.value); restart(); syncLabels(); });
+  $('mass').addEventListener('input', e => { P.m = parseFloat(e.target.value) / 1000; syncLabels(); });
+  $('angle').addEventListener('input', e => { P.theta0 = parseFloat(e.target.value) * Math.PI / 180; restart(); syncLabels(); });
+  $('grav').addEventListener('change', e => { P.g = parseFloat(e.target.value); restart(); syncLabels(); });
+  $('toggle').addEventListener('click', () => { playing = !playing; syncLabels(); });
+  $('reset').addEventListener('click', () => { restart(); });
+
+  // Glisser la masse pour fixer l'angle de départ
+  function bobPos(){
+    return { x: PIVOT.x + P.L * PPM * Math.sin(theta), y: PIVOT.y + P.L * PPM * Math.cos(theta) };
+  }
+  function dragTo(p){
+    const a = clamp(Math.atan2(p.x - PIVOT.x, Math.max(p.y - PIVOT.y, 1)), -ANGLE_MAX, ANGLE_MAX);
+    P.theta0 = a; restart();
+    $('angle').value = Math.max(1, Math.round(Math.abs(a) * 180 / Math.PI));
+    syncLabels();
+  }
+  canvas.addEventListener('pointerdown', evt => {
+    const p = pointerPos(canvas, evt, W, H), b = bobPos();
+    if (Math.hypot(p.x - b.x, p.y - b.y) < 46){
+      dragging = true; canvas.classList.add('dragging');
+      canvas.setPointerCapture(evt.pointerId);
+      dragTo(p); evt.preventDefault();
+    }
+  });
+  canvas.addEventListener('pointermove', evt => { if (dragging) dragTo(pointerPos(canvas, evt, W, H)); });
+  function endDrag(){
+    if (!dragging) return;
+    dragging = false; canvas.classList.remove('dragging');
+    playing = true; syncLabels();
+  }
+  canvas.addEventListener('pointerup', endDrag);
+  canvas.addEventListener('pointercancel', endDrag);
+
+  // ---------- Boucle d'animation ----------
+  function loop(now){
+    const dt = Math.min((now - last) / 1000, 0.05);
+    last = now;
+    if (playing && !dragging){
+      const n = Math.max(1, Math.ceil(dt / 0.002));
+      for (let i = 0; i < n; i++) step(dt / n);
+    }
+    draw();
+    requestAnimationFrame(loop);
+  }
+  syncLabels();
+  requestAnimationFrame(loop);
+})();
+</script>
+</body>
+</html>

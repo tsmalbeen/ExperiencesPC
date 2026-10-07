@@ -1,0 +1,589 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mouvement d'un projectile</title>
+<style>
+  /* ---------- Thème (clair / sombre automatique) ---------- */
+  :root{
+    --bg:#f3ede1;
+    --paper:#fbf8f0;
+    --ink:#22242e;
+    --ink-soft:#5b5a52;
+    --line:#d9d0ba;
+    --wave:#b8362b;
+    --wave-glow:rgba(184,54,43,.14);
+    --accent:#2f6f4f;
+    --blue:#2c5f8a;
+    --brass:#a9793f;
+    --ok:#2f6f4f;
+    --warn:#b8362b;
+    --serif:"Iowan Old Style","Palatino Linotype",Palatino,Georgia,serif;
+    --sans:system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+    --mono:ui-monospace,"Cascadia Mono","SF Mono",Consolas,Menlo,monospace;
+    color-scheme: light dark;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{
+      --bg:#171a21;
+      --paper:#1e222b;
+      --ink:#eae6da;
+      --ink-soft:#9a9689;
+      --line:#33384a;
+      --wave:#ff8a72;
+      --wave-glow:rgba(255,138,114,.14);
+      --accent:#79d6a3;
+      --blue:#7fb4e0;
+      --brass:#c99a5b;
+      --ok:#79d6a3;
+      --warn:#ff8a72;
+    }
+  }
+
+  /* ---------- Mise en page ---------- */
+  *{box-sizing:border-box;}
+  html, body{ margin:0; padding:0; }
+  body{
+    background:var(--bg);
+    color:var(--ink);
+    font-family:var(--sans);
+    padding:28px 16px;
+    display:flex;
+    justify-content:center;
+  }
+  main{
+    width:100%;
+    max-width:920px;
+    display:flex;
+    flex-direction:column;
+    gap:20px;
+  }
+  header{ display:flex; flex-direction:column; gap:4px; }
+  .kicker{
+    font-size:.72rem;
+    text-transform:uppercase;
+    letter-spacing:.08em;
+    color:var(--ink-soft);
+  }
+  h1{
+    font-family:var(--serif);
+    font-weight:600;
+    font-size:clamp(1.5rem, 1.1rem + 1.6vw, 2.2rem);
+    margin:0;
+    text-wrap:balance;
+  }
+  header p{
+    margin:0;
+    color:var(--ink-soft);
+    font-size:.92rem;
+    max-width:66ch;
+  }
+
+  /* ---------- Zone de simulation ---------- */
+  .scene{
+    background:var(--paper);
+    border:1px solid var(--line);
+    border-radius:14px;
+    padding:20px clamp(12px,3vw,28px) 8px;
+    display:flex;
+    flex-direction:column;
+    gap:6px;
+  }
+  .scene-top{
+    display:flex;
+    justify-content:space-between;
+    align-items:baseline;
+    gap:12px;
+    flex-wrap:wrap;
+  }
+  .scene-title{ font-family:var(--serif); font-weight:600; }
+  .status{
+    font-family:var(--mono);
+    font-size:.82rem;
+    padding:3px 10px;
+    border-radius:999px;
+    border:1px solid var(--line);
+    color:var(--ink-soft);
+  }
+  .status.ok{ color:var(--ok); border-color:var(--ok); }
+  .status.off{ color:var(--warn); border-color:var(--warn); }
+  canvas{
+    width:100%;
+    height:auto;
+    display:block;
+  }
+  canvas.draggable{ touch-action:none; cursor:grab; }
+  canvas.dragging{ cursor:grabbing; }
+  .hint{ margin:0; font-size:.78rem; color:var(--ink-soft); }
+
+  /* ---------- Mesures ---------- */
+  .readouts{
+    display:grid;
+    grid-template-columns:repeat(auto-fit,minmax(150px,1fr));
+    gap:10px 18px;
+    padding-block:10px;
+    border-top:1px solid var(--line);
+    margin-top:6px;
+  }
+  .readout{ display:flex; flex-direction:column; gap:2px; }
+  .readout .label{
+    font-size:.78rem;
+    color:var(--ink-soft);
+  }
+  .readout .value{
+    font-family:var(--mono);
+    font-variant-numeric:tabular-nums;
+    font-size:1.05rem;
+    font-weight:500;
+  }
+  .readout .value em{ color:var(--blue); font-style:normal; font-size:.9rem; }
+
+  /* ---------- Contrôles ---------- */
+  .panel{
+    background:var(--paper);
+    border:1px solid var(--line);
+    border-radius:14px;
+    padding:18px clamp(14px,3vw,26px);
+    display:flex;
+    flex-direction:column;
+    gap:18px;
+  }
+  .controls{
+    display:grid;
+    grid-template-columns:repeat(auto-fit,minmax(240px,1fr));
+    gap:18px 32px;
+  }
+  .control{ display:flex; flex-direction:column; gap:6px; }
+  .control .row{
+    display:flex;
+    justify-content:space-between;
+    align-items:baseline;
+    gap:10px;
+  }
+  .control label{ font-size:.86rem; font-weight:500; }
+  .control .num{
+    font-family:var(--mono);
+    font-variant-numeric:tabular-nums;
+    color:var(--wave);
+    font-size:.92rem;
+  }
+  input[type=range]{
+    -webkit-appearance:none;
+    appearance:none;
+    width:100%;
+    height:4px;
+    margin:8px 0;
+    border-radius:999px;
+    background:var(--line);
+    outline:none;
+  }
+  input[type=range]::-webkit-slider-thumb{
+    -webkit-appearance:none;
+    width:20px; height:20px;
+    border-radius:50%;
+    background:var(--wave);
+    border:2px solid var(--paper);
+    box-shadow:0 0 0 1px var(--line);
+    cursor:pointer;
+  }
+  input[type=range]::-moz-range-thumb{
+    width:18px; height:18px;
+    border-radius:50%;
+    background:var(--wave);
+    border:2px solid var(--paper);
+    box-shadow:0 0 0 1px var(--line);
+    cursor:pointer;
+  }
+  select{
+    font-family:var(--sans);
+    font-size:.86rem;
+    padding:7px 10px;
+    border-radius:8px;
+    border:1px solid var(--line);
+    background:var(--paper);
+    color:var(--ink);
+    width:100%;
+  }
+  .check{
+    display:flex;
+    align-items:center;
+    gap:8px;
+    font-size:.86rem;
+    font-weight:500;
+    cursor:pointer;
+  }
+  .check input{ width:18px; height:18px; accent-color:var(--accent); margin:0; }
+  .buttons{ display:flex; gap:10px; flex-wrap:wrap; }
+  button{
+    font-family:var(--sans);
+    font-size:.86rem;
+    font-weight:500;
+    padding:9px 16px;
+    border-radius:8px;
+    border:1px solid var(--line);
+    background:transparent;
+    color:var(--ink);
+    cursor:pointer;
+  }
+  button.primary{
+    background:var(--accent);
+    border-color:var(--accent);
+    color:var(--paper);
+  }
+  button:focus-visible, input:focus-visible, select:focus-visible{
+    outline:2px solid var(--accent);
+    outline-offset:2px;
+  }
+
+  /* ---------- Formules ---------- */
+  .formula{
+    font-family:var(--mono);
+    font-size:.86rem;
+    color:var(--ink-soft);
+    border-top:1px solid var(--line);
+    padding-top:14px;
+    display:flex;
+    flex-wrap:wrap;
+    gap:6px 22px;
+  }
+  .formula b{ color:var(--ink); font-weight:600; }
+  footer{
+    font-size:.78rem;
+    color:var(--ink-soft);
+    text-align:center;
+    text-wrap:balance;
+  }
+</style>
+</head>
+<body>
+
+<main>
+  <header>
+    <span class="kicker">Mécanique</span>
+    <h1>Mouvement d'un projectile</h1>
+    <p>Une balle est lancée dans un champ de pesanteur uniforme, sans frottement. Règle la vitesse et l'angle de tir, puis lance : la trajectoire est une parabole. Compare plusieurs tirs — par exemple 30° et 60° — et observe ce que deviennent les composantes de la vitesse.</p>
+  </header>
+
+  <section class="scene">
+    <div class="scene-top">
+      <strong class="scene-title">Tir à <span id="aLabel">45</span>° et <span id="vLabel">15,0</span> m/s</strong>
+      <span id="status" class="status">Prêt à lancer</span>
+    </div>
+    <canvas id="stage" style="aspect-ratio:1000/520" aria-label="Trajectoire du projectile dans le repère (x, y)."></canvas>
+    <p class="hint">Pointillés : trajectoire prévue par le modèle. Les points sont les positions de la balle à intervalles de temps égaux (chronophotographie).</p>
+    <div class="readouts">
+      <div class="readout"><span class="label">Durée de vol (théorie)</span><span class="value" id="rTf">—</span></div>
+      <div class="readout"><span class="label">Portée (théorie)</span><span class="value" id="rR">—</span></div>
+      <div class="readout"><span class="label">Hauteur max. (théorie)</span><span class="value" id="rH">—</span></div>
+      <div class="readout"><span class="label">Vitesse à l'arrivée</span><span class="value" id="rVf">—</span></div>
+      <div class="readout"><span class="label">Date t</span><span class="value" id="rt">—</span></div>
+      <div class="readout"><span class="label">Position x ; y</span><span class="value" id="rxy">—</span></div>
+      <div class="readout"><span class="label">Vitesse v<sub>x</sub> ; v<sub>y</sub></span><span class="value" id="rvxy">—</span></div>
+      <div class="readout"><span class="label">Vitesse v</span><span class="value" id="rv">—</span></div>
+    </div>
+  </section>
+
+  <section class="panel">
+    <div class="controls">
+      <div class="control">
+        <div class="row"><label for="v0">Vitesse initiale v₀</label><span class="num" id="v0Val"></span></div>
+        <input type="range" id="v0" min="2" max="30" step="0.5" value="15">
+      </div>
+      <div class="control">
+        <div class="row"><label for="alpha">Angle de tir α</label><span class="num" id="alphaVal"></span></div>
+        <input type="range" id="alpha" min="0" max="90" step="1" value="45">
+      </div>
+      <div class="control">
+        <div class="row"><label for="h0">Hauteur de départ h</label><span class="num" id="h0Val"></span></div>
+        <input type="range" id="h0" min="0" max="20" step="0.5" value="0">
+      </div>
+      <div class="control">
+        <div class="row"><label for="grav">Pesanteur g</label><span class="num" id="gravVal"></span></div>
+        <select id="grav">
+          <option value="9.81">Terre — 9,81 m/s²</option>
+          <option value="1.62">Lune — 1,62 m/s²</option>
+          <option value="3.71">Mars — 3,71 m/s²</option>
+          <option value="24.8">Jupiter — 24,8 m/s²</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="buttons">
+      <button class="primary" id="launch">Lancer</button>
+      <button id="clear">Effacer les tirs précédents</button>
+    </div>
+
+    <div class="formula">
+      <span>x(t)&nbsp;=&nbsp;<b>v₀·cos&nbsp;α·t</b></span>
+      <span>y(t)&nbsp;=&nbsp;<b>h&nbsp;+&nbsp;v₀·sin&nbsp;α·t&nbsp;−&nbsp;½·g·t²</b></span>
+      <span>v<sub>x</sub>&nbsp;=&nbsp;<b>v₀·cos&nbsp;α</b></span>
+      <span>v<sub>y</sub>&nbsp;=&nbsp;<b>v₀·sin&nbsp;α&nbsp;−&nbsp;g·t</b></span>
+      <span>portée (h&nbsp;=&nbsp;0)&nbsp;=&nbsp;<b>v₀²·sin&nbsp;2α&nbsp;/&nbsp;g</b></span>
+    </div>
+  </section>
+
+  <footer>Modèle : chute libre dans un champ de pesanteur uniforme, frottements de l'air négligés. Le repère est orthonormé (même échelle sur les deux axes) et l'échelle s'adapte automatiquement à la trajectoire.</footer>
+</main>
+
+<script>
+(function(){
+  // ---------- Utilitaires ----------
+  const $ = id => document.getElementById(id);
+  const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
+  const fmt = (v, d) => Number.isFinite(v)
+    ? v.toLocaleString('fr-FR', {minimumFractionDigits:d, maximumFractionDigits:d})
+    : '—';
+  const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const MONO = 'ui-monospace, "Cascadia Mono", "SF Mono", Consolas, Menlo, monospace';
+  const SANS = 'system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif';
+
+  // Couleurs du thème, relues si le système bascule clair/sombre
+  const C = {};
+  function readColors(){
+    const s = getComputedStyle(document.documentElement);
+    for (const n of ['bg','paper','ink','ink-soft','line','wave','wave-glow','accent','blue','brass']){
+      C[n.replace(/-(.)/g, (_, c) => c.toUpperCase())] = s.getPropertyValue('--' + n).trim();
+    }
+  }
+  readColors();
+  window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', readColors);
+
+  // Canvas net sur tout écran : on dessine toujours dans un repère logique W × H
+  function setupCanvas(canvas, W, H){
+    const ctx = canvas.getContext('2d');
+    function fit(){
+      const dpr = Math.min(window.devicePixelRatio || 1, 3);
+      const cw = canvas.clientWidth || W;
+      canvas.width = Math.max(1, Math.round(cw * dpr));
+      canvas.height = Math.max(1, Math.round(cw * H / W * dpr));
+      ctx.setTransform(canvas.width / W, 0, 0, canvas.height / H, 0, 0);
+    }
+    window.addEventListener('resize', fit);
+    fit();
+    return ctx;
+  }
+  // Position du pointeur (souris ou doigt) dans le repère logique
+  function pointerPos(canvas, evt, W, H){
+    const r = canvas.getBoundingClientRect();
+    return { x: (evt.clientX - r.left) * W / r.width, y: (evt.clientY - r.top) * H / r.height };
+  }
+  function arrow(ctx, x1, y1, x2, y2, color, width){
+    const len = Math.hypot(x2 - x1, y2 - y1);
+    if (len < 3) return;
+    const a = Math.atan2(y2 - y1, x2 - x1), h = Math.min(10, len * 0.5);
+    ctx.strokeStyle = color; ctx.fillStyle = color; ctx.lineWidth = width || 2.5;
+    ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2 - Math.cos(a) * h * 0.8, y2 - Math.sin(a) * h * 0.8); ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(x2, y2);
+    ctx.lineTo(x2 - h * Math.cos(a - 0.42), y2 - h * Math.sin(a - 0.42));
+    ctx.lineTo(x2 - h * Math.cos(a + 0.42), y2 - h * Math.sin(a + 0.42));
+    ctx.closePath(); ctx.fill();
+  }
+  // Pas "rond" (1, 2, 5 × 10^n) pour graduer un axe
+  function niceStep(x){
+    if (!(x > 0)) return 1;
+    const p = Math.pow(10, Math.floor(Math.log10(x))), m = x / p;
+    return (m < 1.5 ? 1 : m < 3.5 ? 2 : m < 7.5 ? 5 : 10) * p;
+  }
+
+  // ---------- Constantes ----------
+  const W = 1000, H = 520;
+  const PLOT = { x0: 96, y0: 470, w: 880, h: 440 };   // origine du repère et taille utile (px)
+  const MAX_GHOSTS = 5;
+
+  // ---------- État ----------
+  const canvas = $('stage');
+  const ctx = setupCanvas(canvas, W, H);
+  const P = { v0: 15, alpha: 45 * Math.PI / 180, h0: 0, g: 9.81 };
+  let phase = 'ready';          // 'ready' | 'flying' | 'landed'
+  let t = 0;
+  let ghosts = [];              // tirs précédents (paramètres figés)
+  let last = performance.now();
+
+  // ---------- Physique ----------
+  function flight(p){
+    const vx = p.v0 * Math.cos(p.alpha), vy = p.v0 * Math.sin(p.alpha);
+    const tf = (vy + Math.sqrt(vy * vy + 2 * p.g * p.h0)) / p.g;       // y(tf) = 0
+    const apex = p.h0 + vy * vy / (2 * p.g);
+    return { vx, vy, tf, range: vx * tf, apex, vf: Math.sqrt(p.v0 * p.v0 + 2 * p.g * p.h0) };
+  }
+  function at(p, f, time){
+    return {
+      x: f.vx * time,
+      y: Math.max(0, p.h0 + f.vy * time - 0.5 * p.g * time * time),
+      vx: f.vx,
+      vy: f.vy - p.g * time
+    };
+  }
+
+  // ---------- Affichage des mesures ----------
+  function updateReadouts(f, s){
+    $('aLabel').textContent = fmt(P.alpha * 180 / Math.PI, 0);
+    $('vLabel').textContent = fmt(P.v0, 1);
+    $('rTf').textContent = fmt(f.tf, 2) + ' s';
+    $('rR').textContent = fmt(f.range, 2) + ' m';
+    $('rH').textContent = fmt(f.apex, 2) + ' m';
+    $('rVf').textContent = fmt(f.vf, 2) + ' m/s';
+    $('rt').textContent = fmt(t, 2) + ' s';
+    $('rxy').textContent = fmt(s.x, 1) + ' ; ' + fmt(s.y, 1) + ' m';
+    $('rvxy').textContent = fmt(s.vx, 1) + ' ; ' + fmt(s.vy, 1) + ' m/s';
+    $('rv').textContent = fmt(Math.hypot(s.vx, s.vy), 2) + ' m/s';
+
+    const st = $('status');
+    if (phase === 'flying'){ st.textContent = 'En vol'; st.className = 'status ok'; }
+    else if (phase === 'landed'){ st.textContent = 'Au sol — portée ' + fmt(f.range, 2) + ' m'; st.className = 'status ok'; }
+    else { st.textContent = 'Prêt à lancer'; st.className = 'status'; }
+  }
+
+  // ---------- Rendu ----------
+  function draw(){
+    const f = flight(P), s = at(P, f, t);
+    updateReadouts(f, s);
+    ctx.clearRect(0, 0, W, H);
+
+    // Échelle commune aux deux axes, englobant le tir courant et les tirs gardés
+    let xExt = Math.max(f.range, 1), yExt = Math.max(f.apex, 1);
+    for (const gh of ghosts){ xExt = Math.max(xExt, gh.f.range); yExt = Math.max(yExt, gh.f.apex); }
+    const ppm = Math.min(PLOT.w / (xExt * 1.06), PLOT.h / (yExt * 1.12));
+    const X = x => PLOT.x0 + x * ppm, Y = y => PLOT.y0 - y * ppm;
+
+    // support de lancement
+    if (P.h0 > 0){
+      ctx.fillStyle = C.line;
+      ctx.fillRect(PLOT.x0 - 34, Y(P.h0), 34, P.h0 * ppm);
+      ctx.strokeStyle = C.inkSoft; ctx.strokeRect(PLOT.x0 - 34, Y(P.h0), 34, P.h0 * ppm);
+    }
+
+    // quadrillage et graduations
+    const stepM = niceStep(PLOT.w / ppm / 9);
+    const dec = stepM < 1 ? 1 : 0;
+    ctx.font = '13px ' + MONO; ctx.lineWidth = 1;
+    ctx.textAlign = 'center';
+    for (let x = 0; X(x) <= PLOT.x0 + PLOT.w + 0.5; x += stepM){
+      ctx.strokeStyle = C.line; ctx.globalAlpha = 0.55;
+      ctx.beginPath(); ctx.moveTo(X(x), PLOT.y0); ctx.lineTo(X(x), PLOT.y0 - PLOT.h); ctx.stroke();
+      ctx.globalAlpha = 1; ctx.fillStyle = C.inkSoft;
+      ctx.fillText(fmt(x, dec), X(x), PLOT.y0 + 20);
+    }
+    ctx.textAlign = 'right';
+    for (let y = stepM; Y(y) >= PLOT.y0 - PLOT.h - 0.5; y += stepM){
+      ctx.strokeStyle = C.line; ctx.globalAlpha = 0.55;
+      ctx.beginPath(); ctx.moveTo(PLOT.x0, Y(y)); ctx.lineTo(PLOT.x0 + PLOT.w, Y(y)); ctx.stroke();
+      ctx.globalAlpha = 1; ctx.fillStyle = C.inkSoft;
+      ctx.fillText(fmt(y, dec), PLOT.x0 - 10, Y(y) + 4);
+    }
+    ctx.fillStyle = C.inkSoft; ctx.textAlign = 'right';
+    ctx.fillText('x (m)', PLOT.x0 + PLOT.w, PLOT.y0 + 40);
+    ctx.textAlign = 'left';
+    ctx.fillText('y (m)', PLOT.x0 - 60, PLOT.y0 - PLOT.h - 8);
+
+    // sol et axe vertical
+    ctx.strokeStyle = C.ink; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.moveTo(PLOT.x0 - 40, PLOT.y0); ctx.lineTo(PLOT.x0 + PLOT.w, PLOT.y0); ctx.stroke();
+    ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(PLOT.x0, PLOT.y0); ctx.lineTo(PLOT.x0, PLOT.y0 - PLOT.h); ctx.stroke();
+    function path(p, fl, tEnd){
+      ctx.beginPath();
+      const n = 120;
+      for (let i = 0; i <= n; i++){
+        const q = at(p, fl, tEnd * i / n);
+        if (i === 0) ctx.moveTo(X(q.x), Y(q.y)); else ctx.lineTo(X(q.x), Y(q.y));
+      }
+      ctx.stroke();
+    }
+
+    // tirs précédents
+    ctx.font = '13px ' + MONO; ctx.textAlign = 'center';
+    for (const gh of ghosts){
+      ctx.strokeStyle = C.inkSoft; ctx.lineWidth = 1.5; ctx.globalAlpha = 0.6;
+      path(gh.p, gh.f, gh.f.tf);
+      ctx.globalAlpha = 1; ctx.fillStyle = C.inkSoft;
+      const top = at(gh.p, gh.f, Math.max(0, gh.f.vy / gh.p.g));
+      ctx.fillText(fmt(gh.p.alpha * 180 / Math.PI, 0) + '°', X(top.x), Y(top.y) - 8);
+    }
+
+    // trajectoire prévue (pointillés)
+    ctx.setLineDash([6, 7]); ctx.strokeStyle = C.wave; ctx.lineWidth = 1.5; ctx.globalAlpha = 0.6;
+    path(P, f, f.tf);
+    ctx.setLineDash([]); ctx.globalAlpha = 1;
+
+    // trajectoire parcourue + chronophotographie
+    if (phase !== 'ready'){
+      ctx.strokeStyle = C.wave; ctx.lineWidth = 2.5;
+      path(P, f, t);
+      const tau = niceStep(f.tf / 14);
+      ctx.fillStyle = C.wave;
+      for (let k = 0; k * tau <= t + 1e-9; k++){
+        const q = at(P, f, k * tau);
+        ctx.beginPath(); ctx.arc(X(q.x), Y(q.y), 4, 0, Math.PI * 2); ctx.fill();
+      }
+      ctx.fillStyle = C.inkSoft; ctx.textAlign = 'right'; ctx.font = '13px ' + MONO;
+      ctx.fillText('Δt = ' + fmt(tau, tau < 0.1 ? 2 : 1) + ' s entre deux points', PLOT.x0 + PLOT.w, 22);
+    }
+
+    // balle et vecteurs vitesse
+    const bx = X(s.x), by = Y(s.y);
+    const vs = 95 / Math.max(f.vf, 1);              // px par m/s
+    if (phase !== 'landed'){
+      ctx.setLineDash([4, 4]);
+      arrow(ctx, bx, by, bx + s.vx * vs, by, C.blue, 2);
+      arrow(ctx, bx, by, bx, by - s.vy * vs, C.blue, 2);
+      ctx.setLineDash([]);
+      arrow(ctx, bx, by, bx + s.vx * vs, by - s.vy * vs, C.accent, 3);
+    }
+    ctx.fillStyle = C.brass;
+    ctx.beginPath(); ctx.arc(bx, by, 9, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = C.paper; ctx.lineWidth = 2; ctx.stroke();
+
+    // légende
+    ctx.font = '13px ' + SANS; ctx.textAlign = 'left';
+    ctx.fillStyle = C.accent; ctx.fillText('→ vitesse v', PLOT.x0 + 14, 22);
+    ctx.fillStyle = C.blue; ctx.fillText('⇢ composantes vx et vy', PLOT.x0 + 110, 22);
+  }
+
+  // ---------- Interactions ----------
+  function syncLabels(){
+    $('v0Val').textContent = fmt(P.v0, 1) + ' m/s';
+    $('alphaVal').textContent = fmt(P.alpha * 180 / Math.PI, 0) + ' °';
+    $('h0Val').textContent = fmt(P.h0, 1) + ' m';
+    $('gravVal').textContent = fmt(P.g, 2) + ' m/s²';
+    $('launch').textContent = phase === 'flying' ? 'Relancer' : 'Lancer';
+  }
+  function paramChanged(){ phase = 'ready'; t = 0; syncLabels(); }
+  $('v0').addEventListener('input', e => { P.v0 = parseFloat(e.target.value); paramChanged(); });
+  $('alpha').addEventListener('input', e => { P.alpha = parseFloat(e.target.value) * Math.PI / 180; paramChanged(); });
+  $('h0').addEventListener('input', e => { P.h0 = parseFloat(e.target.value); paramChanged(); });
+  $('grav').addEventListener('change', e => { P.g = parseFloat(e.target.value); paramChanged(); });
+  $('launch').addEventListener('click', () => { phase = 'flying'; t = 0; last = performance.now(); syncLabels(); });
+  $('clear').addEventListener('click', () => { ghosts = []; });
+
+  function land(){
+    phase = 'landed';
+    const p = Object.assign({}, P);
+    const same = ghosts.some(gh => gh.p.v0 === p.v0 && gh.p.alpha === p.alpha && gh.p.h0 === p.h0 && gh.p.g === p.g);
+    if (!same){
+      ghosts.push({ p, f: flight(p) });
+      if (ghosts.length > MAX_GHOSTS) ghosts.shift();
+    }
+    syncLabels();
+  }
+
+  // ---------- Boucle d'animation ----------
+  function loop(now){
+    const dt = Math.min((now - last) / 1000, 0.05);
+    last = now;
+    if (phase === 'flying'){
+      const tf = flight(P).tf;
+      t += dt;
+      if (t >= tf || reduceMotion){ t = tf; land(); }   // mouvement réduit : résultat immédiat
+    }
+    draw();
+    requestAnimationFrame(loop);
+  }
+  syncLabels();
+  requestAnimationFrame(loop);
+})();
+</script>
+</body>
+</html>

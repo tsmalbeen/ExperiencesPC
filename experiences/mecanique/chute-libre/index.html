@@ -1,0 +1,596 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Chute libre</title>
+<style>
+  /* ---------- Thème (clair / sombre automatique) ---------- */
+  :root{
+    --bg:#f3ede1;
+    --paper:#fbf8f0;
+    --ink:#22242e;
+    --ink-soft:#5b5a52;
+    --line:#d9d0ba;
+    --wave:#b8362b;
+    --wave-glow:rgba(184,54,43,.14);
+    --accent:#2f6f4f;
+    --blue:#2c5f8a;
+    --brass:#a9793f;
+    --ok:#2f6f4f;
+    --warn:#b8362b;
+    --serif:"Iowan Old Style","Palatino Linotype",Palatino,Georgia,serif;
+    --sans:system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+    --mono:ui-monospace,"Cascadia Mono","SF Mono",Consolas,Menlo,monospace;
+    color-scheme: light dark;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{
+      --bg:#171a21;
+      --paper:#1e222b;
+      --ink:#eae6da;
+      --ink-soft:#9a9689;
+      --line:#33384a;
+      --wave:#ff8a72;
+      --wave-glow:rgba(255,138,114,.14);
+      --accent:#79d6a3;
+      --blue:#7fb4e0;
+      --brass:#c99a5b;
+      --ok:#79d6a3;
+      --warn:#ff8a72;
+    }
+  }
+
+  /* ---------- Mise en page ---------- */
+  *{box-sizing:border-box;}
+  html, body{ margin:0; padding:0; }
+  body{
+    background:var(--bg);
+    color:var(--ink);
+    font-family:var(--sans);
+    padding:28px 16px;
+    display:flex;
+    justify-content:center;
+  }
+  main{
+    width:100%;
+    max-width:920px;
+    display:flex;
+    flex-direction:column;
+    gap:20px;
+  }
+  header{ display:flex; flex-direction:column; gap:4px; }
+  .kicker{
+    font-size:.72rem;
+    text-transform:uppercase;
+    letter-spacing:.08em;
+    color:var(--ink-soft);
+  }
+  h1{
+    font-family:var(--serif);
+    font-weight:600;
+    font-size:clamp(1.5rem, 1.1rem + 1.6vw, 2.2rem);
+    margin:0;
+    text-wrap:balance;
+  }
+  header p{
+    margin:0;
+    color:var(--ink-soft);
+    font-size:.92rem;
+    max-width:66ch;
+  }
+
+  /* ---------- Zone de simulation ---------- */
+  .scene{
+    background:var(--paper);
+    border:1px solid var(--line);
+    border-radius:14px;
+    padding:20px clamp(12px,3vw,28px) 8px;
+    display:flex;
+    flex-direction:column;
+    gap:6px;
+  }
+  .scene-top{
+    display:flex;
+    justify-content:space-between;
+    align-items:baseline;
+    gap:12px;
+    flex-wrap:wrap;
+  }
+  .scene-title{ font-family:var(--serif); font-weight:600; }
+  .status{
+    font-family:var(--mono);
+    font-size:.82rem;
+    padding:3px 10px;
+    border-radius:999px;
+    border:1px solid var(--line);
+    color:var(--ink-soft);
+  }
+  .status.ok{ color:var(--ok); border-color:var(--ok); }
+  .status.off{ color:var(--warn); border-color:var(--warn); }
+  canvas{
+    width:100%;
+    height:auto;
+    display:block;
+  }
+  canvas.draggable{ touch-action:none; cursor:grab; }
+  canvas.dragging{ cursor:grabbing; }
+  .hint{ margin:0; font-size:.78rem; color:var(--ink-soft); }
+
+  /* ---------- Mesures ---------- */
+  .readouts{
+    display:grid;
+    grid-template-columns:repeat(auto-fit,minmax(150px,1fr));
+    gap:10px 18px;
+    padding-block:10px;
+    border-top:1px solid var(--line);
+    margin-top:6px;
+  }
+  .readout{ display:flex; flex-direction:column; gap:2px; }
+  .readout .label{
+    font-size:.78rem;
+    color:var(--ink-soft);
+  }
+  .readout .value{
+    font-family:var(--mono);
+    font-variant-numeric:tabular-nums;
+    font-size:1.05rem;
+    font-weight:500;
+  }
+  .readout .value em{ color:var(--blue); font-style:normal; font-size:.9rem; }
+
+  /* ---------- Contrôles ---------- */
+  .panel{
+    background:var(--paper);
+    border:1px solid var(--line);
+    border-radius:14px;
+    padding:18px clamp(14px,3vw,26px);
+    display:flex;
+    flex-direction:column;
+    gap:18px;
+  }
+  .controls{
+    display:grid;
+    grid-template-columns:repeat(auto-fit,minmax(240px,1fr));
+    gap:18px 32px;
+  }
+  .control{ display:flex; flex-direction:column; gap:6px; }
+  .control .row{
+    display:flex;
+    justify-content:space-between;
+    align-items:baseline;
+    gap:10px;
+  }
+  .control label{ font-size:.86rem; font-weight:500; }
+  .control .num{
+    font-family:var(--mono);
+    font-variant-numeric:tabular-nums;
+    color:var(--wave);
+    font-size:.92rem;
+  }
+  input[type=range]{
+    -webkit-appearance:none;
+    appearance:none;
+    width:100%;
+    height:4px;
+    margin:8px 0;
+    border-radius:999px;
+    background:var(--line);
+    outline:none;
+  }
+  input[type=range]::-webkit-slider-thumb{
+    -webkit-appearance:none;
+    width:20px; height:20px;
+    border-radius:50%;
+    background:var(--wave);
+    border:2px solid var(--paper);
+    box-shadow:0 0 0 1px var(--line);
+    cursor:pointer;
+  }
+  input[type=range]::-moz-range-thumb{
+    width:18px; height:18px;
+    border-radius:50%;
+    background:var(--wave);
+    border:2px solid var(--paper);
+    box-shadow:0 0 0 1px var(--line);
+    cursor:pointer;
+  }
+  select{
+    font-family:var(--sans);
+    font-size:.86rem;
+    padding:7px 10px;
+    border-radius:8px;
+    border:1px solid var(--line);
+    background:var(--paper);
+    color:var(--ink);
+    width:100%;
+  }
+  .check{
+    display:flex;
+    align-items:center;
+    gap:8px;
+    font-size:.86rem;
+    font-weight:500;
+    cursor:pointer;
+  }
+  .check input{ width:18px; height:18px; accent-color:var(--accent); margin:0; }
+  .buttons{ display:flex; gap:10px; flex-wrap:wrap; }
+  button{
+    font-family:var(--sans);
+    font-size:.86rem;
+    font-weight:500;
+    padding:9px 16px;
+    border-radius:8px;
+    border:1px solid var(--line);
+    background:transparent;
+    color:var(--ink);
+    cursor:pointer;
+  }
+  button.primary{
+    background:var(--accent);
+    border-color:var(--accent);
+    color:var(--paper);
+  }
+  button:focus-visible, input:focus-visible, select:focus-visible{
+    outline:2px solid var(--accent);
+    outline-offset:2px;
+  }
+
+  /* ---------- Formules ---------- */
+  .formula{
+    font-family:var(--mono);
+    font-size:.86rem;
+    color:var(--ink-soft);
+    border-top:1px solid var(--line);
+    padding-top:14px;
+    display:flex;
+    flex-wrap:wrap;
+    gap:6px 22px;
+  }
+  .formula b{ color:var(--ink); font-weight:600; }
+  footer{
+    font-size:.78rem;
+    color:var(--ink-soft);
+    text-align:center;
+    text-wrap:balance;
+  }
+</style>
+</head>
+<body>
+
+<main>
+  <header>
+    <span class="kicker">Mécanique</span>
+    <h1>Chute libre</h1>
+    <p>Une balle est lâchée sans vitesse initiale. En chute libre, seul le poids agit : la vitesse augmente régulièrement et la masse ne joue aucun rôle. Active les frottements de l'air pour comparer avec une chute réelle — là, la masse compte.</p>
+  </header>
+
+  <section class="scene">
+    <div class="scene-top">
+      <strong class="scene-title">Lâcher depuis h = <span id="hLabel">20,0</span> m</strong>
+      <span id="status" class="status">Prêt à lâcher</span>
+    </div>
+    <canvas id="stage" style="aspect-ratio:1000/540" aria-label="Chute de la balle, avec les graphiques de l'altitude et de la vitesse en fonction du temps."></canvas>
+    <p class="hint">Les points marquent les positions à intervalles de temps égaux : l'écart qui grandit montre que la balle accélère.</p>
+    <div class="readouts">
+      <div class="readout"><span class="label">Date t</span><span class="value" id="rt">—</span></div>
+      <div class="readout"><span class="label">Altitude z</span><span class="value" id="rz">—</span></div>
+      <div class="readout"><span class="label">Vitesse v</span><span class="value" id="rv">—</span></div>
+      <div class="readout"><span class="label">Durée de chute (théorie)</span><span class="value" id="rTf">—</span></div>
+      <div class="readout"><span class="label">Vitesse au sol (théorie)</span><span class="value" id="rVf">—</span></div>
+      <div class="readout air" hidden><span class="label">Durée de chute dans l'air</span><span class="value" id="rTfA">—</span></div>
+      <div class="readout air" hidden><span class="label">Vitesse au sol dans l'air</span><span class="value" id="rVfA">—</span></div>
+      <div class="readout air" hidden><span class="label">Vitesse limite dans l'air</span><span class="value" id="rVl">—</span></div>
+    </div>
+  </section>
+
+  <section class="panel">
+    <div class="controls">
+      <div class="control">
+        <div class="row"><label for="height">Hauteur de chute h</label><span class="num" id="heightVal"></span></div>
+        <input type="range" id="height" min="1" max="50" step="0.5" value="20">
+      </div>
+      <div class="control">
+        <div class="row"><label for="mass">Masse de la balle m</label><span class="num" id="massVal"></span></div>
+        <input type="range" id="mass" min="10" max="2000" step="10" value="50">
+      </div>
+      <div class="control">
+        <div class="row"><label for="grav">Pesanteur g</label><span class="num" id="gravVal"></span></div>
+        <select id="grav">
+          <option value="9.81">Terre — 9,81 m/s²</option>
+          <option value="1.62">Lune — 1,62 m/s²</option>
+          <option value="3.71">Mars — 3,71 m/s²</option>
+          <option value="24.8">Jupiter — 24,8 m/s²</option>
+        </select>
+      </div>
+      <div class="control" style="justify-content:center">
+        <label class="check"><input type="checkbox" id="air"> Ajouter une balle soumise aux frottements de l'air</label>
+      </div>
+    </div>
+
+    <div class="buttons">
+      <button class="primary" id="drop">Lâcher</button>
+      <button id="reset">Remonter la balle</button>
+    </div>
+
+    <div class="formula">
+      <span>z(t)&nbsp;=&nbsp;<b>h&nbsp;−&nbsp;½·g·t²</b></span>
+      <span>v(t)&nbsp;=&nbsp;<b>g·t</b></span>
+      <span>t<sub>chute</sub>&nbsp;=&nbsp;<b>√(2h&nbsp;/&nbsp;g)</b></span>
+      <span>v<sub>sol</sub>&nbsp;=&nbsp;<b>√(2·g·h)</b></span>
+      <span>air&nbsp;: f&nbsp;=&nbsp;<b>k·v²</b>, v<sub>lim</sub>&nbsp;=&nbsp;<b>√(m·g&nbsp;/&nbsp;k)</b></span>
+    </div>
+  </section>
+
+  <footer>Chute libre : seul le poids agit, sans vitesse initiale. Frottements de l'air : force k·v² pour une balle de 10 cm de diamètre dans l'air terrestre (k = ½·ρ·Cₓ·S ≈ 2,2 × 10⁻³ kg/m), poussée d'Archimède négligée.</footer>
+</main>
+
+<script>
+(function(){
+  // ---------- Utilitaires ----------
+  const $ = id => document.getElementById(id);
+  const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
+  const fmt = (v, d) => Number.isFinite(v)
+    ? v.toLocaleString('fr-FR', {minimumFractionDigits:d, maximumFractionDigits:d})
+    : '—';
+  const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const MONO = 'ui-monospace, "Cascadia Mono", "SF Mono", Consolas, Menlo, monospace';
+  const SANS = 'system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif';
+
+  // Couleurs du thème, relues si le système bascule clair/sombre
+  const C = {};
+  function readColors(){
+    const s = getComputedStyle(document.documentElement);
+    for (const n of ['bg','paper','ink','ink-soft','line','wave','wave-glow','accent','blue','brass']){
+      C[n.replace(/-(.)/g, (_, c) => c.toUpperCase())] = s.getPropertyValue('--' + n).trim();
+    }
+  }
+  readColors();
+  window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', readColors);
+
+  // Canvas net sur tout écran : on dessine toujours dans un repère logique W × H
+  function setupCanvas(canvas, W, H){
+    const ctx = canvas.getContext('2d');
+    function fit(){
+      const dpr = Math.min(window.devicePixelRatio || 1, 3);
+      const cw = canvas.clientWidth || W;
+      canvas.width = Math.max(1, Math.round(cw * dpr));
+      canvas.height = Math.max(1, Math.round(cw * H / W * dpr));
+      ctx.setTransform(canvas.width / W, 0, 0, canvas.height / H, 0, 0);
+    }
+    window.addEventListener('resize', fit);
+    fit();
+    return ctx;
+  }
+  // Position du pointeur (souris ou doigt) dans le repère logique
+  function pointerPos(canvas, evt, W, H){
+    const r = canvas.getBoundingClientRect();
+    return { x: (evt.clientX - r.left) * W / r.width, y: (evt.clientY - r.top) * H / r.height };
+  }
+  function arrow(ctx, x1, y1, x2, y2, color, width){
+    const len = Math.hypot(x2 - x1, y2 - y1);
+    if (len < 3) return;
+    const a = Math.atan2(y2 - y1, x2 - x1), h = Math.min(10, len * 0.5);
+    ctx.strokeStyle = color; ctx.fillStyle = color; ctx.lineWidth = width || 2.5;
+    ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2 - Math.cos(a) * h * 0.8, y2 - Math.sin(a) * h * 0.8); ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(x2, y2);
+    ctx.lineTo(x2 - h * Math.cos(a - 0.42), y2 - h * Math.sin(a - 0.42));
+    ctx.lineTo(x2 - h * Math.cos(a + 0.42), y2 - h * Math.sin(a + 0.42));
+    ctx.closePath(); ctx.fill();
+  }
+  // Pas "rond" (1, 2, 5 × 10^n) pour graduer un axe
+  function niceStep(x){
+    if (!(x > 0)) return 1;
+    const p = Math.pow(10, Math.floor(Math.log10(x))), m = x / p;
+    return (m < 1.5 ? 1 : m < 3.5 ? 2 : m < 7.5 ? 5 : 10) * p;
+  }
+
+  // ---------- Constantes ----------
+  const W = 1000, H = 540;
+  const K_AIR = 0.5 * 1.2 * 0.47 * Math.PI * 0.05 * 0.05;   // ½·ρ·Cx·S (kg/m), balle de 10 cm
+  const COL = { top: 50, ground: 490, axis: 78, xVac: 160, xAir: 250 };
+
+  // ---------- État ----------
+  const canvas = $('stage');
+  const ctx = setupCanvas(canvas, W, H);
+  const P = { h: 20, m: 0.05, g: 9.81, air: false };
+  let phase = 'ready';          // 'ready' | 'falling' | 'landed'
+  let t = 0;
+  let last = performance.now();
+
+  // ---------- Physique (solutions exactes, unités SI) ----------
+  // Chute libre
+  function vacuum(){
+    const tf = Math.sqrt(2 * P.h / P.g);
+    return {
+      tf, vf: P.g * tf,
+      z: time => P.h - 0.5 * P.g * time * time,
+      v: time => P.g * time
+    };
+  }
+  // Chute avec frottement quadratique : m·dv/dt = m·g − k·v²
+  const lnCosh = x => x + Math.log1p(Math.exp(-2 * x)) - Math.LN2;
+  function inAir(){
+    const vl = Math.sqrt(P.m * P.g / K_AIR);            // vitesse limite
+    const a = P.g * P.h / (vl * vl);
+    const tf = (vl / P.g) * (a + Math.log(1 + Math.sqrt(1 - Math.exp(-2 * a))));   // acosh(e^a)
+    const v = time => vl * Math.tanh(P.g * time / vl);
+    return {
+      vl, tf, vf: v(tf),
+      z: time => P.h - (vl * vl / P.g) * lnCosh(P.g * time / vl),
+      v
+    };
+  }
+
+  // ---------- Affichage des mesures ----------
+  function updateReadouts(vac, air){
+    const tv = Math.min(t, vac.tf);
+    $('hLabel').textContent = fmt(P.h, 1);
+    $('rt').textContent = fmt(t, 2) + ' s';
+    let z = fmt(Math.max(0, vac.z(tv)), 2) + ' m';
+    let v = fmt(vac.v(tv), 2) + ' m/s';
+    if (air){
+      const ta = Math.min(t, air.tf);
+      z += ' <em>air ' + fmt(Math.max(0, air.z(ta)), 2) + '</em>';
+      v += ' <em>air ' + fmt(air.v(ta), 2) + '</em>';
+      $('rTfA').textContent = fmt(air.tf, 2) + ' s';
+      $('rVfA').textContent = fmt(air.vf, 2) + ' m/s';
+      $('rVl').textContent = fmt(air.vl, 1) + ' m/s';
+    }
+    $('rz').innerHTML = z;
+    $('rv').innerHTML = v;
+    $('rTf').textContent = fmt(vac.tf, 2) + ' s';
+    $('rVf').textContent = fmt(vac.vf, 2) + ' m/s';
+
+    const st = $('status');
+    if (phase === 'falling'){ st.textContent = 'Chute en cours'; st.className = 'status ok'; }
+    else if (phase === 'landed'){
+      st.textContent = 'Au sol en ' + fmt(vac.tf, 2) + ' s' + (air ? ' (air : ' + fmt(air.tf, 2) + ' s)' : '');
+      st.className = 'status ok';
+    } else { st.textContent = 'Prêt à lâcher'; st.className = 'status'; }
+  }
+
+  // ---------- Rendu ----------
+  function drawGraph(g, tMax, yMax, title, unit, series){
+    const X = time => g.x + g.w * time / tMax, Y = val => g.y + g.h - g.h * val / yMax;
+    ctx.font = '13px ' + MONO; ctx.lineWidth = 1;
+    const sx = niceStep(tMax / 6), sy = niceStep(yMax / 4);
+    ctx.textAlign = 'center';
+    for (let a = 0; a <= tMax + 1e-9; a += sx){
+      ctx.strokeStyle = C.line; ctx.globalAlpha = 0.55;
+      ctx.beginPath(); ctx.moveTo(X(a), g.y); ctx.lineTo(X(a), g.y + g.h); ctx.stroke();
+      ctx.globalAlpha = 1; ctx.fillStyle = C.inkSoft;
+      ctx.fillText(fmt(a, sx < 1 ? 1 : 0), X(a), g.y + g.h + 18);
+    }
+    ctx.textAlign = 'right';
+    for (let b = 0; b <= yMax + 1e-9; b += sy){
+      ctx.strokeStyle = C.line; ctx.globalAlpha = 0.55;
+      ctx.beginPath(); ctx.moveTo(g.x, Y(b)); ctx.lineTo(g.x + g.w, Y(b)); ctx.stroke();
+      ctx.globalAlpha = 1; ctx.fillStyle = C.inkSoft;
+      ctx.fillText(fmt(b, sy < 1 ? 1 : 0), g.x - 8, Y(b) + 4);
+    }
+    ctx.strokeStyle = C.inkSoft; ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.moveTo(g.x, g.y); ctx.lineTo(g.x, g.y + g.h); ctx.lineTo(g.x + g.w, g.y + g.h); ctx.stroke();
+    ctx.fillStyle = C.ink; ctx.textAlign = 'left'; ctx.font = '14px ' + SANS;
+    ctx.fillText(title + ' (' + unit + ')', g.x + 8, g.y - 8);
+    ctx.fillStyle = C.inkSoft; ctx.textAlign = 'right'; ctx.font = '13px ' + MONO;
+    ctx.fillText('t (s)', g.x + g.w, g.y + g.h + 36);
+
+    for (const s of series){
+      const plot = tEnd => {
+        ctx.beginPath();
+        for (let i = 0; i <= 80; i++){
+          const time = tEnd * i / 80, px = X(time), py = Y(clamp(s.fn(time), 0, yMax));
+          if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+        }
+        ctx.stroke();
+      };
+      // courbe prévue (pointillés) puis courbe parcourue
+      ctx.strokeStyle = s.color; ctx.lineWidth = 1.5; ctx.globalAlpha = 0.5; ctx.setLineDash([5, 6]);
+      plot(s.tf);
+      ctx.setLineDash([]); ctx.globalAlpha = 1; ctx.lineWidth = 2.5;
+      const te = Math.min(t, s.tf);
+      if (te > 0) plot(te);
+      ctx.fillStyle = s.color;
+      ctx.beginPath(); ctx.arc(X(te), Y(clamp(s.fn(te), 0, yMax)), 4.5, 0, Math.PI * 2); ctx.fill();
+    }
+  }
+
+  function draw(){
+    const vac = vacuum(), air = P.air ? inAir() : null;
+    updateReadouts(vac, air);
+    ctx.clearRect(0, 0, W, H);
+    const tMax = air ? Math.max(vac.tf, air.tf) : vac.tf;
+    const ppm = (COL.ground - COL.top) / P.h;
+    const Yz = z => COL.ground - Math.max(0, z) * ppm;
+
+    // règle verticale
+    ctx.strokeStyle = C.inkSoft; ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.moveTo(COL.axis, COL.top); ctx.lineTo(COL.axis, COL.ground); ctx.stroke();
+    ctx.font = '13px ' + MONO; ctx.fillStyle = C.inkSoft; ctx.textAlign = 'right'; ctx.lineWidth = 1;
+    const sz = niceStep(P.h / 6);
+    for (let z = 0; z <= P.h + 1e-9; z += sz){
+      ctx.beginPath(); ctx.moveTo(COL.axis - 7, Yz(z)); ctx.lineTo(COL.axis, Yz(z)); ctx.stroke();
+      ctx.fillText(fmt(z, sz < 1 ? 1 : 0), COL.axis - 12, Yz(z) + 4);
+    }
+    ctx.textAlign = 'left';
+    ctx.fillText('z (m)', COL.axis - 40, COL.top - 18);
+
+    // sol et hauteur de lâcher
+    ctx.strokeStyle = C.ink; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.moveTo(COL.axis, COL.ground); ctx.lineTo(330, COL.ground); ctx.stroke();
+    ctx.setLineDash([5, 6]); ctx.strokeStyle = C.line; ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.moveTo(COL.axis, COL.top); ctx.lineTo(330, COL.top); ctx.stroke();
+    ctx.setLineDash([]);
+
+    // balles + chronophotographie
+    const tau = niceStep(tMax / 10);
+    const bodies = [{ b: vac, x: COL.xVac, color: C.wave, label: 'sans air' }];
+    if (air) bodies.push({ b: air, x: COL.xAir, color: C.blue, label: 'dans l\'air' });
+    const R = 11;
+    for (const o of bodies){
+      const tb = Math.min(t, o.b.tf);
+      ctx.fillStyle = o.color; ctx.globalAlpha = 0.45;
+      if (phase !== 'ready'){
+        for (let k = 0; k * tau <= tb + 1e-9; k++){
+          ctx.beginPath(); ctx.arc(o.x, Yz(o.b.z(k * tau)) - R, 3.5, 0, Math.PI * 2); ctx.fill();
+        }
+      }
+      ctx.globalAlpha = 1;
+      const y = Yz(o.b.z(tb)) - R;
+      // vecteur vitesse
+      const s = 70 * o.b.v(tb) / Math.max(vac.vf, 1e-6);
+      if (tb < o.b.tf) arrow(ctx, o.x + 22, y, o.x + 22, y + s, C.accent, 2.5);
+      ctx.fillStyle = o.color;
+      ctx.beginPath(); ctx.arc(o.x, y, R, 0, Math.PI * 2); ctx.fill();
+      ctx.strokeStyle = C.paper; ctx.lineWidth = 2; ctx.stroke();
+      ctx.fillStyle = o.color; ctx.font = '13px ' + SANS; ctx.textAlign = 'center';
+      ctx.fillText(o.label, o.x, COL.ground + 22);
+    }
+    if (phase !== 'ready'){
+      ctx.fillStyle = C.inkSoft; ctx.font = '13px ' + MONO; ctx.textAlign = 'left';
+      ctx.fillText('Δt = ' + fmt(tau, tau < 0.1 ? 2 : 1) + ' s entre deux points', COL.axis + 50, COL.top - 18);
+    }
+
+    // graphiques z(t) et v(t)
+    const sz2 = [{ fn: vac.z, tf: vac.tf, color: C.wave }];
+    const sv = [{ fn: vac.v, tf: vac.tf, color: C.wave }];
+    if (air){ sz2.push({ fn: air.z, tf: air.tf, color: C.blue }); sv.push({ fn: air.v, tf: air.tf, color: C.blue }); }
+    drawGraph({ x: 430, y: 44, w: 540, h: 170 }, tMax, P.h, 'Altitude z', 'm', sz2);
+    drawGraph({ x: 430, y: 304, w: 540, h: 170 }, tMax, vac.vf, 'Vitesse v', 'm/s', sv);
+  }
+
+  // ---------- Interactions ----------
+  function syncLabels(){
+    $('heightVal').textContent = fmt(P.h, 1) + ' m';
+    $('massVal').textContent = P.m >= 1 ? fmt(P.m, 2) + ' kg' : fmt(P.m * 1000, 0) + ' g';
+    $('gravVal').textContent = fmt(P.g, 2) + ' m/s²';
+    document.querySelectorAll('.readout.air').forEach(el => { el.hidden = !P.air; });
+  }
+  function paramChanged(){ phase = 'ready'; t = 0; syncLabels(); }
+  $('height').addEventListener('input', e => { P.h = parseFloat(e.target.value); paramChanged(); });
+  $('mass').addEventListener('input', e => { P.m = parseFloat(e.target.value) / 1000; paramChanged(); });
+  $('grav').addEventListener('change', e => { P.g = parseFloat(e.target.value); paramChanged(); });
+  $('air').addEventListener('change', e => { P.air = e.target.checked; paramChanged(); });
+  $('drop').addEventListener('click', () => { phase = 'falling'; t = 0; last = performance.now(); });
+  $('reset').addEventListener('click', paramChanged);
+
+  // ---------- Boucle d'animation ----------
+  function loop(now){
+    const dt = Math.min((now - last) / 1000, 0.05);
+    last = now;
+    if (phase === 'falling'){
+      const tEnd = P.air ? Math.max(vacuum().tf, inAir().tf) : vacuum().tf;
+      t += dt;
+      if (t >= tEnd || reduceMotion){ t = tEnd; phase = 'landed'; }   // mouvement réduit : résultat immédiat
+    }
+    draw();
+    requestAnimationFrame(loop);
+  }
+  syncLabels();
+  requestAnimationFrame(loop);
+})();
+</script>
+</body>
+</html>
