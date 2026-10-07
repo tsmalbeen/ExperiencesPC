@@ -262,7 +262,7 @@
   <header>
     <span class="kicker">Chimie</span>
     <h1>Loi de Beer-Lambert</h1>
-    <p>Un spectrophotomètre mesure l'absorbance A d'une solution colorée de permanganate de potassium. Relève A pour plusieurs concentrations afin de tracer la droite d'étalonnage, puis sers-t'en pour déterminer la concentration d'une solution inconnue.</p>
+    <p>Un spectrophotomètre mesure l'absorbance A d'une solution colorée. Choisis la solution, règle la longueur d'onde là où elle absorbe bien, relève A pour plusieurs concentrations afin de tracer la droite d'étalonnage, puis sers-t'en pour déterminer la concentration d'une solution inconnue.</p>
   </header>
 
   <section class="scene">
@@ -270,8 +270,8 @@
       <strong class="scene-title">Spectrophotomètre réglé sur λ = <span id="lamLabel">525</span> nm</strong>
       <span id="status" class="status">—</span>
     </div>
-    <canvas id="stage" style="aspect-ratio:1000/460" aria-label="En haut, le faisceau lumineux traverse la cuve et atteint le détecteur ; en bas, le spectre d'absorption et la droite d'étalonnage."></canvas>
-    <p class="hint">Change la concentration puis « Relever ce point » (deux points au moins pour tracer la droite). Les points sont effacés si tu modifies λ ou l'épaisseur de la cuve.</p>
+    <canvas id="stage" style="aspect-ratio:1000/460" aria-label="En haut, le faisceau lumineux traverse la cuve et atteint le détecteur ; en bas, le spectre d'absorption de la solution choisie et la droite d'étalonnage."></canvas>
+    <p class="hint">Change la concentration puis « Relever ce point » (deux points au moins pour tracer la droite). Les points sont effacés si tu changes de solution, de longueur d'onde ou de cuve.</p>
     <div class="readouts">
       <div class="readout"><span class="label">Absorbance A</span><span class="value" id="rA">—</span></div>
       <div class="readout"><span class="label">Lumière transmise</span><span class="value" id="rT">—</span></div>
@@ -285,12 +285,23 @@
   <section class="panel">
     <div class="controls">
       <div class="control">
+        <div class="row"><label for="sol">Solution étudiée</label></div>
+        <select id="sol">
+          <option value="0" selected>Permanganate de potassium (violet)</option>
+          <option value="1">Sulfate de cuivre (bleu)</option>
+          <option value="2">Bleu patenté V, colorant E131</option>
+          <option value="3">Tartrazine, colorant E102 (jaune)</option>
+          <option value="4">Bétadine diluée (diiode, brun)</option>
+          <option value="5">Chlorure de potassium (incolore)</option>
+        </select>
+      </div>
+      <div class="control">
         <div class="row"><label for="conc">Concentration C</label><span class="num" id="concVal"></span></div>
-        <input type="range" id="conc" min="0" max="0.5" step="0.01" value="0.2">
+        <input type="range" id="conc" min="0" max="100" step="2" value="40">
       </div>
       <div class="control">
         <div class="row"><label for="lam">Longueur d'onde λ</label><span class="num" id="lamVal"></span></div>
-        <input type="range" id="lam" min="400" max="700" step="5" value="525">
+        <input type="range" id="lam" min="400" max="800" step="5" value="525">
       </div>
       <div class="control">
         <div class="row"><label for="len">Épaisseur de la cuve ℓ</label><span class="num" id="lenVal"></span></div>
@@ -304,6 +315,7 @@
     <div class="buttons">
       <button class="primary" id="add">Relever ce point</button>
       <button id="clear">Effacer les points</button>
+      <button id="peak">Régler λ sur la valeur conseillée</button>
     </div>
 
     <div class="formula">
@@ -314,7 +326,7 @@
     </div>
   </section>
 
-  <footer>Modèle : solution de permanganate de potassium, ε = 2 200 L·mol⁻¹·cm⁻¹ au maximum d'absorption (525 nm), spectre approché par une courbe en cloche. La loi n'est fiable que pour des solutions diluées (A < 2 environ).</footer>
+  <footer>Modèle : chaque spectre est approché par une courbe en cloche autour du maximum d'absorption, avec des valeurs de ε en ordre de grandeur (permanganate 2 200 L·mol⁻¹·cm⁻¹ à 525 nm, sulfate de cuivre 12 à 810 nm, bleu patenté 100 000 à 640 nm, tartrazine 23 000 à 427 nm). Le diiode de la Bétadine absorbe surtout dans l'ultraviolet : on le dose sur le flanc visible de son pic, vers 470 nm (ε ≈ 600). Le chlorure de potassium, incolore, n'absorbe pas dans le visible. Une solution absorbe la couleur complémentaire de celle qu'on lui voit. La loi n'est fiable que pour des solutions diluées (A < 2 environ).</footer>
 </main>
 
 <script>
@@ -455,21 +467,36 @@
 
   // ---------- Constantes ----------
   const W = 1000, H = 460;
-  const EPS_MAX = 2200, LAM_MAX = 525, WIDTH = 45;   // L/(mol·cm), nm, nm
-  const C_UNKNOWN = 0.27;                            // mmol/L (à retrouver par l'élève)
-  const SPEC = { x: 60, y: 270, w: 380, h: 130 };
+  // eps : ε au maximum en L/(mol·cm) ; peak, width : position et largeur du pic (nm) ; best : longueur d'onde de travail conseillée (nm)
+  // cMax : concentration maximale (mol/L) ; unit, factor, dec : unité d'affichage de la concentration ; rgb : teinte de la solution
+  const SOLUTIONS = [
+    { name: 'permanganate de potassium', eps: 2200, peak: 525, width: 45, best: 525, cMax: 5e-4, unit: 'mmol/L', factor: 1e3, dec: 2, rgb: [150, 40, 150] },
+    { name: 'sulfate de cuivre', eps: 12, peak: 810, width: 120, best: 800, cMax: 0.1, unit: 'mmol/L', factor: 1e3, dec: 0, rgb: [38, 110, 205] },
+    { name: 'bleu patenté V', eps: 1e5, peak: 640, width: 35, best: 640, cMax: 2e-5, unit: 'µmol/L', factor: 1e6, dec: 1, rgb: [0, 120, 215] },
+    { name: 'tartrazine', eps: 23000, peak: 427, width: 45, best: 427, cMax: 8e-5, unit: 'µmol/L', factor: 1e6, dec: 1, rgb: [235, 185, 20] },
+    // diiode en présence d'iodure : le pic est dans l'ultraviolet, on travaille sur son flanc visible
+    { name: 'Bétadine diluée — diiode', eps: 26000, peak: 350, width: 62, best: 470, cMax: 1e-3, unit: 'mmol/L', factor: 1e3, dec: 2, rgb: [190, 105, 20] },
+    // solution incolore : aucune absorption dans le visible
+    { name: 'chlorure de potassium', eps: 0, peak: 525, width: 45, best: 525, cMax: 0.1, unit: 'mmol/L', factor: 1e3, dec: 0, rgb: [190, 200, 210], colourless: true }
+  ];
+  const UNKNOWN = 0.54;                              // concentration inconnue, en fraction de cMax (à retrouver par l'élève)
+  const SPEC = { x: 70, y: 270, w: 370, h: 130 };
   const CAL = { x: 560, y: 270, w: 400, h: 130 };
 
   // ---------- État ----------
   const canvas = $('stage');
   const ctx = setupCanvas(canvas, W, H);
-  const P = { c: 0.2, lam: 525, len: 1, unknown: false };   // mmol/L, nm, cm
-  let points = [];                                   // étalonnage : {c, A}
+  const P = { sol: 0, pct: 40, lam: 525, len: 1, unknown: false };   // pct : concentration en % de cMax
+  let points = [];                                   // étalonnage : {c, A}, c en mol/L
 
   // ---------- Chimie ----------
-  const epsilon = nm => EPS_MAX * Math.exp(-Math.pow((nm - LAM_MAX) / WIDTH, 2));
-  const absorbance = c => epsilon(P.lam) * P.len * c * 1e-3;          // c en mmol/L
-  // pente de la droite d'étalonnage passant par l'origine (moindres carrés)
+  const S = () => SOLUTIONS[P.sol];
+  const conc = () => P.pct / 100 * S().cMax;         // mol/L
+  const epsilon = nm => S().eps * Math.exp(-Math.pow((nm - S().peak) / S().width, 2));
+  const absorbance = c => epsilon(P.lam) * P.len * c;
+  const fmtC = c => fmt(c * S().factor, S().dec) + ' ' + S().unit;
+  const epsTop = () => { let m = 0; for (let nm = 400; nm <= 800; nm += 5) m = Math.max(m, epsilon(nm)); return m; };
+  // pente de la droite d'étalonnage passant par l'origine (moindres carrés), en L/mol
   function slope(){
     const sxx = points.reduce((s, p) => s + p.c * p.c, 0), sxy = points.reduce((s, p) => s + p.c * p.A, 0);
     return points.length >= 2 && sxx > 0 ? sxy / sxx : null;
@@ -480,18 +507,19 @@
     out('lamLabel', fmt(P.lam, 0));
     out('rA', fmt(A, 3));
     out('rT', fmt(Math.pow(10, -A) * 100, 1) + ' %');
-    out('rEps', fmt(epsilon(P.lam), 0) + ' L/(mol·cm)');
-    out('rK', k ? fmt(k, 2) + ' L/mmol' : '—');
+    out('rEps', fmt(epsilon(P.lam), epsilon(P.lam) < 100 ? 1 : 0) + ' L/(mol·cm)');
+    out('rK', k ? fmt(k / S().factor, 4) + ' L/' + S().unit.replace('/L', '') : '—');
     out('rAx', P.unknown ? fmt(A, 3) : '—');
-    out('rCx', P.unknown && k ? fmt(A / k, 3) + ' mmol/L' : '—');
-    if (A > 2) setStatus('A > 2 : trop peu de lumière transmise, mesure peu fiable', 'off');
-    else if (epsilon(P.lam) < 0.5 * EPS_MAX) setStatus('Loin du maximum d\'absorption : mesure peu sensible');
-    else setStatus('Mesure au voisinage du maximum d\'absorption', 'ok');
+    out('rCx', P.unknown && k ? fmtC(A / k) : '—');
+    if (S().colourless) setStatus('Solution incolore : elle n\'absorbe pas la lumière visible', 'off');
+    else if (A > 2) setStatus('A > 2 : trop peu de lumière transmise, mesure peu fiable', 'off');
+    else if (epsilon(P.lam) < 0.5 * epsilon(S().best)) setStatus('Absorption trop faible à cette longueur d\'onde : mesure peu sensible');
+    else setStatus('Longueur d\'onde adaptée à la mesure', 'ok');
   }
 
   // ---------- Rendu ----------
   function draw(){
-    const c = P.unknown ? C_UNKNOWN : P.c;
+    const c = P.unknown ? UNKNOWN * S().cMax : conc();
     const A = absorbance(c), k = slope();
     updateReadouts(A, k);
     ctx.clearRect(0, 0, W, H);
@@ -507,7 +535,8 @@
     ctx.globalAlpha = Math.max(0.04, Math.pow(10, -A));
     ctx.beginPath(); ctx.moveTo(cx0 + cw, yb); ctx.lineTo(780, yb); ctx.stroke();
     ctx.globalAlpha = 1;
-    ctx.fillStyle = 'rgba(150,40,150,' + (1 - Math.exp(-5 * c)).toFixed(3) + ')';
+    // la teinte de la cuve suit la concentration
+    ctx.fillStyle = 'rgba(' + S().rgb.join(',') + ',' + (S().colourless ? 0.12 : 1 - Math.exp(-2.6 * c / S().cMax)).toFixed(3) + ')';
     ctx.fillRect(cx0, yb - 55, cw, 110);
     ctx.strokeStyle = C.ink; ctx.lineWidth = 2;
     ctx.beginPath(); ctx.moveTo(cx0, yb - 70); ctx.lineTo(cx0, yb + 55); ctx.lineTo(cx0 + cw, yb + 55); ctx.lineTo(cx0 + cw, yb - 70); ctx.stroke();
@@ -518,46 +547,59 @@
     ctx.fillStyle = C.inkSoft; ctx.font = '13px ' + MONO;
     ctx.fillText('I₀', 290, yb - 18); ctx.fillText('I', (cx0 + cw + 780) / 2, yb - 18);
     ctx.fillText('ℓ = ' + fmt(P.len, 1) + ' cm', cx0 + cw / 2, yb + 76);
-    ctx.fillText(P.unknown ? 'solution inconnue' : 'C = ' + fmt(P.c, 2) + ' mmol/L', cx0 + cw / 2, yb - 80);
+    ctx.fillStyle = C.ink; ctx.font = '14px ' + SANS;
+    ctx.fillText(S().name.charAt(0).toUpperCase() + S().name.slice(1), cx0 + cw / 2, yb - 98);
+    if (S().colourless){ ctx.fillStyle = C.wave; ctx.font = '13px ' + SANS; ctx.fillText('Pas d\'absorption dans le visible : dosage impossible par spectrophotométrie (on utilise la conductimétrie).', W / 2, yb + 104); }
+    ctx.fillStyle = C.inkSoft; ctx.font = '13px ' + MONO;
+    ctx.fillText(P.unknown ? 'solution inconnue' : 'C = ' + fmtC(c), cx0 + cw / 2, yb - 80);
 
     // spectre d'absorption de la solution
-    const S = axes(ctx, SPEC, { xMin: 400, xMax: 700, yMax: 2400, yTicks: 3, title: 'Spectre : ε en L/(mol·cm)', xLabel: 'λ (nm)' });
-    curve(ctx, S, epsilon, 400, 700, C.wave, 2.5);
+    const G1 = axes(ctx, SPEC, { xMin: 400, xMax: 800, xTicks: 4, yMax: Math.max(10, epsTop() * 1.1), yTicks: 3, title: 'Spectre : ε en L/(mol·cm)', xLabel: 'λ (nm)' });
+    curve(ctx, G1, epsilon, 400, 800, C.wave, 2.5);
     ctx.setLineDash([5, 6]); ctx.strokeStyle = beam; ctx.lineWidth = 2;
-    ctx.beginPath(); ctx.moveTo(S.X(P.lam), SPEC.y); ctx.lineTo(S.X(P.lam), SPEC.y + SPEC.h); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(G1.X(P.lam), SPEC.y); ctx.lineTo(G1.X(P.lam), SPEC.y + SPEC.h); ctx.stroke();
     ctx.setLineDash([]);
 
-    // droite d'étalonnage
-    const aMax = Math.max(0.1, absorbance(0.5) * 1.1);
-    const G = axes(ctx, CAL, { xMax: 0.5, xTicks: 5, yMax: aMax, yTicks: 3, title: 'Étalonnage : absorbance A', xLabel: 'C (mmol/L)' });
-    if (k) curve(ctx, G, x => k * x, 0, 0.5, C.inkSoft, 1.5);
+    // droite d'étalonnage (concentration dans l'unité d'affichage)
+    const f = S().factor, xMax = S().cMax * f;
+    const aMax = Math.max(0.1, absorbance(S().cMax) * 1.1);
+    const G2 = axes(ctx, CAL, { xMax, xTicks: 5, yMax: aMax, yTicks: 3, title: 'Étalonnage : absorbance A', xLabel: 'C (' + S().unit + ')' });
+    if (k) curve(ctx, G2, x => k * x / f, 0, xMax, C.inkSoft, 1.5);
     ctx.strokeStyle = C.blue; ctx.lineWidth = 2.5;
     for (const p of points){
-      ctx.beginPath(); ctx.moveTo(G.X(p.c) - 6, G.Y(p.A)); ctx.lineTo(G.X(p.c) + 6, G.Y(p.A));
-      ctx.moveTo(G.X(p.c), G.Y(p.A) - 6); ctx.lineTo(G.X(p.c), G.Y(p.A) + 6); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(G2.X(p.c * f) - 6, G2.Y(p.A)); ctx.lineTo(G2.X(p.c * f) + 6, G2.Y(p.A));
+      ctx.moveTo(G2.X(p.c * f), G2.Y(p.A) - 6); ctx.lineTo(G2.X(p.c * f), G2.Y(p.A) + 6); ctx.stroke();
     }
     if (P.unknown){
       // lecture graphique : A mesurée → concentration
+      const xr = k ? Math.min(A / k * f, xMax) : xMax, ya = G2.Y(Math.min(A, aMax));
       ctx.setLineDash([5, 6]); ctx.strokeStyle = C.accent; ctx.lineWidth = 1.8;
-      ctx.beginPath(); ctx.moveTo(CAL.x, G.Y(A)); ctx.lineTo(k ? G.X(A / k) : CAL.x + CAL.w, G.Y(A));
-      if (k) ctx.lineTo(G.X(A / k), CAL.y + CAL.h);
+      ctx.beginPath(); ctx.moveTo(CAL.x, ya); ctx.lineTo(G2.X(xr), ya);
+      if (k) ctx.lineTo(G2.X(xr), CAL.y + CAL.h);
       ctx.stroke(); ctx.setLineDash([]);
     } else {
       ctx.fillStyle = C.wave; ctx.strokeStyle = C.paper; ctx.lineWidth = 2;
-      ctx.beginPath(); ctx.arc(G.X(P.c), G.Y(A), 6, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+      ctx.beginPath(); ctx.arc(G2.X(c * f), G2.Y(Math.min(A, aMax)), 6, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
     }
   }
 
   // ---------- Interactions ----------
-  bind('conc', v => { P.c = v; }, v => fmt(v, 2) + ' mmol/L');
+  function setLambda(nm){ P.lam = nm; $('lam').value = nm; out('lamVal', fmt(nm, 0) + ' nm'); points = []; }
+  bind('sol', v => {
+    P.sol = v; points = [];
+    setLambda(S().best);                             // on se place d'emblée sur la longueur d'onde conseillée
+    out('concVal', fmtC(conc()));
+  });
+  bind('conc', v => { P.pct = v; }, v => fmtC(v / 100 * S().cMax));
   bind('lam', v => { P.lam = v; points = []; }, v => fmt(v, 0) + ' nm');
   bind('len', v => { P.len = v; points = []; }, v => fmt(v, 1) + ' cm');
   bind('unknown', v => { P.unknown = v; });
   $('add').addEventListener('click', () => {
-    if (P.unknown || points.some(p => Math.abs(p.c - P.c) < 1e-9)) return;
-    points.push({ c: P.c, A: absorbance(P.c) });
+    if (P.unknown || points.some(p => Math.abs(p.c - conc()) < 1e-12)) return;
+    points.push({ c: conc(), A: absorbance(conc()) });
   });
   $('clear').addEventListener('click', () => { points = []; });
+  $('peak').addEventListener('click', () => setLambda(S().best));
 
   // ---------- Boucle de rendu ----------
   function loop(){ draw(); requestAnimationFrame(loop); }
