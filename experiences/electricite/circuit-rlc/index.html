@@ -548,5 +548,15 @@
   requestAnimationFrame(loop);
 })();
 </script>
+<script>
+  // Compteur de visites GoatCounter (sans cookie), chargé uniquement sur le site en ligne
+  if (location.protocol === 'https:'){
+    const gc = document.createElement('script');
+    gc.async = true;
+    gc.src = 'https://gc.zgo.at/count.js';
+    gc.dataset.goatcounter = 'https://miyvi.goatcounter.com/count';
+    document.head.appendChild(gc);
+  }
+</script>
 </body>
 </html>
