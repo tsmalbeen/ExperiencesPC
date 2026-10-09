@@ -1,0 +1,614 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Chromatographie sur couche mince</title>
+<style>
+  /* ---------- Thème (clair / sombre automatique) ---------- */
+  :root{
+    --bg:#f3ede1;
+    --paper:#fbf8f0;
+    --ink:#22242e;
+    --ink-soft:#5b5a52;
+    --line:#d9d0ba;
+    --wave:#b8362b;
+    --wave-glow:rgba(184,54,43,.14);
+    --accent:#2f6f4f;
+    --blue:#2c5f8a;
+    --brass:#a9793f;
+    --violet:#8a3fc0;
+    --pink:#cf5f8c;
+    --ok:#2f6f4f;
+    --warn:#b8362b;
+    --serif:"Iowan Old Style","Palatino Linotype",Palatino,Georgia,serif;
+    --sans:system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+    --mono:ui-monospace,"Cascadia Mono","SF Mono",Consolas,Menlo,monospace;
+    color-scheme: light dark;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{
+      --bg:#171a21;
+      --paper:#1e222b;
+      --ink:#eae6da;
+      --ink-soft:#9a9689;
+      --line:#33384a;
+      --wave:#ff8a72;
+      --wave-glow:rgba(255,138,114,.14);
+      --accent:#79d6a3;
+      --blue:#7fb4e0;
+      --brass:#c99a5b;
+      --violet:#c39af5;
+      --pink:#f29bbd;
+      --ok:#79d6a3;
+      --warn:#ff8a72;
+    }
+  }
+
+  /* ---------- Mise en page ---------- */
+  *{box-sizing:border-box;}
+  html, body{ margin:0; padding:0; }
+  body{
+    background:var(--bg);
+    color:var(--ink);
+    font-family:var(--sans);
+    padding:28px 16px;
+    display:flex;
+    justify-content:center;
+  }
+  main{
+    width:100%;
+    max-width:920px;
+    display:flex;
+    flex-direction:column;
+    gap:20px;
+  }
+  header{ display:flex; flex-direction:column; gap:4px; }
+  .kicker{
+    font-size:.72rem;
+    text-transform:uppercase;
+    letter-spacing:.08em;
+    color:var(--ink-soft);
+  }
+  h1{
+    font-family:var(--serif);
+    font-weight:600;
+    font-size:clamp(1.5rem, 1.1rem + 1.6vw, 2.2rem);
+    margin:0;
+    text-wrap:balance;
+  }
+  header p{
+    margin:0;
+    color:var(--ink-soft);
+    font-size:.92rem;
+    max-width:66ch;
+  }
+
+  /* ---------- Zone de simulation ---------- */
+  .scene{
+    background:var(--paper);
+    border:1px solid var(--line);
+    border-radius:14px;
+    padding:20px clamp(12px,3vw,28px) 8px;
+    display:flex;
+    flex-direction:column;
+    gap:6px;
+  }
+  .scene-top{
+    display:flex;
+    justify-content:space-between;
+    align-items:baseline;
+    gap:12px;
+    flex-wrap:wrap;
+  }
+  .scene-title{ font-family:var(--serif); font-weight:600; }
+  .status{
+    font-family:var(--mono);
+    font-size:.82rem;
+    padding:3px 10px;
+    border-radius:999px;
+    border:1px solid var(--line);
+    color:var(--ink-soft);
+  }
+  .status.ok{ color:var(--ok); border-color:var(--ok); }
+  .status.off{ color:var(--warn); border-color:var(--warn); }
+  canvas{
+    width:100%;
+    height:auto;
+    display:block;
+  }
+  canvas.draggable{ touch-action:none; cursor:grab; }
+  canvas.dragging{ cursor:grabbing; }
+  canvas.tappable{ touch-action:manipulation; }
+  .hint{ margin:0; font-size:.78rem; color:var(--ink-soft); }
+
+  /* ---------- Mesures ---------- */
+  .readouts{
+    display:grid;
+    grid-template-columns:repeat(auto-fit,minmax(150px,1fr));
+    gap:10px 18px;
+    padding-block:10px;
+    border-top:1px solid var(--line);
+    margin-top:6px;
+  }
+  .readout{ display:flex; flex-direction:column; gap:2px; }
+  .readout .label{
+    font-size:.78rem;
+    color:var(--ink-soft);
+  }
+  .readout .value{
+    font-family:var(--mono);
+    font-variant-numeric:tabular-nums;
+    font-size:1.05rem;
+    font-weight:500;
+  }
+  .readout .value em{ color:var(--blue); font-style:normal; font-size:.9rem; }
+
+  /* ---------- Contrôles ---------- */
+  .panel{
+    background:var(--paper);
+    border:1px solid var(--line);
+    border-radius:14px;
+    padding:18px clamp(14px,3vw,26px);
+    display:flex;
+    flex-direction:column;
+    gap:18px;
+  }
+  .controls{
+    display:grid;
+    grid-template-columns:repeat(auto-fit,minmax(240px,1fr));
+    gap:18px 32px;
+  }
+  .control{ display:flex; flex-direction:column; gap:6px; }
+  .control .row{
+    display:flex;
+    justify-content:space-between;
+    align-items:baseline;
+    gap:10px;
+  }
+  .control label{ font-size:.86rem; font-weight:500; }
+  .control .num{
+    font-family:var(--mono);
+    font-variant-numeric:tabular-nums;
+    color:var(--wave);
+    font-size:.92rem;
+  }
+  input[type=range]{
+    -webkit-appearance:none;
+    appearance:none;
+    width:100%;
+    height:4px;
+    margin:8px 0;
+    border-radius:999px;
+    background:var(--line);
+    outline:none;
+  }
+  input[type=range]::-webkit-slider-thumb{
+    -webkit-appearance:none;
+    width:20px; height:20px;
+    border-radius:50%;
+    background:var(--wave);
+    border:2px solid var(--paper);
+    box-shadow:0 0 0 1px var(--line);
+    cursor:pointer;
+  }
+  input[type=range]::-moz-range-thumb{
+    width:18px; height:18px;
+    border-radius:50%;
+    background:var(--wave);
+    border:2px solid var(--paper);
+    box-shadow:0 0 0 1px var(--line);
+    cursor:pointer;
+  }
+  select{
+    font-family:var(--sans);
+    font-size:.86rem;
+    padding:7px 10px;
+    border-radius:8px;
+    border:1px solid var(--line);
+    background:var(--paper);
+    color:var(--ink);
+    width:100%;
+  }
+  .check{
+    display:flex;
+    align-items:center;
+    gap:8px;
+    font-size:.86rem;
+    font-weight:500;
+    cursor:pointer;
+  }
+  .check input{ width:18px; height:18px; accent-color:var(--accent); margin:0; }
+  .buttons{ display:flex; gap:10px; flex-wrap:wrap; }
+  button{
+    font-family:var(--sans);
+    font-size:.86rem;
+    font-weight:500;
+    padding:9px 16px;
+    border-radius:8px;
+    border:1px solid var(--line);
+    background:transparent;
+    color:var(--ink);
+    cursor:pointer;
+  }
+  button.primary{
+    background:var(--accent);
+    border-color:var(--accent);
+    color:var(--paper);
+  }
+  button:focus-visible, input:focus-visible, select:focus-visible{
+    outline:2px solid var(--accent);
+    outline-offset:2px;
+  }
+
+  /* ---------- Formules ---------- */
+  .formula{
+    font-family:var(--mono);
+    font-size:.86rem;
+    color:var(--ink-soft);
+    border-top:1px solid var(--line);
+    padding-top:14px;
+    display:flex;
+    flex-wrap:wrap;
+    gap:6px 22px;
+  }
+  .formula b{ color:var(--ink); font-weight:600; }
+  footer{
+    font-size:.78rem;
+    color:var(--ink-soft);
+    text-align:center;
+    text-wrap:balance;
+  }
+  .credit{ margin:-12px 0 0; font-size:.7rem; color:var(--ink-soft); text-align:center; }
+</style>
+</head>
+<body>
+
+<main>
+  <header>
+    <span class="kicker">Chimie</span>
+    <h1>Chromatographie sur couche mince</h1>
+    <p>L'éluant monte par capillarité le long de la plaque et entraîne les espèces déposées, chacune plus ou moins loin. Un mélange se sépare en plusieurs taches, que l'on identifie en comparant leur hauteur à celle d'espèces de référence déposées à côté.</p>
+  </header>
+
+  <section class="scene">
+    <div class="scene-top">
+      <strong class="scene-title">Un colorant vert est-il un mélange ?</strong>
+      <span id="status" class="status">—</span>
+    </div>
+    <canvas id="stage" class="draggable" style="aspect-ratio:1000/560" aria-label="Plaque de chromatographie dans une cuve, avec trois dépôts : un colorant vert, un colorant jaune et un colorant bleu."></canvas>
+    <p class="hint">Fais glisser le front de l'éluant pour le monter ou le redescendre à la main. Touche une tache pour mesurer son rapport frontal.</p>
+    <div class="readouts">
+      <div class="readout"><span class="label">Tache mesurée</span><span class="value" id="rSpot">—</span></div>
+      <div class="readout"><span class="label">Distance parcourue par la tache h</span><span class="value" id="rh">—</span></div>
+      <div class="readout"><span class="label">Distance parcourue par le front H</span><span class="value" id="rH">—</span></div>
+      <div class="readout"><span class="label">Rapport frontal R<sub>f</sub></span><span class="value" id="rRf">—</span></div>
+    </div>
+  </section>
+
+  <section class="panel">
+    <div class="controls">
+      <div class="control">
+        <div class="row"><label for="eluant">Éluant</label></div>
+        <select id="eluant">
+          <option value="0" selected>Éluant 1 : bien adapté</option>
+          <option value="1">Éluant 2 : entraîne trop les espèces</option>
+          <option value="2">Éluant 3 : n'entraîne presque rien</option>
+        </select>
+      </div>
+      <div class="control">
+        <label class="check"><input type="checkbox" id="showRf"> Afficher le rapport frontal de chaque tache</label>
+      </div>
+    </div>
+
+    <div class="buttons">
+      <button class="primary" id="run">Lancer l'élution</button>
+      <button id="reset">Nouvelle plaque</button>
+    </div>
+
+    <div class="formula">
+      <span>R<sub>f</sub>&nbsp;=&nbsp;<b>h&nbsp;/&nbsp;H</b></span>
+      <span>0&nbsp;≤&nbsp;R<sub>f</sub>&nbsp;≤&nbsp;<b>1</b></span>
+      <span>même éluant, même plaque, même R<sub>f</sub>&nbsp;→&nbsp;<b>même espèce</b></span>
+    </div>
+  </section>
+
+  <footer>Les distances h et H se mesurent à partir de la ligne de dépôt, qui doit rester au-dessus du niveau de l'éluant. Les rapports frontaux utilisés ici sont des valeurs d'illustration, pas des mesures.</footer>
+  <p class="credit">D'après les animations fournies par T. Knecht.</p>
+</main>
+
+<script>
+(function(){
+  // ---------- Utilitaires ----------
+  const $ = id => document.getElementById(id);
+  const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
+  const fmt = (v, d) => Number.isFinite(v)
+    ? v.toLocaleString('fr-FR', {minimumFractionDigits:d, maximumFractionDigits:d})
+    : '—';
+  const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const MONO = 'ui-monospace, "Cascadia Mono", "SF Mono", Consolas, Menlo, monospace';
+  const SANS = 'system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif';
+
+  // Couleurs du thème, relues si le système bascule clair/sombre
+  const C = {};
+  function readColors(){
+    const s = getComputedStyle(document.documentElement);
+    for (const n of ['bg','paper','ink','ink-soft','line','wave','wave-glow','accent','blue','brass','violet','pink']){
+      C[n.replace(/-(.)/g, (_, c) => c.toUpperCase())] = s.getPropertyValue('--' + n).trim();
+    }
+  }
+  readColors();
+  window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', readColors);
+
+  // Canvas net sur tout écran : on dessine toujours dans un repère logique W × H
+  function setupCanvas(canvas, W, H){
+    const ctx = canvas.getContext('2d');
+    function fit(){
+      const dpr = Math.min(window.devicePixelRatio || 1, 3);
+      const cw = canvas.clientWidth || W;
+      canvas.width = Math.max(1, Math.round(cw * dpr));
+      canvas.height = Math.max(1, Math.round(cw * H / W * dpr));
+      ctx.setTransform(canvas.width / W, 0, 0, canvas.height / H, 0, 0);
+    }
+    window.addEventListener('resize', fit);
+    fit();
+    return ctx;
+  }
+  // Position du pointeur (souris ou doigt) dans le repère logique
+  function pointerPos(canvas, evt, W, H){
+    const r = canvas.getBoundingClientRect();
+    return { x: (evt.clientX - r.left) * W / r.width, y: (evt.clientY - r.top) * H / r.height };
+  }
+  function arrow(ctx, x1, y1, x2, y2, color, width){
+    const len = Math.hypot(x2 - x1, y2 - y1);
+    if (len < 3) return;
+    const a = Math.atan2(y2 - y1, x2 - x1), h = Math.min(10, len * 0.5);
+    ctx.strokeStyle = color; ctx.fillStyle = color; ctx.lineWidth = width || 2.5;
+    ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2 - Math.cos(a) * h * 0.8, y2 - Math.sin(a) * h * 0.8); ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(x2, y2);
+    ctx.lineTo(x2 - h * Math.cos(a - 0.42), y2 - h * Math.sin(a - 0.42));
+    ctx.lineTo(x2 - h * Math.cos(a + 0.42), y2 - h * Math.sin(a + 0.42));
+    ctx.closePath(); ctx.fill();
+  }
+  // Pas "rond" (1, 2, 5 × 10^n) pour graduer un axe
+  function niceStep(x){
+    if (!(x > 0)) return 1;
+    const p = Math.pow(10, Math.floor(Math.log10(x))), m = x / p;
+    return (m < 1.5 ? 1 : m < 3.5 ? 2 : m < 7.5 ? 5 : 10) * p;
+  }
+
+  // Relie un curseur, une liste ou une case à cocher à un paramètre (et affiche sa valeur)
+  function bind(id, onChange, format){
+    const el = $(id), label = $(id + 'Val');
+    const val = () => el.type === 'checkbox' ? el.checked : parseFloat(el.value);
+    const show = () => { if (label && format) label.textContent = format(val()); };
+    el.addEventListener(el.type === 'range' ? 'input' : 'change', () => { onChange(val()); show(); });
+    show();
+  }
+  const out = (id, text) => { $(id).textContent = text; };
+  function setStatus(text, cls){
+    const s = $('status');
+    s.textContent = text; s.className = 'status' + (cls ? ' ' + cls : '');
+  }
+  // Repère gradué dans le rectangle g ; renvoie les conversions X(x) et Y(y)
+  function axes(ctx, g, o){
+    const xMin = o.xMin || 0, yMin = o.yMin || 0;
+    const X = x => g.x + g.w * (x - xMin) / (o.xMax - xMin);
+    const Y = y => g.y + g.h - g.h * (y - yMin) / (o.yMax - yMin);
+    const ink = o.ink || C.ink, soft = o.soft || C.inkSoft, line = o.line || C.line;
+    const sx = niceStep((o.xMax - xMin) / (o.xTicks || 6)), sy = niceStep((o.yMax - yMin) / (o.yTicks || 4));
+    const dec = s => s >= 1 ? 0 : Math.min(4, Math.ceil(-Math.log10(s) - 1e-9));
+    ctx.save();
+    ctx.font = '13px ' + MONO; ctx.lineWidth = 1; ctx.textAlign = 'center';
+    for (let k = Math.ceil(xMin / sx - 1e-9); k * sx <= o.xMax + sx * 1e-6; k++){
+      ctx.strokeStyle = line; ctx.globalAlpha = 0.55;
+      ctx.beginPath(); ctx.moveTo(X(k * sx), g.y); ctx.lineTo(X(k * sx), g.y + g.h); ctx.stroke();
+      ctx.globalAlpha = 1; ctx.fillStyle = soft;
+      ctx.fillText(fmt(k * sx + 0, dec(sx)), X(k * sx), g.y + g.h + 18);
+    }
+    ctx.textAlign = 'right';
+    for (let k = Math.ceil(yMin / sy - 1e-9); k * sy <= o.yMax + sy * 1e-6; k++){
+      ctx.strokeStyle = line; ctx.globalAlpha = 0.55;
+      ctx.beginPath(); ctx.moveTo(g.x, Y(k * sy)); ctx.lineTo(g.x + g.w, Y(k * sy)); ctx.stroke();
+      ctx.globalAlpha = 1; ctx.fillStyle = soft;
+      ctx.fillText(fmt(k * sy + 0, dec(sy)), g.x - 8, Y(k * sy) + 4);
+    }
+    const y0 = yMin < 0 ? Y(0) : g.y + g.h;
+    ctx.strokeStyle = soft; ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.moveTo(g.x, g.y); ctx.lineTo(g.x, g.y + g.h); ctx.moveTo(g.x, y0); ctx.lineTo(g.x + g.w, y0); ctx.stroke();
+    ctx.fillStyle = ink; ctx.textAlign = 'left'; ctx.font = '14px ' + SANS;
+    if (o.title) ctx.fillText(o.title, g.x + 8, g.y - 10);
+    ctx.fillStyle = soft; ctx.textAlign = 'right'; ctx.font = '13px ' + MONO;
+    if (o.xLabel) ctx.fillText(o.xLabel, g.x + g.w, g.y + g.h + 36);
+    ctx.restore();
+    return { X, Y };
+  }
+
+  // ---------- Constantes ----------
+  const W = 1000, H = 560;
+  const PL = { x: 330, y: 40, w: 340, h: 472 };      // plaque
+  const LINE = 450, SURF = 480, TOP = 80;            // ligne de dépôt, surface de l'éluant, arrêt du front
+  const PX_CM = 50, T_TOTAL = 16;                    // échelle, durée d'une élution complète (s)
+  const DYES = {
+    j: { name: 'jaune', rgb: '236,190,18' },
+    b: { name: 'bleu',  rgb: '45,115,225' }
+  };
+  const DEPOSITS = [
+    { x: 400, tag: 'V', dyes: ['j', 'b'] },          // colorant vert : mélange à analyser
+    { x: 500, tag: 'J', dyes: ['j'] },
+    { x: 600, tag: 'B', dyes: ['b'] }
+  ];
+  const ELUANTS = [ { j: 0.72, b: 0.38 }, { j: 0.96, b: 0.9 }, { j: 0.1, b: 0.04 } ];
+  // La plaque reste claire quel que soit le thème : couleurs fixes pour ce qui est tracé dessus
+  const INK = '#33312b', PENCIL = '#8a8578', COL_H = '#b8362b', COL_FRONT = '#2c5f8a';
+
+  // ---------- État ----------
+  const canvas = $('stage');
+  const ctx = setupCanvas(canvas, W, H);
+  const P = { e: 0, showRf: false };
+  let t = 0, running = false, dragging = false, sel = null, last = performance.now();
+
+  // ---------- Modèle ----------
+  // Le front ralentit en montant : hauteur proportionnelle à la racine carrée du temps
+  const frac = () => Math.min(1, Math.sqrt(t / T_TOTAL));
+  const frontY = () => SURF - frac() * (SURF - TOP);
+  const frontDist = () => Math.max(0, LINE - frontY());            // H, en pixels
+  function spots(){
+    const list = [];
+    DEPOSITS.forEach((dep, i) => dep.dyes.forEach(k => {
+      list.push({ key: i + k, dye: k, tag: dep.tag, x: dep.x, y: LINE - ELUANTS[P.e][k] * frontDist() });
+    }));
+    return list;
+  }
+  function syncButtons(){ $('run').textContent = running ? 'Mettre en pause' : frac() >= 1 ? 'Relancer l\'élution' : 'Lancer l\'élution'; }
+  function reset(){ t = 0; running = false; sel = null; syncButtons(); }
+
+  // ---------- Affichage des mesures ----------
+  function updateReadouts(list){
+    const Hd = frontDist(), s = list.find(q => q.key === sel);
+    out('rH', fmt(Hd / PX_CM, 1) + ' cm');
+    if (s){
+      out('rSpot', DYES[s.dye].name + ' du dépôt ' + s.tag);
+      out('rh', fmt((LINE - s.y) / PX_CM, 1) + ' cm');
+      out('rRf', Hd > 0 ? fmt((LINE - s.y) / Hd, 2) : '—');
+    } else {
+      out('rSpot', 'aucune'); out('rh', '—'); out('rRf', '—');
+    }
+    if (frac() >= 1) setStatus('Élution terminée : on sort la plaque', 'ok');
+    else if (running) setStatus(Hd > 0 ? 'Élution en cours' : 'L\'éluant monte vers les dépôts');
+    else setStatus(t === 0 ? 'Plaque prête' : 'Élution interrompue');
+  }
+
+  // ---------- Rendu ----------
+  function label(text, y){
+    ctx.fillStyle = C.inkSoft; ctx.font = '13px ' + SANS; ctx.textAlign = 'right';
+    ctx.fillText(text, 246, y + 4);
+    ctx.strokeStyle = C.inkSoft; ctx.lineWidth = 1; ctx.setLineDash([3, 4]);
+    ctx.beginPath(); ctx.moveTo(254, y); ctx.lineTo(PL.x - 4, y); ctx.stroke();
+    ctx.setLineDash([]);
+  }
+  function draw(){
+    const list = spots(), fy = frontY(), Hd = frontDist();
+    updateReadouts(list);
+    ctx.clearRect(0, 0, W, H);
+
+    // Cuve, couvercle et éluant
+    ctx.fillStyle = C.blue; ctx.globalAlpha = 0.2;
+    ctx.fillRect(272, SURF, 456, 528 - SURF);
+    ctx.globalAlpha = 1;
+    ctx.strokeStyle = C.inkSoft; ctx.lineWidth = 3; ctx.lineJoin = 'round';
+    ctx.beginPath(); ctx.moveTo(270, 24); ctx.lineTo(270, 530); ctx.lineTo(730, 530); ctx.lineTo(730, 24); ctx.stroke();
+    ctx.fillStyle = C.inkSoft; ctx.fillRect(258, 14, 484, 9);
+
+    // Plaque et zone déjà mouillée par l'éluant
+    ctx.fillStyle = '#f6f3ea'; ctx.fillRect(PL.x, PL.y, PL.w, PL.h);
+    ctx.fillStyle = 'rgba(80,120,160,.16)'; ctx.fillRect(PL.x, fy, PL.w, PL.y + PL.h - fy);
+    ctx.strokeStyle = '#b9b2a0'; ctx.lineWidth = 1.5; ctx.strokeRect(PL.x, PL.y, PL.w, PL.h);
+
+    // Ligne de dépôt tracée au crayon
+    ctx.strokeStyle = PENCIL; ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.moveTo(PL.x + 14, LINE); ctx.lineTo(PL.x + PL.w - 14, LINE); ctx.stroke();
+    ctx.fillStyle = PENCIL; ctx.font = '13px ' + SANS; ctx.textAlign = 'center';
+    for (const dep of DEPOSITS){
+      ctx.beginPath(); ctx.moveTo(dep.x, LINE - 5); ctx.lineTo(dep.x, LINE + 5); ctx.stroke();
+      ctx.fillText(dep.tag, dep.x, LINE + 21);
+    }
+
+    // Taches : deux colorants superposés donnent du vert
+    ctx.globalCompositeOperation = 'multiply';
+    for (const s of list){
+      const k = (LINE - s.y) / (LINE - TOP);
+      ctx.fillStyle = 'rgba(' + DYES[s.dye].rgb + ',.88)';
+      ctx.beginPath(); ctx.ellipse(s.x, s.y, 14 + 6 * k, 8 + 5 * k, 0, 0, Math.PI * 2); ctx.fill();
+    }
+    ctx.globalCompositeOperation = 'source-over';
+
+    // Front de l'éluant
+    ctx.strokeStyle = COL_FRONT; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.moveTo(PL.x, fy); ctx.lineTo(PL.x + PL.w, fy); ctx.stroke();
+
+    if (P.showRf && Hd > 0){
+      ctx.fillStyle = INK; ctx.font = '13px ' + MONO; ctx.textAlign = 'left';
+      for (const s of list) ctx.fillText(fmt(ELUANTS[P.e][s.dye], 2), s.x + 24, s.y + 4);
+    }
+    // Mesure de la tache sélectionnée
+    const s = list.find(q => q.key === sel);
+    if (s){
+      ctx.strokeStyle = INK; ctx.lineWidth = 1.5; ctx.setLineDash([4, 3]);
+      ctx.beginPath(); ctx.ellipse(s.x, s.y, 24, 17, 0, 0, Math.PI * 2); ctx.stroke();
+      ctx.setLineDash([]);
+      const xh = s.x - 34, xH = PL.x + PL.w + 20;
+      arrow(ctx, xh, LINE, xh, s.y, COL_H, 2); arrow(ctx, xh, s.y, xh, LINE, COL_H, 2);
+      arrow(ctx, xH, LINE, xH, fy, COL_FRONT, 2); arrow(ctx, xH, fy, xH, LINE, COL_FRONT, 2);
+      ctx.font = 'italic 600 15px ' + SANS; ctx.textAlign = 'center';
+      if (LINE - s.y > 18){ ctx.fillStyle = COL_H; ctx.fillText('h', xh - 11, (LINE + s.y) / 2 + 5); }
+      if (Hd > 18){ ctx.fillStyle = COL_FRONT; ctx.fillText('H', xH + 12, (LINE + fy) / 2 + 5); }
+    }
+
+    label('éluant', SURF + 22);
+    label('ligne de dépôt', LINE);
+    if (fy < LINE - 12) label('front de l\'éluant', fy);
+    ctx.fillStyle = C.inkSoft; ctx.font = '13px ' + SANS; ctx.textAlign = 'left';
+    ctx.fillText('V : colorant vert', 752, 150);
+    ctx.fillText('J : colorant jaune', 752, 172);
+    ctx.fillText('B : colorant bleu', 752, 194);
+  }
+
+  // ---------- Interactions ----------
+  canvas.addEventListener('pointerdown', e => {
+    const p = pointerPos(canvas, e, W, H);
+    const hit = spots().find(s => Math.hypot(s.x - p.x, s.y - p.y) < 24);
+    if (hit){ sel = sel === hit.key ? null : hit.key; return; }
+    if (p.x < PL.x - 50 || p.x > PL.x + PL.w + 50 || Math.abs(p.y - frontY()) > 40) return;
+    dragging = true; running = false; syncButtons();
+    canvas.classList.add('dragging');
+    canvas.setPointerCapture(e.pointerId);
+  });
+  canvas.addEventListener('pointermove', e => {
+    if (!dragging) return;
+    const f = clamp((SURF - pointerPos(canvas, e, W, H).y) / (SURF - TOP), 0, 1);
+    t = f * f * T_TOTAL;
+    syncButtons();
+  });
+  for (const type of ['pointerup', 'pointercancel']){
+    canvas.addEventListener(type, () => { dragging = false; canvas.classList.remove('dragging'); });
+  }
+
+  bind('eluant', v => { P.e = v; reset(); });
+  bind('showRf', v => { P.showRf = v; });
+  $('run').addEventListener('click', () => {
+    if (frac() >= 1) t = 0;
+    running = !running;
+    if (running && reduceMotion){ t = T_TOTAL; running = false; }
+    syncButtons();
+  });
+  $('reset').addEventListener('click', reset);
+  reset();
+
+  // ---------- Boucle d'animation ----------
+  function loop(now){
+    const dt = Math.min((now - last) / 1000, 0.05);
+    last = now;
+    if (running){
+      t += dt;
+      if (t >= T_TOTAL){ t = T_TOTAL; running = false; syncButtons(); }
+    }
+    draw();
+    requestAnimationFrame(loop);
+  }
+  requestAnimationFrame(loop);
+})();
+</script>
+<script>
+  // Compteur de visites GoatCounter (sans cookie), chargé uniquement sur le site en ligne
+  if (location.protocol === 'https:'){
+    const gc = document.createElement('script');
+    gc.async = true;
+    gc.src = 'https://gc.zgo.at/count.js';
+    gc.dataset.goatcounter = 'https://miyvi.goatcounter.com/count';
+    document.head.appendChild(gc);
+  }
+</script>
+</body>
+</html>

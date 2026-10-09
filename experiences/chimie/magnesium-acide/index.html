@@ -1,0 +1,698 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Transformation chimique : magnésium et acide</title>
+<style>
+  /* ---------- Thème (clair / sombre automatique) ---------- */
+  :root{
+    --bg:#f3ede1;
+    --paper:#fbf8f0;
+    --ink:#22242e;
+    --ink-soft:#5b5a52;
+    --line:#d9d0ba;
+    --wave:#b8362b;
+    --wave-glow:rgba(184,54,43,.14);
+    --accent:#2f6f4f;
+    --blue:#2c5f8a;
+    --brass:#a9793f;
+    --violet:#8a3fc0;
+    --pink:#cf5f8c;
+    --ok:#2f6f4f;
+    --warn:#b8362b;
+    --serif:"Iowan Old Style","Palatino Linotype",Palatino,Georgia,serif;
+    --sans:system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+    --mono:ui-monospace,"Cascadia Mono","SF Mono",Consolas,Menlo,monospace;
+    color-scheme: light dark;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{
+      --bg:#171a21;
+      --paper:#1e222b;
+      --ink:#eae6da;
+      --ink-soft:#9a9689;
+      --line:#33384a;
+      --wave:#ff8a72;
+      --wave-glow:rgba(255,138,114,.14);
+      --accent:#79d6a3;
+      --blue:#7fb4e0;
+      --brass:#c99a5b;
+      --violet:#c39af5;
+      --pink:#f29bbd;
+      --ok:#79d6a3;
+      --warn:#ff8a72;
+    }
+  }
+
+  /* ---------- Mise en page ---------- */
+  *{box-sizing:border-box;}
+  html, body{ margin:0; padding:0; }
+  body{
+    background:var(--bg);
+    color:var(--ink);
+    font-family:var(--sans);
+    padding:28px 16px;
+    display:flex;
+    justify-content:center;
+  }
+  main{
+    width:100%;
+    max-width:920px;
+    display:flex;
+    flex-direction:column;
+    gap:20px;
+  }
+  header{ display:flex; flex-direction:column; gap:4px; }
+  .kicker{
+    font-size:.72rem;
+    text-transform:uppercase;
+    letter-spacing:.08em;
+    color:var(--ink-soft);
+  }
+  h1{
+    font-family:var(--serif);
+    font-weight:600;
+    font-size:clamp(1.5rem, 1.1rem + 1.6vw, 2.2rem);
+    margin:0;
+    text-wrap:balance;
+  }
+  header p{
+    margin:0;
+    color:var(--ink-soft);
+    font-size:.92rem;
+    max-width:66ch;
+  }
+
+  /* ---------- Zone de simulation ---------- */
+  .scene{
+    background:var(--paper);
+    border:1px solid var(--line);
+    border-radius:14px;
+    padding:20px clamp(12px,3vw,28px) 8px;
+    display:flex;
+    flex-direction:column;
+    gap:6px;
+  }
+  .scene-top{
+    display:flex;
+    justify-content:space-between;
+    align-items:baseline;
+    gap:12px;
+    flex-wrap:wrap;
+  }
+  .scene-title{ font-family:var(--serif); font-weight:600; }
+  .status{
+    font-family:var(--mono);
+    font-size:.82rem;
+    padding:3px 10px;
+    border-radius:999px;
+    border:1px solid var(--line);
+    color:var(--ink-soft);
+  }
+  .status.ok{ color:var(--ok); border-color:var(--ok); }
+  .status.off{ color:var(--warn); border-color:var(--warn); }
+  canvas{
+    width:100%;
+    height:auto;
+    display:block;
+  }
+  canvas.draggable{ touch-action:none; cursor:grab; }
+  canvas.dragging{ cursor:grabbing; }
+  canvas.tappable{ touch-action:manipulation; }
+  .hint{ margin:0; font-size:.78rem; color:var(--ink-soft); }
+
+  /* ---------- Mesures ---------- */
+  .readouts{
+    display:grid;
+    grid-template-columns:repeat(auto-fit,minmax(150px,1fr));
+    gap:10px 18px;
+    padding-block:10px;
+    border-top:1px solid var(--line);
+    margin-top:6px;
+  }
+  .readout{ display:flex; flex-direction:column; gap:2px; }
+  .readout .label{
+    font-size:.78rem;
+    color:var(--ink-soft);
+  }
+  .readout .value{
+    font-family:var(--mono);
+    font-variant-numeric:tabular-nums;
+    font-size:1.05rem;
+    font-weight:500;
+  }
+  .readout .value em{ color:var(--blue); font-style:normal; font-size:.9rem; }
+
+  /* ---------- Contrôles ---------- */
+  .panel{
+    background:var(--paper);
+    border:1px solid var(--line);
+    border-radius:14px;
+    padding:18px clamp(14px,3vw,26px);
+    display:flex;
+    flex-direction:column;
+    gap:18px;
+  }
+  .controls{
+    display:grid;
+    grid-template-columns:repeat(auto-fit,minmax(240px,1fr));
+    gap:18px 32px;
+  }
+  .control{ display:flex; flex-direction:column; gap:6px; }
+  .control .row{
+    display:flex;
+    justify-content:space-between;
+    align-items:baseline;
+    gap:10px;
+  }
+  .control label{ font-size:.86rem; font-weight:500; }
+  .control .num{
+    font-family:var(--mono);
+    font-variant-numeric:tabular-nums;
+    color:var(--wave);
+    font-size:.92rem;
+  }
+  input[type=range]{
+    -webkit-appearance:none;
+    appearance:none;
+    width:100%;
+    height:4px;
+    margin:8px 0;
+    border-radius:999px;
+    background:var(--line);
+    outline:none;
+  }
+  input[type=range]::-webkit-slider-thumb{
+    -webkit-appearance:none;
+    width:20px; height:20px;
+    border-radius:50%;
+    background:var(--wave);
+    border:2px solid var(--paper);
+    box-shadow:0 0 0 1px var(--line);
+    cursor:pointer;
+  }
+  input[type=range]::-moz-range-thumb{
+    width:18px; height:18px;
+    border-radius:50%;
+    background:var(--wave);
+    border:2px solid var(--paper);
+    box-shadow:0 0 0 1px var(--line);
+    cursor:pointer;
+  }
+  select{
+    font-family:var(--sans);
+    font-size:.86rem;
+    padding:7px 10px;
+    border-radius:8px;
+    border:1px solid var(--line);
+    background:var(--paper);
+    color:var(--ink);
+    width:100%;
+  }
+  .check{
+    display:flex;
+    align-items:center;
+    gap:8px;
+    font-size:.86rem;
+    font-weight:500;
+    cursor:pointer;
+  }
+  .check input{ width:18px; height:18px; accent-color:var(--accent); margin:0; }
+  .buttons{ display:flex; gap:10px; flex-wrap:wrap; }
+  button{
+    font-family:var(--sans);
+    font-size:.86rem;
+    font-weight:500;
+    padding:9px 16px;
+    border-radius:8px;
+    border:1px solid var(--line);
+    background:transparent;
+    color:var(--ink);
+    cursor:pointer;
+  }
+  button.primary{
+    background:var(--accent);
+    border-color:var(--accent);
+    color:var(--paper);
+  }
+  button:focus-visible, input:focus-visible, select:focus-visible{
+    outline:2px solid var(--accent);
+    outline-offset:2px;
+  }
+
+  /* ---------- Formules ---------- */
+  .formula{
+    font-family:var(--mono);
+    font-size:.86rem;
+    color:var(--ink-soft);
+    border-top:1px solid var(--line);
+    padding-top:14px;
+    display:flex;
+    flex-wrap:wrap;
+    gap:6px 22px;
+  }
+  .formula b{ color:var(--ink); font-weight:600; }
+  footer{
+    font-size:.78rem;
+    color:var(--ink-soft);
+    text-align:center;
+    text-wrap:balance;
+  }
+  .credit{ margin:-12px 0 0; font-size:.7rem; color:var(--ink-soft); text-align:center; }
+</style>
+</head>
+<body>
+
+<main>
+  <header>
+    <span class="kicker">Chimie</span>
+    <h1>Transformation chimique : magnésium et acide</h1>
+    <p>Du magnésium solide plongé dans de l'acide chlorhydrique : chaque atome de magnésium réagit avec deux ions H⁺ pour donner un ion Mg²⁺ et une molécule de dihydrogène qui s'échappe. Choisis les quantités de départ et observe quel réactif s'épuise en premier, pendant que les ions chlorure restent spectateurs.</p>
+  </header>
+
+  <section class="scene">
+    <div class="scene-top">
+      <strong class="scene-title">Mg(s) + 2 H⁺(aq) → Mg²⁺(aq) + H₂(g)</strong>
+      <span id="status" class="status">—</span>
+    </div>
+    <canvas id="stage" class="tappable" style="aspect-ratio:1000/560" aria-label="Récipient contenant du magnésium solide et de l'acide chlorhydrique, avec le graphique du nombre d'entités de chaque espèce au cours du temps."></canvas>
+    <p class="hint">Touche la solution pour y ajouter une goutte d'acide chlorhydrique (2 H⁺ et 2 Cl⁻).</p>
+    <div class="readouts">
+      <div class="readout"><span class="label">Mg restant</span><span class="value" id="rMg">—</span></div>
+      <div class="readout"><span class="label">H⁺ restants</span><span class="value" id="rH">—</span></div>
+      <div class="readout"><span class="label">Mg²⁺ formés</span><span class="value" id="rMg2">—</span></div>
+      <div class="readout"><span class="label">H₂ formé</span><span class="value" id="rH2">—</span></div>
+      <div class="readout"><span class="label">Réactif limitant</span><span class="value" id="rLim">—</span></div>
+    </div>
+  </section>
+
+  <section class="panel">
+    <div class="controls">
+      <div class="control">
+        <div class="row"><label for="nMg">Magnésium au départ</label><span class="num" id="nMgVal"></span></div>
+        <input type="range" id="nMg" min="1" max="12" step="1" value="5">
+      </div>
+      <div class="control">
+        <div class="row"><label for="nH">Ions H⁺ au départ</label><span class="num" id="nHVal"></span></div>
+        <input type="range" id="nH" min="2" max="30" step="2" value="14">
+      </div>
+      <div class="control">
+        <div class="row"><label for="speed">Vitesse de l'animation</label><span class="num" id="speedVal"></span></div>
+        <input type="range" id="speed" min="0.5" max="3" step="0.5" value="1">
+      </div>
+      <div class="control">
+        <label class="check"><input type="checkbox" id="showCl" checked> Afficher les ions spectateurs Cl⁻</label>
+      </div>
+    </div>
+
+    <div class="buttons">
+      <button class="primary" id="run">Lancer la transformation</button>
+      <button id="step">Une seule réaction</button>
+      <button id="addMg">Ajouter un atome de magnésium</button>
+      <button id="reset">Revenir à l'état initial</button>
+    </div>
+
+    <div class="formula">
+      <span>Mg limitant si&nbsp;<b>n(Mg)&nbsp;&lt;&nbsp;n(H⁺)&nbsp;/&nbsp;2</b></span>
+      <span>H⁺ limitant si&nbsp;<b>n(H⁺)&nbsp;/&nbsp;2&nbsp;&lt;&nbsp;n(Mg)</b></span>
+      <span>n(Cl⁻)&nbsp;=&nbsp;<b>constante</b></span>
+    </div>
+  </section>
+
+  <footer>Modèle particulaire simplifié : quelques entités au lieu de milliards de milliards, et une durée sans rapport avec celle de la vraie transformation. Les molécules d'eau du solvant ne sont pas représentées.</footer>
+  <p class="credit">D'après les animations fournies par T. Knecht.</p>
+</main>
+
+<script>
+(function(){
+  // ---------- Utilitaires ----------
+  const $ = id => document.getElementById(id);
+  const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
+  const fmt = (v, d) => Number.isFinite(v)
+    ? v.toLocaleString('fr-FR', {minimumFractionDigits:d, maximumFractionDigits:d})
+    : '—';
+  const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const MONO = 'ui-monospace, "Cascadia Mono", "SF Mono", Consolas, Menlo, monospace';
+  const SANS = 'system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif';
+
+  // Couleurs du thème, relues si le système bascule clair/sombre
+  const C = {};
+  function readColors(){
+    const s = getComputedStyle(document.documentElement);
+    for (const n of ['bg','paper','ink','ink-soft','line','wave','wave-glow','accent','blue','brass','violet','pink']){
+      C[n.replace(/-(.)/g, (_, c) => c.toUpperCase())] = s.getPropertyValue('--' + n).trim();
+    }
+  }
+  readColors();
+  window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', readColors);
+
+  // Canvas net sur tout écran : on dessine toujours dans un repère logique W × H
+  function setupCanvas(canvas, W, H){
+    const ctx = canvas.getContext('2d');
+    function fit(){
+      const dpr = Math.min(window.devicePixelRatio || 1, 3);
+      const cw = canvas.clientWidth || W;
+      canvas.width = Math.max(1, Math.round(cw * dpr));
+      canvas.height = Math.max(1, Math.round(cw * H / W * dpr));
+      ctx.setTransform(canvas.width / W, 0, 0, canvas.height / H, 0, 0);
+    }
+    window.addEventListener('resize', fit);
+    fit();
+    return ctx;
+  }
+  // Position du pointeur (souris ou doigt) dans le repère logique
+  function pointerPos(canvas, evt, W, H){
+    const r = canvas.getBoundingClientRect();
+    return { x: (evt.clientX - r.left) * W / r.width, y: (evt.clientY - r.top) * H / r.height };
+  }
+  function arrow(ctx, x1, y1, x2, y2, color, width){
+    const len = Math.hypot(x2 - x1, y2 - y1);
+    if (len < 3) return;
+    const a = Math.atan2(y2 - y1, x2 - x1), h = Math.min(10, len * 0.5);
+    ctx.strokeStyle = color; ctx.fillStyle = color; ctx.lineWidth = width || 2.5;
+    ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2 - Math.cos(a) * h * 0.8, y2 - Math.sin(a) * h * 0.8); ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(x2, y2);
+    ctx.lineTo(x2 - h * Math.cos(a - 0.42), y2 - h * Math.sin(a - 0.42));
+    ctx.lineTo(x2 - h * Math.cos(a + 0.42), y2 - h * Math.sin(a + 0.42));
+    ctx.closePath(); ctx.fill();
+  }
+  // Pas "rond" (1, 2, 5 × 10^n) pour graduer un axe
+  function niceStep(x){
+    if (!(x > 0)) return 1;
+    const p = Math.pow(10, Math.floor(Math.log10(x))), m = x / p;
+    return (m < 1.5 ? 1 : m < 3.5 ? 2 : m < 7.5 ? 5 : 10) * p;
+  }
+
+  // Relie un curseur, une liste ou une case à cocher à un paramètre (et affiche sa valeur)
+  function bind(id, onChange, format){
+    const el = $(id), label = $(id + 'Val');
+    const val = () => el.type === 'checkbox' ? el.checked : parseFloat(el.value);
+    const show = () => { if (label && format) label.textContent = format(val()); };
+    el.addEventListener(el.type === 'range' ? 'input' : 'change', () => { onChange(val()); show(); });
+    show();
+  }
+  const out = (id, text) => { $(id).textContent = text; };
+  function setStatus(text, cls){
+    const s = $('status');
+    s.textContent = text; s.className = 'status' + (cls ? ' ' + cls : '');
+  }
+  // Repère gradué dans le rectangle g ; renvoie les conversions X(x) et Y(y)
+  function axes(ctx, g, o){
+    const xMin = o.xMin || 0, yMin = o.yMin || 0;
+    const X = x => g.x + g.w * (x - xMin) / (o.xMax - xMin);
+    const Y = y => g.y + g.h - g.h * (y - yMin) / (o.yMax - yMin);
+    const ink = o.ink || C.ink, soft = o.soft || C.inkSoft, line = o.line || C.line;
+    const sx = niceStep((o.xMax - xMin) / (o.xTicks || 6)), sy = niceStep((o.yMax - yMin) / (o.yTicks || 4));
+    const dec = s => s >= 1 ? 0 : Math.min(4, Math.ceil(-Math.log10(s) - 1e-9));
+    ctx.save();
+    ctx.font = '13px ' + MONO; ctx.lineWidth = 1; ctx.textAlign = 'center';
+    for (let k = Math.ceil(xMin / sx - 1e-9); k * sx <= o.xMax + sx * 1e-6; k++){
+      ctx.strokeStyle = line; ctx.globalAlpha = 0.55;
+      ctx.beginPath(); ctx.moveTo(X(k * sx), g.y); ctx.lineTo(X(k * sx), g.y + g.h); ctx.stroke();
+      ctx.globalAlpha = 1; ctx.fillStyle = soft;
+      ctx.fillText(fmt(k * sx + 0, dec(sx)), X(k * sx), g.y + g.h + 18);
+    }
+    ctx.textAlign = 'right';
+    for (let k = Math.ceil(yMin / sy - 1e-9); k * sy <= o.yMax + sy * 1e-6; k++){
+      ctx.strokeStyle = line; ctx.globalAlpha = 0.55;
+      ctx.beginPath(); ctx.moveTo(g.x, Y(k * sy)); ctx.lineTo(g.x + g.w, Y(k * sy)); ctx.stroke();
+      ctx.globalAlpha = 1; ctx.fillStyle = soft;
+      ctx.fillText(fmt(k * sy + 0, dec(sy)), g.x - 8, Y(k * sy) + 4);
+    }
+    const y0 = yMin < 0 ? Y(0) : g.y + g.h;
+    ctx.strokeStyle = soft; ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.moveTo(g.x, g.y); ctx.lineTo(g.x, g.y + g.h); ctx.moveTo(g.x, y0); ctx.lineTo(g.x + g.w, y0); ctx.stroke();
+    ctx.fillStyle = ink; ctx.textAlign = 'left'; ctx.font = '14px ' + SANS;
+    if (o.title) ctx.fillText(o.title, g.x + 8, g.y - 10);
+    ctx.fillStyle = soft; ctx.textAlign = 'right'; ctx.font = '13px ' + MONO;
+    if (o.xLabel) ctx.fillText(o.xLabel, g.x + g.w, g.y + g.h + 36);
+    ctx.restore();
+    return { X, Y };
+  }
+
+  // ---------- Constantes ----------
+  const W = 1000, H = 560;
+  const BK = { x: 60, y: 40, w: 460, h: 470, surf: 250 };   // récipient : gaz au-dessus, solution en dessous
+  const GR = { x: 625, y: 70, w: 335, h: 380 };              // graphique
+  const MAX_MG = 12, MAX_H = 40;
+  const SPECIES = [
+    { id: 'mg',  label: 'Mg',   r: 13, color: () => C.inkSoft },
+    { id: 'hp',  label: 'H⁺',   r: 5,  color: () => C.wave },
+    { id: 'cl',  label: 'Cl⁻',  r: 7,  color: () => C.accent },
+    { id: 'mg2', label: 'Mg²⁺', r: 10, color: () => C.blue },
+    { id: 'h2',  label: 'H₂',   r: 6,  color: () => C.brass }
+  ];
+  const RADIUS = Object.fromEntries(SPECIES.map(s => [s.id, s.r]));
+  const BOTTOM = BK.y + BK.h;
+
+  // ---------- État ----------
+  const canvas = $('stage');
+  const ctx = setupCanvas(canvas, W, H);
+  const P = { nMg: 5, nH: 14, speed: 1, showCl: true };
+  const S = {};                                    // entités présentes, par espèce
+  let running = false, stepping = false;
+  let target = null, wait = 0;                     // réaction en préparation : un Mg et les deux H⁺ qui s'en approchent
+  let t = 0, idle = 0, samples = [], last = performance.now();
+
+  const rnd = (a, b) => a + Math.random() * (b - a);
+  const dist = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
+  function particle(id, x, y){
+    const r = RADIUS[id];
+    return { r, x: clamp(x, BK.x + r, BK.x + BK.w - r), y: clamp(y, BK.surf + r, BOTTOM - r),
+             vx: rnd(-30, 30), vy: rnd(-30, 30), flash: 0 };
+  }
+  // Le solide est un empilement d'atomes au fond du récipient
+  function addMg(){
+    if (S.mg.length >= MAX_MG) return;
+    let slot = 0;
+    while (S.mg.some(m => m.slot === slot)) slot++;
+    S.mg.push({ slot, r: RADIUS.mg, flash: 1,
+                x: BK.x + BK.w / 2 + (slot % 6 - 2.5) * 28, y: BOTTOM - 15 - Math.floor(slot / 6) * 26 });
+  }
+  function addAcid(x, y){
+    if (S.hp.length + 2 > MAX_H) return;
+    for (let i = 0; i < 2; i++){
+      for (const id of ['hp', 'cl']){
+        const p = particle(id, x + rnd(-18, 18), y + rnd(-18, 18));
+        p.flash = 1; S[id].push(p);
+      }
+    }
+  }
+  function sample(){
+    samples.push({ t, mg: S.mg.length, hp: S.hp.length, cl: S.cl.length, mg2: S.mg2.length, h2: S.h2.length });
+  }
+  function syncButtons(){ $('run').textContent = running ? 'Mettre en pause' : 'Lancer la transformation'; }
+  function reset(){
+    for (const s of SPECIES) S[s.id] = [];
+    for (let i = 0; i < P.nMg; i++) addMg();
+    for (const m of S.mg) m.flash = 0;
+    for (const id of ['hp', 'cl']){
+      for (let i = 0; i < P.nH; i++) S[id].push(particle(id, rnd(BK.x, BK.x + BK.w), rnd(BK.surf, BOTTOM - 60)));
+    }
+    running = false; stepping = false; target = null; wait = 0.6;
+    t = 0; idle = 0; samples = [];
+    sample(); syncButtons();
+  }
+
+  // ---------- Chimie ----------
+  const canReact = () => S.mg.length >= 1 && S.hp.length >= 2;
+  function pick(){
+    const mg = S.mg.reduce((a, b) => b.slot > a.slot ? b : a);          // atome en surface du solide
+    const h = S.hp.slice().sort((a, b) => dist(a, mg) - dist(b, mg)).slice(0, 2);
+    target = { mg, h };
+  }
+  function fire(){
+    const { mg, h } = target;
+    S.mg.splice(S.mg.indexOf(mg), 1);
+    S.hp = S.hp.filter(p => !h.includes(p));
+    const ion = particle('mg2', mg.x, mg.y); ion.flash = 1; S.mg2.push(ion);
+    const gas = particle('h2', mg.x, mg.y - 22); gas.flash = 1; gas.inGas = false; gas.a = rnd(0, 6); S.h2.push(gas);
+    target = null; stepping = false; wait = 1;
+    sample();
+  }
+
+  // ---------- Mouvement ----------
+  function wander(p, top, bottom, dt){
+    p.vx += rnd(-1, 1) * 400 * dt; p.vy += rnd(-1, 1) * 400 * dt;
+    const v = Math.hypot(p.vx, p.vy);
+    if (v > 42){ p.vx *= 42 / v; p.vy *= 42 / v; }
+    p.x += p.vx * dt; p.y += p.vy * dt;
+    if (p.x < BK.x + p.r){ p.x = BK.x + p.r; p.vx = Math.abs(p.vx); }
+    if (p.x > BK.x + BK.w - p.r){ p.x = BK.x + BK.w - p.r; p.vx = -Math.abs(p.vx); }
+    if (p.y < top + p.r){ p.y = top + p.r; p.vy = Math.abs(p.vy); }
+    if (p.y > bottom - p.r){ p.y = bottom - p.r; p.vy = -Math.abs(p.vy); }
+  }
+  function update(dt){
+    const active = running || stepping;
+    if (active && !target && canReact()){
+      wait -= dt * P.speed;
+      if (wait <= 0 || stepping || reduceMotion) pick();
+    }
+    if (active && target){
+      // Les deux H⁺ choisis rejoignent l'atome de magnésium, puis la réaction a lieu
+      let arrived = 0;
+      target.h.forEach((p, i) => {
+        const gx = target.mg.x + (i ? 12 : -12), gy = target.mg.y - 15;
+        const d = Math.hypot(gx - p.x, gy - p.y), stepLen = 170 * P.speed * dt;
+        if (d <= stepLen || reduceMotion){ p.x = gx; p.y = gy; arrived++; }
+        else { p.x += (gx - p.x) / d * stepLen; p.y += (gy - p.y) / d * stepLen; }
+      });
+      if (arrived === 2) fire();
+    }
+    // Le temps du graphique ne s'écoule que pendant la transformation (et 3 s après son arrêt)
+    if (active && (target || canReact())){ t += dt; idle = 0; }
+    else if (running && idle < 3){ t += dt; idle += dt; }
+
+    for (const s of SPECIES) for (const p of S[s.id]) p.flash = Math.max(0, p.flash - dt * 1.2);
+    if (reduceMotion){
+      for (const p of S.h2){ if (!p.inGas){ p.inGas = true; p.y = rnd(BK.y + 20, BK.surf - 20); } }
+      return;
+    }
+    const locked = target ? target.h : [];
+    for (const id of ['hp', 'cl', 'mg2']){
+      for (const p of S[id]) if (!locked.includes(p)) wander(p, BK.surf, BOTTOM, dt);
+    }
+    for (const p of S.h2){
+      if (p.inGas){ wander(p, BK.y + 4, BK.surf - 4, dt); continue; }
+      p.a += 4 * dt; p.y -= 85 * dt; p.x = clamp(p.x + Math.sin(p.a) * 30 * dt, BK.x + p.r, BK.x + BK.w - p.r);
+      if (p.y < BK.surf - 14){ p.inGas = true; p.vx = rnd(-30, 30); p.vy = -30; }
+    }
+  }
+
+  // ---------- Affichage des mesures ----------
+  function updateReadouts(){
+    const mg = S.mg.length, hp = S.hp.length;
+    out('rMg', String(mg)); out('rH', String(hp));
+    out('rMg2', String(S.mg2.length)); out('rH2', String(S.h2.length));
+    const over = !canReact() && !target;
+    if (!over){
+      out('rLim', 'à découvrir');
+      setStatus(t === 0 ? 'État initial' : (running || stepping) ? 'Transformation en cours' : 'En pause');
+    } else if (mg === 0 && hp === 0){
+      out('rLim', 'aucun');
+      setStatus('État final : mélange stœchiométrique', 'ok');
+    } else {
+      out('rLim', mg === 0 ? 'Mg' : 'H⁺');
+      setStatus(mg === 0 ? 'État final : Mg épuisé, H⁺ en excès' : 'État final : H⁺ épuisé, Mg en excès', 'off');
+    }
+  }
+
+  // ---------- Rendu ----------
+  function drawVessel(){
+    ctx.fillStyle = C.blue; ctx.globalAlpha = 0.12;
+    ctx.fillRect(BK.x, BK.surf, BK.w, BOTTOM - BK.surf);
+    ctx.globalAlpha = 1;
+    ctx.fillStyle = C.inkSoft; ctx.font = '13px ' + SANS; ctx.textAlign = 'left';
+    ctx.fillText('Gaz', BK.x + 12, BK.y + 22);
+    ctx.fillText('Solution', BK.x + 12, BK.surf + 22);
+
+    for (const s of SPECIES){
+      if (s.id === 'cl' && !P.showCl) continue;
+      for (const p of S[s.id]){
+        ctx.fillStyle = s.color();
+        if (s.id === 'h2'){
+          // Molécule H₂ : deux atomes accolés
+          ctx.beginPath(); ctx.arc(p.x - 4, p.y, 5, 0, Math.PI * 2); ctx.arc(p.x + 4, p.y, 5, 0, Math.PI * 2); ctx.fill();
+        } else {
+          ctx.beginPath(); ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2); ctx.fill();
+        }
+        if (s.id === 'mg'){ ctx.strokeStyle = C.paper; ctx.lineWidth = 1.5; ctx.stroke(); }
+        if (p.flash > 0){
+          ctx.strokeStyle = C.wave; ctx.lineWidth = 2; ctx.globalAlpha = p.flash;
+          ctx.beginPath(); ctx.arc(p.x, p.y, p.r + 3 + (1 - p.flash) * 9, 0, Math.PI * 2); ctx.stroke();
+          ctx.globalAlpha = 1;
+        }
+      }
+    }
+    if (target){
+      ctx.strokeStyle = C.wave; ctx.lineWidth = 2; ctx.setLineDash([4, 4]);
+      ctx.beginPath(); ctx.arc(target.mg.x, target.mg.y - 4, 26, 0, Math.PI * 2); ctx.stroke();
+      ctx.setLineDash([]);
+    }
+    ctx.strokeStyle = C.inkSoft; ctx.lineWidth = 3; ctx.lineJoin = 'round';
+    ctx.beginPath();
+    ctx.moveTo(BK.x - 3, BK.y); ctx.lineTo(BK.x - 3, BOTTOM + 3);
+    ctx.lineTo(BK.x + BK.w + 3, BOTTOM + 3); ctx.lineTo(BK.x + BK.w + 3, BK.y);
+    ctx.stroke();
+
+    // Légende
+    let x = BK.x + 8;
+    for (const s of SPECIES){
+      if (s.id === 'cl' && !P.showCl) continue;
+      ctx.fillStyle = s.color();
+      ctx.beginPath(); ctx.arc(x, BOTTOM + 30, 7, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = C.ink; ctx.font = '14px ' + SANS; ctx.textAlign = 'left';
+      ctx.fillText(s.label, x + 13, BOTTOM + 35);
+      x += 92;
+    }
+  }
+  function drawGraph(){
+    const ids = SPECIES.filter(s => s.id !== 'cl' || P.showCl);
+    const top = Math.max(10, ...samples.map(s => Math.max(...ids.map(k => s[k.id]))));
+    const G = axes(ctx, GR, { xMax: Math.max(20, Math.ceil((t + 2) / 10) * 10), yMax: Math.ceil(top / 2) * 2,
+                              title: 'Nombre d\'entités au cours du temps', xLabel: 't (s)', yTicks: 5 });
+    for (const s of ids){
+      ctx.save();
+      ctx.strokeStyle = s.color(); ctx.lineWidth = s.id === 'cl' ? 1.5 : 2.5; ctx.lineJoin = 'round';
+      if (s.id === 'h2') ctx.setLineDash([7, 6]);             // H₂ et Mg²⁺ se forment ensemble : courbes confondues
+      ctx.beginPath();
+      ctx.moveTo(G.X(samples[0].t), G.Y(samples[0][s.id]));
+      for (let i = 1; i < samples.length; i++){
+        ctx.lineTo(G.X(samples[i].t), G.Y(samples[i - 1][s.id]));
+        ctx.lineTo(G.X(samples[i].t), G.Y(samples[i][s.id]));
+      }
+      ctx.lineTo(G.X(t), G.Y(samples[samples.length - 1][s.id]));
+      ctx.stroke();
+      ctx.restore();
+    }
+  }
+  function draw(){
+    updateReadouts();
+    ctx.clearRect(0, 0, W, H);
+    drawVessel();
+    drawGraph();
+  }
+
+  // ---------- Interactions ----------
+  const inSolution = p => p.x > BK.x && p.x < BK.x + BK.w && p.y > BK.surf && p.y < BOTTOM;
+  canvas.addEventListener('pointerdown', e => {
+    const p = pointerPos(canvas, e, W, H);
+    if (inSolution(p)){ addAcid(p.x, p.y); sample(); }
+  });
+  canvas.addEventListener('pointermove', e => { canvas.style.cursor = inSolution(pointerPos(canvas, e, W, H)) ? 'copy' : ''; });
+
+  bind('nMg', v => { P.nMg = v; reset(); }, v => fmt(v, 0) + (v > 1 ? ' atomes' : ' atome'));
+  bind('nH', v => { P.nH = v; reset(); }, v => fmt(v, 0) + ' ions');
+  bind('speed', v => { P.speed = v; }, v => '× ' + fmt(v, 1));
+  bind('showCl', v => { P.showCl = v; });
+  $('run').addEventListener('click', () => { running = !running; idle = 0; syncButtons(); });
+  $('step').addEventListener('click', () => { if (canReact()) stepping = true; });
+  $('addMg').addEventListener('click', () => { addMg(); sample(); });
+  $('reset').addEventListener('click', reset);
+  reset();
+
+  // ---------- Boucle d'animation ----------
+  function loop(now){
+    const dt = Math.min((now - last) / 1000, 0.05);
+    last = now;
+    update(dt);
+    draw();
+    requestAnimationFrame(loop);
+  }
+  requestAnimationFrame(loop);
+})();
+</script>
+<script>
+  // Compteur de visites GoatCounter (sans cookie), chargé uniquement sur le site en ligne
+  if (location.protocol === 'https:'){
+    const gc = document.createElement('script');
+    gc.async = true;
+    gc.src = 'https://gc.zgo.at/count.js';
+    gc.dataset.goatcounter = 'https://miyvi.goatcounter.com/count';
+    document.head.appendChild(gc);
+  }
+</script>
+</body>
+</html>

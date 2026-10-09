@@ -1,0 +1,665 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Titrage par le permanganate</title>
+<style>
+  /* ---------- Thème (clair / sombre automatique) ---------- */
+  :root{
+    --bg:#f3ede1;
+    --paper:#fbf8f0;
+    --ink:#22242e;
+    --ink-soft:#5b5a52;
+    --line:#d9d0ba;
+    --wave:#b8362b;
+    --wave-glow:rgba(184,54,43,.14);
+    --accent:#2f6f4f;
+    --blue:#2c5f8a;
+    --brass:#a9793f;
+    --violet:#8a3fc0;
+    --pink:#cf5f8c;
+    --ok:#2f6f4f;
+    --warn:#b8362b;
+    --serif:"Iowan Old Style","Palatino Linotype",Palatino,Georgia,serif;
+    --sans:system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+    --mono:ui-monospace,"Cascadia Mono","SF Mono",Consolas,Menlo,monospace;
+    color-scheme: light dark;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{
+      --bg:#171a21;
+      --paper:#1e222b;
+      --ink:#eae6da;
+      --ink-soft:#9a9689;
+      --line:#33384a;
+      --wave:#ff8a72;
+      --wave-glow:rgba(255,138,114,.14);
+      --accent:#79d6a3;
+      --blue:#7fb4e0;
+      --brass:#c99a5b;
+      --violet:#c39af5;
+      --pink:#f29bbd;
+      --ok:#79d6a3;
+      --warn:#ff8a72;
+    }
+  }
+
+  /* ---------- Mise en page ---------- */
+  *{box-sizing:border-box;}
+  html, body{ margin:0; padding:0; }
+  body{
+    background:var(--bg);
+    color:var(--ink);
+    font-family:var(--sans);
+    padding:28px 16px;
+    display:flex;
+    justify-content:center;
+  }
+  main{
+    width:100%;
+    max-width:920px;
+    display:flex;
+    flex-direction:column;
+    gap:20px;
+  }
+  header{ display:flex; flex-direction:column; gap:4px; }
+  .kicker{
+    font-size:.72rem;
+    text-transform:uppercase;
+    letter-spacing:.08em;
+    color:var(--ink-soft);
+  }
+  h1{
+    font-family:var(--serif);
+    font-weight:600;
+    font-size:clamp(1.5rem, 1.1rem + 1.6vw, 2.2rem);
+    margin:0;
+    text-wrap:balance;
+  }
+  header p{
+    margin:0;
+    color:var(--ink-soft);
+    font-size:.92rem;
+    max-width:66ch;
+  }
+
+  /* ---------- Zone de simulation ---------- */
+  .scene{
+    background:var(--paper);
+    border:1px solid var(--line);
+    border-radius:14px;
+    padding:20px clamp(12px,3vw,28px) 8px;
+    display:flex;
+    flex-direction:column;
+    gap:6px;
+  }
+  .scene-top{
+    display:flex;
+    justify-content:space-between;
+    align-items:baseline;
+    gap:12px;
+    flex-wrap:wrap;
+  }
+  .scene-title{ font-family:var(--serif); font-weight:600; }
+  .status{
+    font-family:var(--mono);
+    font-size:.82rem;
+    padding:3px 10px;
+    border-radius:999px;
+    border:1px solid var(--line);
+    color:var(--ink-soft);
+  }
+  .status.ok{ color:var(--ok); border-color:var(--ok); }
+  .status.off{ color:var(--warn); border-color:var(--warn); }
+  canvas{
+    width:100%;
+    height:auto;
+    display:block;
+  }
+  canvas.draggable{ touch-action:none; cursor:grab; }
+  canvas.dragging{ cursor:grabbing; }
+  canvas.tappable{ touch-action:manipulation; }
+  .hint{ margin:0; font-size:.78rem; color:var(--ink-soft); }
+
+  /* ---------- Mesures ---------- */
+  .readouts{
+    display:grid;
+    grid-template-columns:repeat(auto-fit,minmax(150px,1fr));
+    gap:10px 18px;
+    padding-block:10px;
+    border-top:1px solid var(--line);
+    margin-top:6px;
+  }
+  .readout{ display:flex; flex-direction:column; gap:2px; }
+  .readout .label{
+    font-size:.78rem;
+    color:var(--ink-soft);
+  }
+  .readout .value{
+    font-family:var(--mono);
+    font-variant-numeric:tabular-nums;
+    font-size:1.05rem;
+    font-weight:500;
+  }
+  .readout .value em{ color:var(--blue); font-style:normal; font-size:.9rem; }
+
+  /* ---------- Contrôles ---------- */
+  .panel{
+    background:var(--paper);
+    border:1px solid var(--line);
+    border-radius:14px;
+    padding:18px clamp(14px,3vw,26px);
+    display:flex;
+    flex-direction:column;
+    gap:18px;
+  }
+  .controls{
+    display:grid;
+    grid-template-columns:repeat(auto-fit,minmax(240px,1fr));
+    gap:18px 32px;
+  }
+  .control{ display:flex; flex-direction:column; gap:6px; }
+  .control .row{
+    display:flex;
+    justify-content:space-between;
+    align-items:baseline;
+    gap:10px;
+  }
+  .control label{ font-size:.86rem; font-weight:500; }
+  .control .num{
+    font-family:var(--mono);
+    font-variant-numeric:tabular-nums;
+    color:var(--wave);
+    font-size:.92rem;
+  }
+  input[type=range]{
+    -webkit-appearance:none;
+    appearance:none;
+    width:100%;
+    height:4px;
+    margin:8px 0;
+    border-radius:999px;
+    background:var(--line);
+    outline:none;
+  }
+  input[type=range]::-webkit-slider-thumb{
+    -webkit-appearance:none;
+    width:20px; height:20px;
+    border-radius:50%;
+    background:var(--wave);
+    border:2px solid var(--paper);
+    box-shadow:0 0 0 1px var(--line);
+    cursor:pointer;
+  }
+  input[type=range]::-moz-range-thumb{
+    width:18px; height:18px;
+    border-radius:50%;
+    background:var(--wave);
+    border:2px solid var(--paper);
+    box-shadow:0 0 0 1px var(--line);
+    cursor:pointer;
+  }
+  select{
+    font-family:var(--sans);
+    font-size:.86rem;
+    padding:7px 10px;
+    border-radius:8px;
+    border:1px solid var(--line);
+    background:var(--paper);
+    color:var(--ink);
+    width:100%;
+  }
+  .check{
+    display:flex;
+    align-items:center;
+    gap:8px;
+    font-size:.86rem;
+    font-weight:500;
+    cursor:pointer;
+  }
+  .check input{ width:18px; height:18px; accent-color:var(--accent); margin:0; }
+  .buttons{ display:flex; gap:10px; flex-wrap:wrap; }
+  button{
+    font-family:var(--sans);
+    font-size:.86rem;
+    font-weight:500;
+    padding:9px 16px;
+    border-radius:8px;
+    border:1px solid var(--line);
+    background:transparent;
+    color:var(--ink);
+    cursor:pointer;
+  }
+  button.primary{
+    background:var(--accent);
+    border-color:var(--accent);
+    color:var(--paper);
+  }
+  button:focus-visible, input:focus-visible, select:focus-visible{
+    outline:2px solid var(--accent);
+    outline-offset:2px;
+  }
+
+  /* ---------- Formules ---------- */
+  .formula{
+    font-family:var(--mono);
+    font-size:.86rem;
+    color:var(--ink-soft);
+    border-top:1px solid var(--line);
+    padding-top:14px;
+    display:flex;
+    flex-wrap:wrap;
+    gap:6px 22px;
+  }
+  .formula b{ color:var(--ink); font-weight:600; }
+  footer{
+    font-size:.78rem;
+    color:var(--ink-soft);
+    text-align:center;
+    text-wrap:balance;
+  }
+  .credit{ margin:-12px 0 0; font-size:.7rem; color:var(--ink-soft); text-align:center; }
+</style>
+</head>
+<body>
+
+<main>
+  <header>
+    <span class="kicker">Chimie</span>
+    <h1>Titrage par le permanganate</h1>
+    <p>On verse goutte à goutte une solution violette de permanganate dans une solution incolore de dioxyde de soufre. Tant qu'il reste du SO₂, les ions MnO₄⁻ sont consommés et le mélange reste incolore ; dès qu'il n'y en a plus, la goutte suivante le colore : l'équivalence vient d'être dépassée.</p>
+  </header>
+
+  <section class="scene">
+    <div class="scene-top">
+      <strong class="scene-title">2 MnO₄⁻ + 5 SO₂ + 2 H₂O → 2 Mn²⁺ + 5 SO₄²⁻ + 4 H⁺</strong>
+      <span id="status" class="status">—</span>
+    </div>
+    <canvas id="stage" class="tappable" style="aspect-ratio:1000/560" aria-label="Burette de permanganate au-dessus d'un bécher contenant des molécules de dioxyde de soufre, avec le décompte des espèces présentes."></canvas>
+    <p class="hint">Touche la burette pour faire tomber une goutte, garde le doigt ou la souris appuyé pour verser en continu.</p>
+    <div class="readouts">
+      <div class="readout"><span class="label">Gouttes versées</span><span class="value" id="rDrops">—</span></div>
+      <div class="readout"><span class="label">MnO₄⁻ versés</span><span class="value" id="rMn">—</span></div>
+      <div class="readout"><span class="label">SO₂ restant</span><span class="value" id="rSo2">—</span></div>
+      <div class="readout"><span class="label">MnO₄⁻ en excès</span><span class="value" id="rExc">—</span></div>
+    </div>
+  </section>
+
+  <section class="panel">
+    <div class="controls">
+      <div class="control">
+        <div class="row"><label for="n0">SO₂ dans le bécher au départ</label><span class="num" id="n0Val"></span></div>
+        <input type="range" id="n0" min="10" max="60" step="5" value="30">
+      </div>
+    </div>
+
+    <div class="buttons">
+      <button class="primary" id="pour">Verser une goutte</button>
+      <button id="auto">Verser en continu</button>
+      <button id="undo">Annuler la dernière goutte</button>
+      <button id="pause">Pause</button>
+      <button id="reset">Recommencer</button>
+    </div>
+
+    <div class="formula">
+      <span>1 goutte&nbsp;=&nbsp;<b>2 MnO₄⁻</b></span>
+      <span>2 MnO₄⁻ consomment&nbsp;<b>5 SO₂</b></span>
+      <span>à l'équivalence&nbsp;:&nbsp;<b>n(MnO₄⁻)&nbsp;/&nbsp;2&nbsp;=&nbsp;n(SO₂)&nbsp;/&nbsp;5</b></span>
+    </div>
+  </section>
+
+  <footer>Modèle particulaire simplifié : quelques dizaines d'entités au lieu de milliards de milliards. L'eau (solvant) et les ions spectateurs K⁺ ne sont pas représentés. Annuler une goutte est impossible au laboratoire, mais pratique pour revoir le passage par l'équivalence.</footer>
+  <p class="credit">D'après les animations fournies par T. Knecht.</p>
+</main>
+
+<script>
+(function(){
+  // ---------- Utilitaires ----------
+  const $ = id => document.getElementById(id);
+  const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
+  const fmt = (v, d) => Number.isFinite(v)
+    ? v.toLocaleString('fr-FR', {minimumFractionDigits:d, maximumFractionDigits:d})
+    : '—';
+  const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const MONO = 'ui-monospace, "Cascadia Mono", "SF Mono", Consolas, Menlo, monospace';
+  const SANS = 'system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif';
+
+  // Couleurs du thème, relues si le système bascule clair/sombre
+  const C = {};
+  function readColors(){
+    const s = getComputedStyle(document.documentElement);
+    for (const n of ['bg','paper','ink','ink-soft','line','wave','wave-glow','accent','blue','brass','violet','pink']){
+      C[n.replace(/-(.)/g, (_, c) => c.toUpperCase())] = s.getPropertyValue('--' + n).trim();
+    }
+  }
+  readColors();
+  window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', readColors);
+
+  // Canvas net sur tout écran : on dessine toujours dans un repère logique W × H
+  function setupCanvas(canvas, W, H){
+    const ctx = canvas.getContext('2d');
+    function fit(){
+      const dpr = Math.min(window.devicePixelRatio || 1, 3);
+      const cw = canvas.clientWidth || W;
+      canvas.width = Math.max(1, Math.round(cw * dpr));
+      canvas.height = Math.max(1, Math.round(cw * H / W * dpr));
+      ctx.setTransform(canvas.width / W, 0, 0, canvas.height / H, 0, 0);
+    }
+    window.addEventListener('resize', fit);
+    fit();
+    return ctx;
+  }
+  // Position du pointeur (souris ou doigt) dans le repère logique
+  function pointerPos(canvas, evt, W, H){
+    const r = canvas.getBoundingClientRect();
+    return { x: (evt.clientX - r.left) * W / r.width, y: (evt.clientY - r.top) * H / r.height };
+  }
+  function arrow(ctx, x1, y1, x2, y2, color, width){
+    const len = Math.hypot(x2 - x1, y2 - y1);
+    if (len < 3) return;
+    const a = Math.atan2(y2 - y1, x2 - x1), h = Math.min(10, len * 0.5);
+    ctx.strokeStyle = color; ctx.fillStyle = color; ctx.lineWidth = width || 2.5;
+    ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2 - Math.cos(a) * h * 0.8, y2 - Math.sin(a) * h * 0.8); ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(x2, y2);
+    ctx.lineTo(x2 - h * Math.cos(a - 0.42), y2 - h * Math.sin(a - 0.42));
+    ctx.lineTo(x2 - h * Math.cos(a + 0.42), y2 - h * Math.sin(a + 0.42));
+    ctx.closePath(); ctx.fill();
+  }
+  // Pas "rond" (1, 2, 5 × 10^n) pour graduer un axe
+  function niceStep(x){
+    if (!(x > 0)) return 1;
+    const p = Math.pow(10, Math.floor(Math.log10(x))), m = x / p;
+    return (m < 1.5 ? 1 : m < 3.5 ? 2 : m < 7.5 ? 5 : 10) * p;
+  }
+
+  // Relie un curseur, une liste ou une case à cocher à un paramètre (et affiche sa valeur)
+  function bind(id, onChange, format){
+    const el = $(id), label = $(id + 'Val');
+    const val = () => el.type === 'checkbox' ? el.checked : parseFloat(el.value);
+    const show = () => { if (label && format) label.textContent = format(val()); };
+    el.addEventListener(el.type === 'range' ? 'input' : 'change', () => { onChange(val()); show(); });
+    show();
+  }
+  const out = (id, text) => { $(id).textContent = text; };
+  function setStatus(text, cls){
+    const s = $('status');
+    s.textContent = text; s.className = 'status' + (cls ? ' ' + cls : '');
+  }
+  // Repère gradué dans le rectangle g ; renvoie les conversions X(x) et Y(y)
+  function axes(ctx, g, o){
+    const xMin = o.xMin || 0, yMin = o.yMin || 0;
+    const X = x => g.x + g.w * (x - xMin) / (o.xMax - xMin);
+    const Y = y => g.y + g.h - g.h * (y - yMin) / (o.yMax - yMin);
+    const ink = o.ink || C.ink, soft = o.soft || C.inkSoft, line = o.line || C.line;
+    const sx = niceStep((o.xMax - xMin) / (o.xTicks || 6)), sy = niceStep((o.yMax - yMin) / (o.yTicks || 4));
+    const dec = s => s >= 1 ? 0 : Math.min(4, Math.ceil(-Math.log10(s) - 1e-9));
+    ctx.save();
+    ctx.font = '13px ' + MONO; ctx.lineWidth = 1; ctx.textAlign = 'center';
+    for (let k = Math.ceil(xMin / sx - 1e-9); k * sx <= o.xMax + sx * 1e-6; k++){
+      ctx.strokeStyle = line; ctx.globalAlpha = 0.55;
+      ctx.beginPath(); ctx.moveTo(X(k * sx), g.y); ctx.lineTo(X(k * sx), g.y + g.h); ctx.stroke();
+      ctx.globalAlpha = 1; ctx.fillStyle = soft;
+      ctx.fillText(fmt(k * sx + 0, dec(sx)), X(k * sx), g.y + g.h + 18);
+    }
+    ctx.textAlign = 'right';
+    for (let k = Math.ceil(yMin / sy - 1e-9); k * sy <= o.yMax + sy * 1e-6; k++){
+      ctx.strokeStyle = line; ctx.globalAlpha = 0.55;
+      ctx.beginPath(); ctx.moveTo(g.x, Y(k * sy)); ctx.lineTo(g.x + g.w, Y(k * sy)); ctx.stroke();
+      ctx.globalAlpha = 1; ctx.fillStyle = soft;
+      ctx.fillText(fmt(k * sy + 0, dec(sy)), g.x - 8, Y(k * sy) + 4);
+    }
+    const y0 = yMin < 0 ? Y(0) : g.y + g.h;
+    ctx.strokeStyle = soft; ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.moveTo(g.x, g.y); ctx.lineTo(g.x, g.y + g.h); ctx.moveTo(g.x, y0); ctx.lineTo(g.x + g.w, y0); ctx.stroke();
+    ctx.fillStyle = ink; ctx.textAlign = 'left'; ctx.font = '14px ' + SANS;
+    if (o.title) ctx.fillText(o.title, g.x + 8, g.y - 10);
+    ctx.fillStyle = soft; ctx.textAlign = 'right'; ctx.font = '13px ' + MONO;
+    if (o.xLabel) ctx.fillText(o.xLabel, g.x + g.w, g.y + g.h + 36);
+    ctx.restore();
+    return { X, Y };
+  }
+
+  // ---------- Constantes ----------
+  const W = 1000, H = 560;
+  const BK = { x: 440, y: 262, w: 440, h: 268, surf: 312 };      // bécher : parois et surface du liquide
+  const BUR = { x: 660, top: 18, bottom: 196, tip: 236, w: 26 }; // burette, centrée sur le bécher
+  const CAP = 30;                                                // nombre de gouttes dans la burette
+  const SPECIES = [
+    { id: 'so2',  label: 'SO₂',   r: 9,   color: () => C.blue },
+    { id: 'so4',  label: 'SO₄²⁻', r: 9,   color: () => C.inkSoft },
+    { id: 'mn2',  label: 'Mn²⁺',  r: 7,   color: () => C.pink },
+    { id: 'hp',   label: 'H⁺',    r: 3.5, color: () => C.brass },
+    { id: 'mno4', label: 'MnO₄⁻', r: 8,   color: () => C.violet }
+  ];
+  const RADIUS = Object.fromEntries(SPECIES.map(s => [s.id, s.r]));
+
+  // ---------- État ----------
+  const canvas = $('stage');
+  const ctx = setupCanvas(canvas, W, H);
+  const P = { n0: 30 };
+  const S = {};                                   // particules présentes dans le bécher, par espèce
+  let drops = [], history = [];                   // gouttes en chute, gouttes versées (pour annuler)
+  let auto = false, paused = false, holding = false, timer = 0, last = performance.now();
+
+  const rnd = (a, b) => a + Math.random() * (b - a);
+  function particle(id, x, y){
+    const r = RADIUS[id];
+    return { r, x: clamp(x, BK.x + r, BK.x + BK.w - r), y: clamp(y, BK.surf + r, BK.y + BK.h - r),
+             vx: rnd(-30, 30), vy: rnd(-30, 30), flash: 0 };
+  }
+  function syncButtons(){
+    $('auto').textContent = auto ? 'Arrêter de verser' : 'Verser en continu';
+    $('pause').textContent = paused ? 'Reprendre' : 'Pause';
+  }
+  function reset(){
+    for (const s of SPECIES) S[s.id] = [];
+    for (let i = 0; i < P.n0; i++) S.so2.push(particle('so2', rnd(BK.x, BK.x + BK.w), rnd(BK.surf, BK.y + BK.h)));
+    drops = []; history = [];
+    auto = false; paused = false; holding = false; timer = 0;
+    syncButtons();
+  }
+
+  // ---------- Chimie ----------
+  // Une goutte apporte 2 MnO₄⁻ : ils réagissent avec 5 SO₂ s'il en reste, sinon ils s'accumulent
+  function land(d){
+    drops.splice(drops.indexOf(d), 1);
+    const rec = { so2: [], so4: [], mn2: [], hp: [], mno4: [] };
+    const add = (id, x, y) => { const p = particle(id, x, y); p.flash = 1; S[id].push(p); rec[id].push(p); };
+    if (S.so2.length >= 5){
+      const d2 = p => (p.x - d.x) ** 2 + (p.y - BK.surf) ** 2;
+      S.so2.sort((a, b) => d2(a) - d2(b));
+      rec.so2 = S.so2.splice(0, 5);
+      let cx = 0, cy = 0;
+      for (const p of rec.so2){ add('so4', p.x, p.y); cx += p.x / 5; cy += p.y / 5; }
+      add('mn2', cx - 10, cy); add('mn2', cx + 10, cy);
+      for (let i = 0; i < 4; i++) add('hp', cx + rnd(-16, 16), cy + rnd(-16, 16));
+    } else {
+      add('mno4', d.x - 9, BK.surf + 12); add('mno4', d.x + 9, BK.surf + 12);
+    }
+    d.landed = true; d.rec = rec;
+  }
+  function pour(){
+    if (history.length >= CAP){ auto = false; holding = false; syncButtons(); return; }
+    paused = false;
+    const d = { x: BUR.x + rnd(-3, 3), y: BUR.tip + 8, landed: false, rec: null };
+    drops.push(d); history.push(d);
+    if (reduceMotion) land(d);
+    syncButtons();
+  }
+  function undo(){
+    const d = history.pop();
+    if (!d) return;
+    if (!d.landed) drops.splice(drops.indexOf(d), 1);
+    else {
+      for (const id of ['so4', 'mn2', 'hp', 'mno4']) S[id] = S[id].filter(p => !d.rec[id].includes(p));
+      S.so2.push(...d.rec.so2);
+    }
+    auto = false; syncButtons();
+  }
+
+  // ---------- Mouvement ----------
+  function update(dt){
+    if (holding || auto){
+      timer += dt;
+      if (timer > (holding ? 0.3 : 0.7)){ timer = 0; pour(); }
+    }
+    for (const d of drops.slice()){
+      d.y += 260 * dt;
+      if (d.y >= BK.surf) land(d);
+    }
+    for (const s of SPECIES) for (const p of S[s.id]){
+      p.flash = Math.max(0, p.flash - dt * 1.2);
+      if (reduceMotion) continue;
+      // Agitation thermique : marche au hasard, rebond sur les parois
+      p.vx += rnd(-1, 1) * 400 * dt; p.vy += rnd(-1, 1) * 400 * dt;
+      const v = Math.hypot(p.vx, p.vy);
+      if (v > 42){ p.vx *= 42 / v; p.vy *= 42 / v; }
+      p.x += p.vx * dt; p.y += p.vy * dt;
+      if (p.x < BK.x + p.r){ p.x = BK.x + p.r; p.vx = Math.abs(p.vx); }
+      if (p.x > BK.x + BK.w - p.r){ p.x = BK.x + BK.w - p.r; p.vx = -Math.abs(p.vx); }
+      if (p.y < BK.surf + p.r){ p.y = BK.surf + p.r; p.vy = Math.abs(p.vy); }
+      if (p.y > BK.y + BK.h - p.r){ p.y = BK.y + BK.h - p.r; p.vy = -Math.abs(p.vy); }
+    }
+  }
+
+  // ---------- Affichage des mesures ----------
+  function updateReadouts(){
+    const n = history.length, so2 = S.so2.length, exc = S.mno4.length;
+    out('rDrops', n + ' sur ' + CAP);
+    out('rMn', String(2 * n));
+    out('rSo2', String(so2));
+    out('rExc', String(exc));
+    if (exc > 0) setStatus('Équivalence dépassée : MnO₄⁻ en excès', 'off');
+    else if (so2 === 0) setStatus('Équivalence : plus de SO₂, pas encore d\'excès', 'ok');
+    else setStatus(n === 0 ? 'Avant le titrage' : 'Avant l\'équivalence');
+  }
+
+  // ---------- Rendu ----------
+  function drawCounts(){
+    ctx.fillStyle = C.ink; ctx.font = '600 15px ' + SANS; ctx.textAlign = 'left';
+    ctx.fillText('Dans le bécher', 30, 62);
+    SPECIES.forEach((s, i) => {
+      const y = 108 + i * 72, n = S[s.id].length;
+      ctx.fillStyle = s.color();
+      ctx.beginPath(); ctx.arc(40, y, 8, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = C.ink; ctx.font = '600 15px ' + SANS; ctx.textAlign = 'left';
+      ctx.fillText(s.label, 58, y + 5);
+      ctx.font = '600 15px ' + MONO; ctx.textAlign = 'right';
+      ctx.fillText(String(n), 158, y + 5);
+      ctx.fillStyle = C.line; ctx.fillRect(172, y - 9, 192, 18);
+      ctx.fillStyle = s.color(); ctx.fillRect(172, y - 9, Math.min(192, n * 3.2), 18);
+    });
+  }
+  function drawBurette(){
+    const x0 = BUR.x - BUR.w / 2, span = BUR.bottom - BUR.top - 12;
+    const level = BUR.top + 12 + span * history.length / CAP;
+    ctx.fillStyle = C.violet; ctx.globalAlpha = 0.8;
+    ctx.fillRect(x0, level, BUR.w, BUR.bottom - level);
+    if (history.length < CAP){
+      ctx.beginPath();
+      ctx.moveTo(x0, BUR.bottom); ctx.lineTo(BUR.x - 4, BUR.bottom + 16); ctx.lineTo(BUR.x - 4, BUR.tip);
+      ctx.lineTo(BUR.x + 4, BUR.tip); ctx.lineTo(BUR.x + 4, BUR.bottom + 16); ctx.lineTo(x0 + BUR.w, BUR.bottom);
+      ctx.closePath(); ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+    ctx.strokeStyle = C.inkSoft; ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(x0, BUR.top); ctx.lineTo(x0, BUR.bottom); ctx.lineTo(BUR.x - 4, BUR.bottom + 16); ctx.lineTo(BUR.x - 4, BUR.tip);
+    ctx.moveTo(x0 + BUR.w, BUR.top); ctx.lineTo(x0 + BUR.w, BUR.bottom); ctx.lineTo(BUR.x + 4, BUR.bottom + 16); ctx.lineTo(BUR.x + 4, BUR.tip);
+    ctx.stroke();
+    ctx.lineWidth = 1;
+    for (let k = 0; k <= 10; k++){
+      const y = BUR.top + 12 + span * k / 10;
+      ctx.beginPath(); ctx.moveTo(x0 + BUR.w, y); ctx.lineTo(x0 + BUR.w - (k % 5 ? 7 : 12), y); ctx.stroke();
+    }
+    // Robinet
+    ctx.fillStyle = C.ink;
+    ctx.fillRect(BUR.x - 18, BUR.bottom + 19, 36, 7);
+    ctx.fillRect(BUR.x + 18, BUR.bottom + 14, 6, 17);
+    ctx.fillStyle = C.inkSoft; ctx.font = '13px ' + SANS; ctx.textAlign = 'left';
+    ctx.fillText('Solution de permanganate', BUR.x + 34, BUR.top + 26);
+    ctx.fillText('de potassium (violette)', BUR.x + 34, BUR.top + 44);
+  }
+  function drawBeaker(){
+    // La teinte violette apparaît avec les premiers MnO₄⁻ non consommés
+    ctx.fillStyle = C.blue; ctx.globalAlpha = 0.1;
+    ctx.fillRect(BK.x, BK.surf, BK.w, BK.y + BK.h - BK.surf);
+    ctx.fillStyle = C.violet; ctx.globalAlpha = 0.5 * Math.min(1, S.mno4.length / 8);
+    ctx.fillRect(BK.x, BK.surf, BK.w, BK.y + BK.h - BK.surf);
+    ctx.globalAlpha = 1;
+    for (const s of SPECIES){
+      for (const p of S[s.id]){
+        ctx.fillStyle = s.color();
+        ctx.beginPath(); ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2); ctx.fill();
+        if (p.flash > 0){
+          ctx.strokeStyle = C.wave; ctx.lineWidth = 2; ctx.globalAlpha = p.flash;
+          ctx.beginPath(); ctx.arc(p.x, p.y, p.r + 3 + (1 - p.flash) * 9, 0, Math.PI * 2); ctx.stroke();
+          ctx.globalAlpha = 1;
+        }
+      }
+    }
+    ctx.strokeStyle = C.inkSoft; ctx.lineWidth = 3; ctx.lineJoin = 'round';
+    ctx.beginPath();
+    ctx.moveTo(BK.x - 3, BK.y); ctx.lineTo(BK.x - 3, BK.y + BK.h + 3);
+    ctx.lineTo(BK.x + BK.w + 3, BK.y + BK.h + 3); ctx.lineTo(BK.x + BK.w + 3, BK.y);
+    ctx.stroke();
+    ctx.fillStyle = C.inkSoft; ctx.font = '13px ' + SANS; ctx.textAlign = 'left';
+    ctx.fillText('Solution de dioxyde de soufre', BK.x + 2, BK.y + BK.h + 24);
+  }
+  function draw(){
+    updateReadouts();
+    ctx.clearRect(0, 0, W, H);
+    drawCounts();
+    drawBurette();
+    drawBeaker();
+    ctx.fillStyle = C.violet;
+    for (const d of drops){
+      ctx.beginPath(); ctx.moveTo(d.x, d.y - 13); ctx.quadraticCurveTo(d.x + 9, d.y, d.x, d.y + 6);
+      ctx.quadraticCurveTo(d.x - 9, d.y, d.x, d.y - 13); ctx.fill();
+    }
+  }
+
+  // ---------- Interactions ----------
+  const onBurette = p => Math.abs(p.x - BUR.x) < 60 && p.y < BUR.tip + 20;
+  canvas.addEventListener('pointerdown', e => {
+    if (!onBurette(pointerPos(canvas, e, W, H))) return;
+    pour(); holding = true; timer = 0;
+    canvas.setPointerCapture(e.pointerId);
+  });
+  for (const type of ['pointerup', 'pointercancel']) canvas.addEventListener(type, () => { holding = false; });
+  canvas.addEventListener('pointermove', e => { canvas.style.cursor = onBurette(pointerPos(canvas, e, W, H)) ? 'pointer' : ''; });
+  canvas.addEventListener('contextmenu', e => e.preventDefault());
+
+  bind('n0', v => { P.n0 = v; reset(); }, v => fmt(v, 0) + ' molécules');
+  $('pour').addEventListener('click', pour);
+  $('auto').addEventListener('click', () => { auto = !auto; if (auto) paused = false; timer = 1; syncButtons(); });
+  $('undo').addEventListener('click', undo);
+  $('pause').addEventListener('click', () => { paused = !paused; if (paused) auto = false; syncButtons(); });
+  $('reset').addEventListener('click', reset);
+  reset();
+
+  // ---------- Boucle d'animation ----------
+  function loop(now){
+    const dt = Math.min((now - last) / 1000, 0.05);
+    last = now;
+    if (!paused) update(dt);
+    draw();
+    requestAnimationFrame(loop);
+  }
+  requestAnimationFrame(loop);
+})();
+</script>
+<script>
+  // Compteur de visites GoatCounter (sans cookie), chargé uniquement sur le site en ligne
+  if (location.protocol === 'https:'){
+    const gc = document.createElement('script');
+    gc.async = true;
+    gc.src = 'https://gc.zgo.at/count.js';
+    gc.dataset.goatcounter = 'https://miyvi.goatcounter.com/count';
+    document.head.appendChild(gc);
+  }
+</script>
+</body>
+</html>
