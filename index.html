@@ -319,6 +319,9 @@
     background:var(--paper);
   }
   .contact:hover, .contact:focus-visible{ border-color:var(--accent); outline:none; }
+  .header-links{ display:flex; flex-wrap:wrap; gap:8px 10px; }
+  button.contact{ font-family:var(--sans); cursor:pointer; }
+  button.contact:disabled{ cursor:progress; color:var(--ink-soft); }
   footer a{ color:var(--accent); }
   [hidden]{ display:none !important; }
 </style>
@@ -330,7 +333,10 @@
     <span class="kicker">Lycée — Seconde, Première, Terminale</span>
     <h1>Expériences de physique-chimie</h1>
     <p>Des simulations pour manipuler en classe. Chaque expérience tient dans un seul fichier, qui s'ouvre directement dans le navigateur, sans installation ni connexion.</p>
-    <a class="contact" href="contact.html">Signaler une erreur ou proposer une expérience →</a>
+    <div class="header-links">
+      <a class="contact" href="contact.html">Signaler une erreur ou proposer une expérience →</a>
+      <button class="contact" id="zip">Télécharger toutes les expériences (.zip) ↓</button>
+    </div>
   </header>
 
   <div class="tools">
@@ -531,6 +537,52 @@
     for (const o of buttons) o.setAttribute('aria-pressed', String(o === b));
     apply();
   });
+})();
+</script>
+<script>
+(function(){
+  // Toutes les expériences dans un seul .zip (sans la page d'accueil), fabriqué dans le navigateur
+  // à partir des cartes ci-dessus : une nouvelle carte est donc incluse automatiquement
+  const btn = document.getElementById('zip');
+  const ONLINE = 'https://tsmalbeen.github.io/ExperiencesPC/index.html#tout-telecharger';
+  if (!location.protocol.startsWith('http')){
+    // Depuis le disque, le navigateur refuse de relire les fichiers : on passe par le site en ligne
+    btn.addEventListener('click', () => { location.href = ONLINE; });
+    return;
+  }
+  const label = btn.textContent;
+  const loadJSZip = () => window.JSZip ? Promise.resolve() : new Promise((ok, ko) => {
+    const s = document.createElement('script');
+    s.src = 'https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js';
+    s.onload = ok; s.onerror = ko;
+    document.head.appendChild(s);
+  });
+  btn.addEventListener('click', async () => {
+    btn.disabled = true; btn.textContent = 'Préparation du fichier…';
+    try {
+      await loadJSZip();
+      const zip = new JSZip(), root = zip.folder('experiences-physique-chimie');
+      const paths = [...new Set([...document.querySelectorAll('.card')].map(c => c.getAttribute('href')))];
+      await Promise.all(paths.map(async p => {
+        const r = await fetch(p);
+        if (!r.ok) throw new Error(p);
+        root.file(p.replace(/^experiences\//, ''), await r.arrayBuffer());
+      }));
+      const blob = await zip.generateAsync({ type: 'blob', compression: 'DEFLATE' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob); a.download = 'experiences-physique-chimie.zip';
+      document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(() => URL.revokeObjectURL(a.href), 10000);
+      btn.textContent = label;
+    } catch (e) {
+      btn.textContent = 'Échec du téléchargement, réessayer ↓';
+    }
+    btn.disabled = false;
+  });
+  if (location.hash === '#tout-telecharger'){
+    history.replaceState(null, '', location.pathname);
+    btn.click();
+  }
 })();
 </script>
 <script>
