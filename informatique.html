@@ -1,0 +1,595 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Informatique au lycée</title>
+<style>
+  /* ---------- Thème (clair / sombre automatique) ---------- */
+  :root{
+    --bg:#f3ede1;
+    --paper:#fbf8f0;
+    --ink:#22242e;
+    --ink-soft:#5b5a52;
+    --line:#d9d0ba;
+    --wave:#b8362b;
+    --wave-glow:rgba(184,54,43,.14);
+    --accent:#2f6f4f;
+    --blue:#2c5f8a;
+    --brass:#a9793f;
+    --ok:#2f6f4f;
+    --warn:#b8362b;
+    --serif:"Iowan Old Style","Palatino Linotype",Palatino,Georgia,serif;
+    --sans:system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+    --mono:ui-monospace,"Cascadia Mono","SF Mono",Consolas,Menlo,monospace;
+    color-scheme: light dark;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{
+      --bg:#171a21;
+      --paper:#1e222b;
+      --ink:#eae6da;
+      --ink-soft:#9a9689;
+      --line:#33384a;
+      --wave:#ff8a72;
+      --wave-glow:rgba(255,138,114,.14);
+      --accent:#79d6a3;
+      --blue:#7fb4e0;
+      --brass:#c99a5b;
+      --ok:#79d6a3;
+      --warn:#ff8a72;
+    }
+  }
+
+  /* ---------- Mise en page ---------- */
+  *{box-sizing:border-box;}
+  html, body{ margin:0; padding:0; }
+  body{
+    background:var(--bg);
+    color:var(--ink);
+    font-family:var(--sans);
+    padding:28px 16px;
+    display:flex;
+    justify-content:center;
+  }
+  main{
+    width:100%;
+    max-width:920px;
+    display:flex;
+    flex-direction:column;
+    gap:20px;
+  }
+  header{ display:flex; flex-direction:column; gap:4px; }
+  .kicker{
+    font-size:.72rem;
+    text-transform:uppercase;
+    letter-spacing:.08em;
+    color:var(--ink-soft);
+  }
+  h1{
+    font-family:var(--serif);
+    font-weight:600;
+    font-size:clamp(1.5rem, 1.1rem + 1.6vw, 2.2rem);
+    margin:0;
+    text-wrap:balance;
+  }
+  header p{
+    margin:0;
+    color:var(--ink-soft);
+    font-size:.92rem;
+    max-width:66ch;
+  }
+
+  /* ---------- Zone de simulation ---------- */
+  .scene{
+    background:var(--paper);
+    border:1px solid var(--line);
+    border-radius:14px;
+    padding:20px clamp(12px,3vw,28px) 8px;
+    display:flex;
+    flex-direction:column;
+    gap:6px;
+  }
+  .scene-top{
+    display:flex;
+    justify-content:space-between;
+    align-items:baseline;
+    gap:12px;
+    flex-wrap:wrap;
+  }
+  .scene-title{ font-family:var(--serif); font-weight:600; }
+  .status{
+    font-family:var(--mono);
+    font-size:.82rem;
+    padding:3px 10px;
+    border-radius:999px;
+    border:1px solid var(--line);
+    color:var(--ink-soft);
+  }
+  .status.ok{ color:var(--ok); border-color:var(--ok); }
+  .status.off{ color:var(--warn); border-color:var(--warn); }
+  canvas{
+    width:100%;
+    height:auto;
+    display:block;
+  }
+  canvas.draggable{ touch-action:none; cursor:grab; }
+  canvas.dragging{ cursor:grabbing; }
+  .hint{ margin:0; font-size:.78rem; color:var(--ink-soft); }
+
+  /* ---------- Mesures ---------- */
+  .readouts{
+    display:grid;
+    grid-template-columns:repeat(auto-fit,minmax(150px,1fr));
+    gap:10px 18px;
+    padding-block:10px;
+    border-top:1px solid var(--line);
+    margin-top:6px;
+  }
+  .readout{ display:flex; flex-direction:column; gap:2px; }
+  .readout .label{
+    font-size:.78rem;
+    color:var(--ink-soft);
+  }
+  .readout .value{
+    font-family:var(--mono);
+    font-variant-numeric:tabular-nums;
+    font-size:1.05rem;
+    font-weight:500;
+  }
+  .readout .value em{ color:var(--blue); font-style:normal; font-size:.9rem; }
+
+  /* ---------- Contrôles ---------- */
+  .panel{
+    background:var(--paper);
+    border:1px solid var(--line);
+    border-radius:14px;
+    padding:18px clamp(14px,3vw,26px);
+    display:flex;
+    flex-direction:column;
+    gap:18px;
+  }
+  .controls{
+    display:grid;
+    grid-template-columns:repeat(auto-fit,minmax(240px,1fr));
+    gap:18px 32px;
+  }
+  .control{ display:flex; flex-direction:column; gap:6px; }
+  .control .row{
+    display:flex;
+    justify-content:space-between;
+    align-items:baseline;
+    gap:10px;
+  }
+  .control label{ font-size:.86rem; font-weight:500; }
+  .control .num{
+    font-family:var(--mono);
+    font-variant-numeric:tabular-nums;
+    color:var(--wave);
+    font-size:.92rem;
+  }
+  input[type=range]{
+    -webkit-appearance:none;
+    appearance:none;
+    width:100%;
+    height:4px;
+    margin:8px 0;
+    border-radius:999px;
+    background:var(--line);
+    outline:none;
+  }
+  input[type=range]::-webkit-slider-thumb{
+    -webkit-appearance:none;
+    width:20px; height:20px;
+    border-radius:50%;
+    background:var(--wave);
+    border:2px solid var(--paper);
+    box-shadow:0 0 0 1px var(--line);
+    cursor:pointer;
+  }
+  input[type=range]::-moz-range-thumb{
+    width:18px; height:18px;
+    border-radius:50%;
+    background:var(--wave);
+    border:2px solid var(--paper);
+    box-shadow:0 0 0 1px var(--line);
+    cursor:pointer;
+  }
+  select{
+    font-family:var(--sans);
+    font-size:.86rem;
+    padding:7px 10px;
+    border-radius:8px;
+    border:1px solid var(--line);
+    background:var(--paper);
+    color:var(--ink);
+    width:100%;
+  }
+  .check{
+    display:flex;
+    align-items:center;
+    gap:8px;
+    font-size:.86rem;
+    font-weight:500;
+    cursor:pointer;
+  }
+  .check input{ width:18px; height:18px; accent-color:var(--accent); margin:0; }
+  .buttons{ display:flex; gap:10px; flex-wrap:wrap; }
+  button{
+    font-family:var(--sans);
+    font-size:.86rem;
+    font-weight:500;
+    padding:9px 16px;
+    border-radius:8px;
+    border:1px solid var(--line);
+    background:transparent;
+    color:var(--ink);
+    cursor:pointer;
+  }
+  button.primary{
+    background:var(--accent);
+    border-color:var(--accent);
+    color:var(--paper);
+  }
+  button:focus-visible, input:focus-visible, select:focus-visible{
+    outline:2px solid var(--accent);
+    outline-offset:2px;
+  }
+
+  /* ---------- Formules ---------- */
+  .formula{
+    font-family:var(--mono);
+    font-size:.86rem;
+    color:var(--ink-soft);
+    border-top:1px solid var(--line);
+    padding-top:14px;
+    display:flex;
+    flex-wrap:wrap;
+    gap:6px 22px;
+  }
+  .formula b{ color:var(--ink); font-weight:600; }
+  footer{
+    font-size:.78rem;
+    color:var(--ink-soft);
+    text-align:center;
+    text-wrap:balance;
+  }
+
+  /* ---------- Page d'accueil ---------- */
+  main{ gap:26px; }
+  section{ display:flex; flex-direction:column; gap:12px; }
+  h2{
+    font-family:var(--serif);
+    font-weight:600;
+    font-size:1.2rem;
+    margin:0;
+    padding-bottom:6px;
+    border-bottom:1px solid var(--line);
+  }
+  .tools{
+    display:flex;
+    flex-wrap:wrap;
+    gap:10px 14px;
+    align-items:center;
+  }
+  .tools input[type=search]{
+    flex:1 1 220px;
+    font-family:var(--sans);
+    font-size:.92rem;
+    padding:9px 12px;
+    border-radius:8px;
+    border:1px solid var(--line);
+    background:var(--paper);
+    color:var(--ink);
+  }
+  .levels{ display:flex; gap:6px; flex-wrap:wrap; }
+  .levels button{ padding:8px 14px; }
+  .levels button[aria-pressed=true]{ background:var(--accent); border-color:var(--accent); color:var(--paper); }
+  .count{ font-size:.8rem; color:var(--ink-soft); margin:0; }
+  .grid{
+    display:grid;
+    grid-template-columns:repeat(auto-fill,minmax(250px,1fr));
+    gap:12px;
+  }
+  .card{
+    background:var(--paper);
+    border:1px solid var(--line);
+    border-radius:12px;
+    padding:14px 16px;
+    display:flex;
+    flex-direction:column;
+    gap:6px;
+    color:var(--ink);
+    text-decoration:none;
+  }
+  .card:hover, .card:focus-visible{ border-color:var(--accent); outline:none; }
+  .card strong{ font-family:var(--serif); font-size:1.02rem; }
+  .card span{ font-size:.84rem; color:var(--ink-soft); flex:1; }
+  .card small{ font-family:var(--mono); font-size:.72rem; color:var(--accent); }
+  .contact{
+    align-self:flex-start;
+    margin-top:8px;
+    font-size:.86rem;
+    font-weight:500;
+    color:var(--accent);
+    text-decoration:none;
+    border:1px solid var(--line);
+    border-radius:8px;
+    padding:7px 12px;
+    background:var(--paper);
+  }
+  .contact:hover, .contact:focus-visible{ border-color:var(--accent); outline:none; }
+  .header-links{ display:flex; flex-wrap:wrap; gap:8px 10px; }
+  button.contact{ font-family:var(--sans); cursor:pointer; }
+  button.contact:disabled{ cursor:progress; color:var(--ink-soft); }
+  footer a{ color:var(--accent); }
+  [hidden]{ display:none !important; }
+  /* ---------- Navigation entre les sites, ressources à venir ---------- */
+  .site-nav{ display:flex; gap:14px; font-size:.8rem; margin-bottom:4px; }
+  .site-nav a{ color:var(--ink-soft); text-decoration:none; }
+  .site-nav a:hover, .site-nav a:focus-visible{ color:var(--accent); }
+  .site-nav [aria-current]{ color:var(--ink); font-weight:600; }
+  section > p.intro{ margin:0; font-size:.86rem; color:var(--ink-soft); max-width:72ch; }
+  .card.soon{ border-style:dashed; background:transparent; }
+  .card.soon small{ color:var(--ink-soft); }
+</style>
+</head>
+<body>
+
+<main>
+  <header>
+    <nav class="site-nav" aria-label="Sites">
+      <a href="index.html">Physique-chimie</a>
+      <a href="informatique.html" aria-current="page">Informatique</a>
+    </nav>
+    <span class="kicker">Lycée — SNT, NSI, voie professionnelle</span>
+    <h1>Informatique au lycée</h1>
+    <p>Des ressources pour enseigner l'informatique : SNT en Seconde, spécialité NSI en Première et en Terminale, puis la voie professionnelle et le BTS. Chaque ressource tient dans un seul fichier, qui s'ouvre directement dans le navigateur, sans installation ni connexion.</p>
+    <div class="header-links">
+      <a class="contact" href="contact.html">Signaler une erreur ou proposer une ressource →</a>
+      <button class="contact" id="zip">Télécharger toutes les ressources (.zip) ↓</button>
+    </div>
+  </header>
+
+  <div class="tools">
+    <input type="search" id="search" placeholder="Rechercher une ressource, une notion…" aria-label="Rechercher une ressource">
+    <div class="levels" role="group" aria-label="Filtrer par enseignement">
+      <button data-level="" aria-pressed="true">Tout</button>
+      <button data-level="SNT" aria-pressed="false">SNT</button>
+      <button data-level="NSI · Première" aria-pressed="false">NSI Première</button>
+      <button data-level="NSI · Terminale" aria-pressed="false">NSI Terminale</button>
+      <button data-level="Voie pro" aria-pressed="false">Voie pro et BTS</button>
+    </div>
+  </div>
+  <p class="count" id="count" aria-live="polite"></p>
+
+  <section data-subject>
+    <h2>Outils pour la classe</h2>
+    <p class="intro">Des outils utiles dans plusieurs thèmes et à plusieurs niveaux.</p>
+    <div class="grid">
+      <a class="card" href="informatique/outils/editeur-web/index.html" data-level="SNT · NSI · Première · NSI · Terminale · Voie pro">
+        <strong>Éditeur HTML, CSS et JavaScript</strong>
+        <span>Écrire une page web en trois fichiers et voir le résultat aussitôt, avec une console pour les messages et les erreurs.</span>
+        <small>SNT · NSI · Voie pro</small>
+      </a>
+    </div>
+  </section>
+
+  <!-- Thèmes des programmes, à décommenter au fur et à mesure que les ressources sont prêtes
+  <section data-subject>
+    <h2>SNT — Seconde</h2>
+    <p class="intro">Sciences numériques et technologie : sept thèmes, enseignés à tous les élèves de Seconde.</p>
+    <div class="grid">
+      <div class="card soon" data-level="SNT">
+        <strong>Internet</strong>
+        <span>Protocole TCP/IP, découpage en paquets, adresses IP, annuaire DNS, réseaux pair-à-pair.</span>
+        <small>SNT · à venir</small>
+      </div>
+      <div class="card soon" data-level="SNT">
+        <strong>Le Web</strong>
+        <span>URL, requêtes HTTP, langages HTML et CSS, moteurs de recherche et indexation.</span>
+        <small>SNT · à venir</small>
+      </div>
+      <div class="card soon" data-level="SNT">
+        <strong>Les réseaux sociaux</strong>
+        <span>Modélisation par des graphes, effet petit monde, modèles économiques, cyberharcèlement.</span>
+        <small>SNT · à venir</small>
+      </div>
+      <div class="card soon" data-level="SNT">
+        <strong>Les données structurées</strong>
+        <span>Tables et fichiers CSV, descripteurs, métadonnées, données ouvertes.</span>
+        <small>SNT · à venir</small>
+      </div>
+      <div class="card soon" data-level="SNT">
+        <strong>Localisation, cartographie et mobilité</strong>
+        <span>Positionnement par satellites, trilatération, cartes numériques, calcul d'itinéraire.</span>
+        <small>SNT · à venir</small>
+      </div>
+      <div class="card soon" data-level="SNT">
+        <strong>Informatique embarquée et objets connectés</strong>
+        <span>Capteurs, actionneurs, programmation d'un système embarqué, interface homme-machine.</span>
+        <small>SNT · à venir</small>
+      </div>
+      <div class="card soon" data-level="SNT">
+        <strong>La photographie numérique</strong>
+        <span>Pixels et définition, codage des couleurs, capteur, traitements d'image.</span>
+        <small>SNT · à venir</small>
+      </div>
+    </div>
+  </section>
+
+  <section data-subject>
+    <h2>NSI — Première</h2>
+    <p class="intro">Numérique et sciences informatiques, spécialité de Première.</p>
+    <div class="grid">
+      <div class="card soon" data-level="NSI · Première">
+        <strong>Représentation des données : types de base</strong>
+        <span>Binaire et hexadécimal, entiers relatifs, nombres flottants, booléens, codage des caractères.</span>
+        <small>NSI · Première · à venir</small>
+      </div>
+      <div class="card soon" data-level="NSI · Première">
+        <strong>Représentation des données : types construits</strong>
+        <span>Tuples, tableaux, dictionnaires ; parcours et compréhensions.</span>
+        <small>NSI · Première · à venir</small>
+      </div>
+      <div class="card soon" data-level="NSI · Première">
+        <strong>Traitement de données en tables</strong>
+        <span>Import d'un fichier CSV, recherche, tri et fusion de tables.</span>
+        <small>NSI · Première · à venir</small>
+      </div>
+      <div class="card soon" data-level="NSI · Première">
+        <strong>Interactions sur le Web</strong>
+        <span>Événements, formulaires, modèle client-serveur, méthodes GET et POST.</span>
+        <small>NSI · Première · à venir</small>
+      </div>
+      <div class="card soon" data-level="NSI · Première">
+        <strong>Architectures matérielles et systèmes d'exploitation</strong>
+        <span>Modèle de von Neumann, portes logiques, système d'exploitation, ligne de commande, réseau.</span>
+        <small>NSI · Première · à venir</small>
+      </div>
+      <div class="card soon" data-level="NSI · Première">
+        <strong>Langages et programmation</strong>
+        <span>Fonctions, spécification, tests, constructions élémentaires en Python.</span>
+        <small>NSI · Première · à venir</small>
+      </div>
+      <div class="card soon" data-level="NSI · Première">
+        <strong>Algorithmique</strong>
+        <span>Parcours séquentiel, tris par sélection et par insertion, dichotomie, algorithmes gloutons, k plus proches voisins.</span>
+        <small>NSI · Première · à venir</small>
+      </div>
+    </div>
+  </section>
+
+  <section data-subject>
+    <h2>NSI — Terminale</h2>
+    <p class="intro">Numérique et sciences informatiques, spécialité de Terminale.</p>
+    <div class="grid">
+      <div class="card soon" data-level="NSI · Terminale">
+        <strong>Structures de données</strong>
+        <span>Programmation objet, listes, piles, files, arbres et graphes.</span>
+        <small>NSI · Terminale · à venir</small>
+      </div>
+      <div class="card soon" data-level="NSI · Terminale">
+        <strong>Bases de données</strong>
+        <span>Modèle relationnel, langage SQL, système de gestion de bases de données.</span>
+        <small>NSI · Terminale · à venir</small>
+      </div>
+      <div class="card soon" data-level="NSI · Terminale">
+        <strong>Architectures, systèmes et réseaux</strong>
+        <span>Processus et ordonnancement, protocoles de routage, sécurisation des communications.</span>
+        <small>NSI · Terminale · à venir</small>
+      </div>
+      <div class="card soon" data-level="NSI · Terminale">
+        <strong>Langages et programmation</strong>
+        <span>Récursivité, modularité, paradigmes de programmation, calculabilité.</span>
+        <small>NSI · Terminale · à venir</small>
+      </div>
+      <div class="card soon" data-level="NSI · Terminale">
+        <strong>Algorithmique</strong>
+        <span>Algorithmes sur les arbres et les graphes, diviser pour régner, programmation dynamique, recherche textuelle.</span>
+        <small>NSI · Terminale · à venir</small>
+      </div>
+    </div>
+  </section>
+
+  <section data-subject>
+    <h2>Voie professionnelle et BTS</h2>
+    <p class="intro">Bac professionnel et BTS des métiers de l'informatique et des réseaux.</p>
+    <div class="grid">
+      <div class="card soon" data-level="Voie pro · BTS">
+        <strong>Contenus à définir</strong>
+        <span>Thèmes à préciser selon les filières visées, par exemple bac pro CIEL, BTS SIO ou BTS CIEL.</span>
+        <small>Voie pro · BTS · à venir</small>
+      </div>
+    </div>
+  </section>
+  -->
+
+  <footer>Chaque ressource tient dans un fichier index.html autonome, que l'on peut copier seul sur une clé USB ou un autre ordinateur. <a href="contact.html">Signaler une erreur ou proposer une ressource</a>.</footer>
+</main>
+
+<script>
+(function(){
+  // Filtre des cartes par texte et par niveau (la page reste utilisable sans JavaScript)
+  const search = document.getElementById('search'), count = document.getElementById('count');
+  const cards = [...document.querySelectorAll('.card')], buttons = [...document.querySelectorAll('.levels button')];
+  const plain = s => s.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+  let level = '';
+  function apply(){
+    const q = plain(search.value.trim());
+    let shown = 0;
+    for (const card of cards){
+      const ok = (!level || card.dataset.level.includes(level)) && (!q || plain(card.textContent).includes(q));
+      card.hidden = !ok;
+      if (ok) shown++;
+    }
+    for (const sec of document.querySelectorAll('[data-subject]')) sec.hidden = !sec.querySelector('.card:not([hidden])');
+    count.textContent = shown === cards.length ? '' : shown === 0 ? 'Aucune expérience ne correspond.' : shown + ' expérience' + (shown > 1 ? 's' : '') + ' sur ' + cards.length;
+  }
+  search.addEventListener('input', apply);
+  for (const b of buttons) b.addEventListener('click', () => {
+    level = b.dataset.level;
+    for (const o of buttons) o.setAttribute('aria-pressed', String(o === b));
+    apply();
+  });
+})();
+</script>
+<script>
+(function(){
+  // Toutes les ressources dans un seul .zip (sans cette page), fabriqué dans le navigateur
+  // à partir des cartes ci-dessus : une nouvelle carte est donc incluse automatiquement
+  const btn = document.getElementById('zip');
+  if (!document.querySelector('a.card')){ btn.hidden = true; return; }   // aucune ressource publiée pour l'instant
+  const ONLINE = 'https://tsmalbeen.github.io/ExperiencesPC/informatique.html#tout-telecharger';
+  if (!location.protocol.startsWith('http')){
+    // Depuis le disque, le navigateur refuse de relire les fichiers : on passe par le site en ligne
+    btn.addEventListener('click', () => { location.href = ONLINE; });
+    return;
+  }
+  const label = btn.textContent;
+  const loadJSZip = () => window.JSZip ? Promise.resolve() : new Promise((ok, ko) => {
+    const s = document.createElement('script');
+    s.src = 'https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js';
+    s.onload = ok; s.onerror = ko;
+    document.head.appendChild(s);
+  });
+  btn.addEventListener('click', async () => {
+    btn.disabled = true; btn.textContent = 'Préparation du fichier…';
+    try {
+      await loadJSZip();
+      const zip = new JSZip(), root = zip.folder('ressources-informatique');
+      const paths = [...new Set([...document.querySelectorAll('a.card')].map(c => c.getAttribute('href')))];
+      await Promise.all(paths.map(async p => {
+        const r = await fetch(p);
+        if (!r.ok) throw new Error(p);
+        root.file(p.replace(/^informatique\//, ''), await r.arrayBuffer());
+      }));
+      const blob = await zip.generateAsync({ type: 'blob', compression: 'DEFLATE' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob); a.download = 'ressources-informatique.zip';
+      document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(() => URL.revokeObjectURL(a.href), 10000);
+      btn.textContent = label;
+    } catch (e) {
+      btn.textContent = 'Échec du téléchargement, réessayer ↓';
+    }
+    btn.disabled = false;
+  });
+  if (location.hash === '#tout-telecharger'){
+    history.replaceState(null, '', location.pathname);
+    btn.click();
+  }
+})();
+</script>
+<script>
+  // Compteur de visites GoatCounter (sans cookie), chargé uniquement sur le site en ligne
+  if (location.protocol === 'https:'){
+    const gc = document.createElement('script');
+    gc.async = true;
+    gc.src = 'https://gc.zgo.at/count.js';
+    gc.dataset.goatcounter = 'https://miyvi.goatcounter.com/count';
+    document.head.appendChild(gc);
+  }
+</script>
+</body>
+</html>
