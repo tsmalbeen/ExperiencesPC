@@ -1,0 +1,601 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Interactions sur le Web : événements et formulaires</title>
+<style>
+  /* ---------- Thème (clair / sombre automatique) ---------- */
+  :root{
+    --bg:#f3ede1;
+    --paper:#fbf8f0;
+    --ink:#22242e;
+    --ink-soft:#5b5a52;
+    --line:#d9d0ba;
+    --wave:#b8362b;
+    --wave-glow:rgba(184,54,43,.14);
+    --accent:#2f6f4f;
+    --blue:#2c5f8a;
+    --brass:#a9793f;
+    --violet:#8a3fc0;
+    --pink:#cf5f8c;
+    --ok:#2f6f4f;
+    --warn:#b8362b;
+    --serif:"Iowan Old Style","Palatino Linotype",Palatino,Georgia,serif;
+    --sans:system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+    --mono:ui-monospace,"Cascadia Mono","SF Mono",Consolas,Menlo,monospace;
+    color-scheme: light dark;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{
+      --bg:#171a21;
+      --paper:#1e222b;
+      --ink:#eae6da;
+      --ink-soft:#9a9689;
+      --line:#33384a;
+      --wave:#ff8a72;
+      --wave-glow:rgba(255,138,114,.14);
+      --accent:#79d6a3;
+      --blue:#7fb4e0;
+      --brass:#c99a5b;
+      --violet:#c39af5;
+      --pink:#f29bbd;
+      --ok:#79d6a3;
+      --warn:#ff8a72;
+    }
+  }
+
+  /* ---------- Mise en page ---------- */
+  *{box-sizing:border-box;}
+  html, body{ margin:0; padding:0; }
+  body{
+    background:var(--bg);
+    color:var(--ink);
+    font-family:var(--sans);
+    padding:28px 16px;
+    display:flex;
+    justify-content:center;
+  }
+  main{
+    width:100%;
+    max-width:920px;
+    display:flex;
+    flex-direction:column;
+    gap:20px;
+  }
+  header{ display:flex; flex-direction:column; gap:4px; }
+  .kicker{
+    font-size:.72rem;
+    text-transform:uppercase;
+    letter-spacing:.08em;
+    color:var(--ink-soft);
+  }
+  h1{
+    font-family:var(--serif);
+    font-weight:600;
+    font-size:clamp(1.5rem, 1.1rem + 1.6vw, 2.2rem);
+    margin:0;
+    text-wrap:balance;
+  }
+  header p{
+    margin:0;
+    color:var(--ink-soft);
+    font-size:.92rem;
+    max-width:66ch;
+  }
+
+  /* ---------- Zone de simulation ---------- */
+  .scene{
+    background:var(--paper);
+    border:1px solid var(--line);
+    border-radius:14px;
+    padding:20px clamp(12px,3vw,28px) 8px;
+    display:flex;
+    flex-direction:column;
+    gap:6px;
+  }
+  .scene-top{
+    display:flex;
+    justify-content:space-between;
+    align-items:baseline;
+    gap:12px;
+    flex-wrap:wrap;
+  }
+  .scene-title{ font-family:var(--serif); font-weight:600; }
+  .status{
+    font-family:var(--mono);
+    font-size:.82rem;
+    padding:3px 10px;
+    border-radius:999px;
+    border:1px solid var(--line);
+    color:var(--ink-soft);
+  }
+  .status.ok{ color:var(--ok); border-color:var(--ok); }
+  .status.off{ color:var(--warn); border-color:var(--warn); }
+  canvas{
+    width:100%;
+    height:auto;
+    display:block;
+  }
+  canvas.draggable{ touch-action:none; cursor:grab; }
+  canvas.dragging{ cursor:grabbing; }
+  canvas.tappable{ touch-action:manipulation; }
+  .hint{ margin:0; font-size:.78rem; color:var(--ink-soft); }
+
+  /* ---------- Mesures ---------- */
+  .readouts{
+    display:grid;
+    grid-template-columns:repeat(auto-fit,minmax(150px,1fr));
+    gap:10px 18px;
+    padding-block:10px;
+    border-top:1px solid var(--line);
+    margin-top:6px;
+  }
+  .readout{ display:flex; flex-direction:column; gap:2px; }
+  .readout .label{
+    font-size:.78rem;
+    color:var(--ink-soft);
+  }
+  .readout .value{
+    font-family:var(--mono);
+    font-variant-numeric:tabular-nums;
+    font-size:1.05rem;
+    font-weight:500;
+  }
+  .readout .value em{ color:var(--blue); font-style:normal; font-size:.9rem; }
+
+  /* ---------- Contrôles ---------- */
+  .panel{
+    background:var(--paper);
+    border:1px solid var(--line);
+    border-radius:14px;
+    padding:18px clamp(14px,3vw,26px);
+    display:flex;
+    flex-direction:column;
+    gap:18px;
+  }
+  .controls{
+    display:grid;
+    grid-template-columns:repeat(auto-fit,minmax(240px,1fr));
+    gap:18px 32px;
+  }
+  .control{ display:flex; flex-direction:column; gap:6px; }
+  .control .row{
+    display:flex;
+    justify-content:space-between;
+    align-items:baseline;
+    gap:10px;
+  }
+  .control label{ font-size:.86rem; font-weight:500; }
+  .control .num{
+    font-family:var(--mono);
+    font-variant-numeric:tabular-nums;
+    color:var(--wave);
+    font-size:.92rem;
+  }
+  input[type=range]{
+    -webkit-appearance:none;
+    appearance:none;
+    width:100%;
+    height:4px;
+    margin:8px 0;
+    border-radius:999px;
+    background:var(--line);
+    outline:none;
+  }
+  input[type=range]::-webkit-slider-thumb{
+    -webkit-appearance:none;
+    width:20px; height:20px;
+    border-radius:50%;
+    background:var(--wave);
+    border:2px solid var(--paper);
+    box-shadow:0 0 0 1px var(--line);
+    cursor:pointer;
+  }
+  input[type=range]::-moz-range-thumb{
+    width:18px; height:18px;
+    border-radius:50%;
+    background:var(--wave);
+    border:2px solid var(--paper);
+    box-shadow:0 0 0 1px var(--line);
+    cursor:pointer;
+  }
+  select{
+    font-family:var(--sans);
+    font-size:.86rem;
+    padding:7px 10px;
+    border-radius:8px;
+    border:1px solid var(--line);
+    background:var(--paper);
+    color:var(--ink);
+    width:100%;
+  }
+  .check{
+    display:flex;
+    align-items:center;
+    gap:8px;
+    font-size:.86rem;
+    font-weight:500;
+    cursor:pointer;
+  }
+  .check input{ width:18px; height:18px; accent-color:var(--accent); margin:0; }
+  .buttons{ display:flex; gap:10px; flex-wrap:wrap; }
+  button{
+    font-family:var(--sans);
+    font-size:.86rem;
+    font-weight:500;
+    padding:9px 16px;
+    border-radius:8px;
+    border:1px solid var(--line);
+    background:transparent;
+    color:var(--ink);
+    cursor:pointer;
+  }
+  button.primary{
+    background:var(--accent);
+    border-color:var(--accent);
+    color:var(--paper);
+  }
+  button:focus-visible, input:focus-visible, select:focus-visible{
+    outline:2px solid var(--accent);
+    outline-offset:2px;
+  }
+
+  /* ---------- Formules ---------- */
+  .formula{
+    font-family:var(--mono);
+    font-size:.86rem;
+    color:var(--ink-soft);
+    border-top:1px solid var(--line);
+    padding-top:14px;
+    display:flex;
+    flex-wrap:wrap;
+    gap:6px 22px;
+  }
+  .formula b{ color:var(--ink); font-weight:600; }
+  footer{
+    font-size:.78rem;
+    color:var(--ink-soft);
+    text-align:center;
+    text-wrap:balance;
+  }
+
+  /* ---------- Éléments communs aux ressources d'informatique ---------- */
+  [hidden]{ display:none !important; }
+  .tabs{ display:flex; gap:6px; flex-wrap:wrap; }
+  .tabs button{ padding:7px 14px; }
+  .tabs button[aria-selected=true]{ background:var(--accent); border-color:var(--accent); color:var(--paper); }
+  input[type=text], input[type=number], textarea.field{
+    font-family:var(--mono);
+    font-size:.88rem;
+    padding:7px 10px;
+    border-radius:8px;
+    border:1px solid var(--line);
+    background:var(--paper);
+    color:var(--ink);
+    width:100%;
+  }
+  textarea.field{ resize:vertical; min-height:90px; line-height:1.45; }
+  .table-wrap{ overflow-x:auto; }
+  table.data{ border-collapse:collapse; width:100%; font-family:var(--mono); font-size:.82rem; }
+  table.data th, table.data td{ border:1px solid var(--line); padding:5px 9px; text-align:left; white-space:nowrap; }
+  table.data th{ font-family:var(--sans); font-weight:600; color:var(--ink-soft); }
+  table.data tr.hit td{ background:var(--wave-glow); }
+  pre.code{
+    font-family:var(--mono);
+    font-size:.84rem;
+    line-height:1.5;
+    background:var(--bg);
+    border:1px solid var(--line);
+    border-radius:8px;
+    padding:10px 12px;
+    overflow-x:auto;
+    margin:0;
+    white-space:pre;
+  }
+  pre.code .hl{ background:var(--wave-glow); display:inline-block; min-width:100%; }
+  .err{ color:var(--warn); }
+  .good{ color:var(--ok); }
+  .chips{ display:flex; flex-wrap:wrap; gap:6px; }
+  .chip{ font-family:var(--mono); font-size:.8rem; padding:3px 9px; border-radius:999px; border:1px solid var(--line); }
+  .row2{ display:grid; grid-template-columns:repeat(auto-fit,minmax(280px,1fr)); gap:16px; }
+  .stack{ display:flex; flex-direction:column; gap:10px; min-width:0; }
+  .inline{ display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
+  .inline input[type=text], .inline input[type=number]{ width:auto; flex:1 1 120px; }
+  h3{ font-family:var(--serif); font-weight:600; font-size:1.02rem; margin:0; }
+  .muted{ color:var(--ink-soft); font-size:.84rem; margin:0; }
+  .play{ display:flex; flex-wrap:wrap; gap:14px; align-items:center; padding:16px; border:1px dashed var(--line); border-radius:10px; }
+  .zone{ width:180px; height:80px; border-radius:10px; background:var(--blue); color:var(--paper); display:flex; align-items:center; justify-content:center; font-weight:600; user-select:none; transition:background .2s; }
+  .zone.on{ background:var(--wave); }
+  .checks{ display:flex; gap:10px 16px; flex-wrap:wrap; }
+  .log{ height:220px; overflow:auto; }
+  form.demo{ display:grid; gap:10px; max-width:420px; }
+  form.demo label{ display:flex; flex-direction:column; gap:4px; font-size:.86rem; font-weight:500; }
+  form.demo input[type=password]{ font-family:var(--mono); padding:7px 10px; border-radius:8px; border:1px solid var(--line); background:var(--paper); color:var(--ink); }
+  .server{ border:1px solid var(--line); border-radius:10px; padding:12px 14px; background:#fff; color:#222; font-family:Georgia, serif; min-height:60px; }
+  .warn{ border-left:3px solid var(--warn); padding:4px 12px; margin:0; font-size:.88rem; }
+  .spy{ word-break:break-all; white-space:pre-wrap; }
+</style>
+</head>
+<body>
+
+<main>
+  <header>
+    <span class="kicker">Informatique · NSI Première · Interactions sur le Web</span>
+    <h1>Interactions sur le Web : événements et formulaires</h1>
+    <p>Dans le navigateur, chaque action de l'utilisateur déclenche un événement auquel un programme JavaScript peut réagir. Quand on valide un formulaire, ses données partent vers le serveur dans une requête HTTP, avec la méthode GET (dans l'adresse) ou POST (dans le corps de la requête).</p>
+  </header>
+
+  <section class="scene">
+    <div class="scene-top">
+      <div class="tabs" id="part">
+        <button data-tab="events">Événements</button>
+        <button data-tab="forms">Formulaire : GET ou POST</button>
+      </div>
+      <span id="status" class="status">—</span>
+    </div>
+
+    <div class="stack" data-panel="events">
+      <div class="checks" id="types"></div>
+      <div class="play">
+        <button id="target" class="primary">Clique-moi</button>
+        <input type="text" id="field" placeholder="Écris ici…" style="width:200px">
+        <div class="zone" id="zone">Survole-moi</div>
+        <select id="choice" aria-label="Liste de choix"><option>pomme</option><option>poire</option><option>kiwi</option></select>
+      </div>
+      <div class="row2">
+        <div class="stack"><div class="inline"><span class="muted">Événements reçus</span><button id="clearLog">Effacer</button></div><pre class="code log" id="log"></pre></div>
+        <div class="stack"><span class="muted">Code JavaScript qui écoute ces événements</span><pre class="code" id="evCode"></pre></div>
+      </div>
+    </div>
+
+    <div class="stack" data-panel="forms">
+      <div class="row2">
+        <form class="demo" id="form" novalidate>
+          <label>Prénom (obligatoire)<input type="text" name="prenom" id="fPrenom" required value="Léa"></label>
+          <label>Classe<select name="classe"><option>1G1</option><option>1G2</option><option>TG1</option></select></label>
+          <label>Mot de passe<input type="password" name="mdp" value="secret123"></label>
+          <label class="check"><input type="checkbox" name="infos" value="oui" checked> Recevoir les informations du club</label>
+          <div class="inline">
+            <label for="method" style="flex-direction:row; align-items:center">Méthode</label>
+            <select id="method"><option value="GET" selected>GET</option><option value="POST">POST</option></select>
+            <label class="check"><input type="checkbox" id="https" checked> Connexion chiffrée (HTTPS)</label>
+          </div>
+          <div class="buttons"><button class="primary" type="submit">Envoyer le formulaire</button></div>
+        </form>
+        <div class="stack">
+          <span class="muted">Requête envoyée par le navigateur</span>
+          <pre class="code" id="request">Remplis le formulaire puis envoie-le.</pre>
+          <span class="muted">Réponse du serveur, affichée par le navigateur</span>
+          <div class="server" id="response"></div>
+        </div>
+      </div>
+      <p class="warn" id="warning" hidden></p>
+      <div class="stack"><span class="muted">Ce que voit quelqu'un qui espionne le réseau</span><pre class="code spy" id="spy"></pre></div>
+    </div>
+  </section>
+
+  <section class="panel">
+    <div class="formula">
+      <span>événement&nbsp;:&nbsp;<b>element.addEventListener('click', fonction)</b></span>
+      <span>GET&nbsp;:&nbsp;<b>données dans l'URL</b>, après le « ? »</span>
+      <span>POST&nbsp;:&nbsp;<b>données dans le corps</b> de la requête</span>
+      <span>HTTPS&nbsp;:&nbsp;<b>requête chiffrée</b> entre le navigateur et le serveur</span>
+    </div>
+  </section>
+
+  <footer>Le serveur est simulé dans la page : rien n'est réellement envoyé. Avec GET, l'adresse complète reste dans l'historique du navigateur et dans les journaux du serveur : on ne l'utilise jamais pour un mot de passe.</footer>
+</main>
+
+<script>
+(function(){
+  // ---------- Utilitaires ----------
+  const $ = id => document.getElementById(id);
+  const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
+  const fmt = (v, d) => Number.isFinite(v)
+    ? v.toLocaleString('fr-FR', {minimumFractionDigits:d, maximumFractionDigits:d})
+    : '—';
+  const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const MONO = 'ui-monospace, "Cascadia Mono", "SF Mono", Consolas, Menlo, monospace';
+  const SANS = 'system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif';
+
+  // Couleurs du thème, relues si le système bascule clair/sombre
+  const C = {};
+  function readColors(){
+    const s = getComputedStyle(document.documentElement);
+    for (const n of ['bg','paper','ink','ink-soft','line','wave','wave-glow','accent','blue','brass','violet','pink']){
+      C[n.replace(/-(.)/g, (_, c) => c.toUpperCase())] = s.getPropertyValue('--' + n).trim();
+    }
+  }
+  readColors();
+  window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', readColors);
+
+  // Canvas net sur tout écran : on dessine toujours dans un repère logique W × H
+  function setupCanvas(canvas, W, H){
+    const ctx = canvas.getContext('2d');
+    function fit(){
+      const dpr = Math.min(window.devicePixelRatio || 1, 3);
+      const cw = canvas.clientWidth || W;
+      canvas.width = Math.max(1, Math.round(cw * dpr));
+      canvas.height = Math.max(1, Math.round(cw * H / W * dpr));
+      ctx.setTransform(canvas.width / W, 0, 0, canvas.height / H, 0, 0);
+    }
+    window.addEventListener('resize', fit);
+    fit();
+    return ctx;
+  }
+  // Position du pointeur (souris ou doigt) dans le repère logique
+  function pointerPos(canvas, evt, W, H){
+    const r = canvas.getBoundingClientRect();
+    return { x: (evt.clientX - r.left) * W / r.width, y: (evt.clientY - r.top) * H / r.height };
+  }
+  function arrow(ctx, x1, y1, x2, y2, color, width){
+    const len = Math.hypot(x2 - x1, y2 - y1);
+    if (len < 3) return;
+    const a = Math.atan2(y2 - y1, x2 - x1), h = Math.min(10, len * 0.5);
+    ctx.strokeStyle = color; ctx.fillStyle = color; ctx.lineWidth = width || 2.5;
+    ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2 - Math.cos(a) * h * 0.8, y2 - Math.sin(a) * h * 0.8); ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(x2, y2);
+    ctx.lineTo(x2 - h * Math.cos(a - 0.42), y2 - h * Math.sin(a - 0.42));
+    ctx.lineTo(x2 - h * Math.cos(a + 0.42), y2 - h * Math.sin(a + 0.42));
+    ctx.closePath(); ctx.fill();
+  }
+  // Pas "rond" (1, 2, 5 × 10^n) pour graduer un axe
+  function niceStep(x){
+    if (!(x > 0)) return 1;
+    const p = Math.pow(10, Math.floor(Math.log10(x))), m = x / p;
+    return (m < 1.5 ? 1 : m < 3.5 ? 2 : m < 7.5 ? 5 : 10) * p;
+  }
+
+  // Relie un curseur, une liste ou une case à cocher à un paramètre (et affiche sa valeur)
+  function bind(id, onChange, format){
+    const el = $(id), label = $(id + 'Val');
+    const val = () => el.type === 'checkbox' ? el.checked : parseFloat(el.value);
+    const show = () => { if (label && format) label.textContent = format(val()); };
+    el.addEventListener(el.type === 'range' ? 'input' : 'change', () => { onChange(val()); show(); });
+    show();
+  }
+  const out = (id, text) => { $(id).textContent = text; };
+  function setStatus(text, cls){
+    const s = $('status');
+    s.textContent = text; s.className = 'status' + (cls ? ' ' + cls : '');
+  }
+  // Repère gradué dans le rectangle g ; renvoie les conversions X(x) et Y(y)
+  function axes(ctx, g, o){
+    const xMin = o.xMin || 0, yMin = o.yMin || 0;
+    const X = x => g.x + g.w * (x - xMin) / (o.xMax - xMin);
+    const Y = y => g.y + g.h - g.h * (y - yMin) / (o.yMax - yMin);
+    const ink = o.ink || C.ink, soft = o.soft || C.inkSoft, line = o.line || C.line;
+    const sx = niceStep((o.xMax - xMin) / (o.xTicks || 6)), sy = niceStep((o.yMax - yMin) / (o.yTicks || 4));
+    const dec = s => s >= 1 ? 0 : Math.min(4, Math.ceil(-Math.log10(s) - 1e-9));
+    ctx.save();
+    ctx.font = '13px ' + MONO; ctx.lineWidth = 1; ctx.textAlign = 'center';
+    for (let k = Math.ceil(xMin / sx - 1e-9); k * sx <= o.xMax + sx * 1e-6; k++){
+      ctx.strokeStyle = line; ctx.globalAlpha = 0.55;
+      ctx.beginPath(); ctx.moveTo(X(k * sx), g.y); ctx.lineTo(X(k * sx), g.y + g.h); ctx.stroke();
+      ctx.globalAlpha = 1; ctx.fillStyle = soft;
+      ctx.fillText(fmt(k * sx + 0, dec(sx)), X(k * sx), g.y + g.h + 18);
+    }
+    ctx.textAlign = 'right';
+    for (let k = Math.ceil(yMin / sy - 1e-9); k * sy <= o.yMax + sy * 1e-6; k++){
+      ctx.strokeStyle = line; ctx.globalAlpha = 0.55;
+      ctx.beginPath(); ctx.moveTo(g.x, Y(k * sy)); ctx.lineTo(g.x + g.w, Y(k * sy)); ctx.stroke();
+      ctx.globalAlpha = 1; ctx.fillStyle = soft;
+      ctx.fillText(fmt(k * sy + 0, dec(sy)), g.x - 8, Y(k * sy) + 4);
+    }
+    const y0 = yMin < 0 ? Y(0) : g.y + g.h;
+    ctx.strokeStyle = soft; ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.moveTo(g.x, g.y); ctx.lineTo(g.x, g.y + g.h); ctx.moveTo(g.x, y0); ctx.lineTo(g.x + g.w, y0); ctx.stroke();
+    ctx.fillStyle = ink; ctx.textAlign = 'left'; ctx.font = '14px ' + SANS;
+    if (o.title) ctx.fillText(o.title, g.x + 8, g.y - 10);
+    ctx.fillStyle = soft; ctx.textAlign = 'right'; ctx.font = '13px ' + MONO;
+    if (o.xLabel) ctx.fillText(o.xLabel, g.x + g.w, g.y + g.h + 36);
+    ctx.restore();
+    return { X, Y };
+  }
+  // Onglets : boutons [data-tab] dans #id, panneaux [data-panel] de même nom
+  function tabs(id, onChange){
+    const btns = [...document.querySelectorAll('#' + id + ' button')];
+    const names = btns.map(b => b.dataset.tab);
+    const show = name => {
+      for (const b of btns) b.setAttribute('aria-selected', String(b.dataset.tab === name));
+      for (const p of document.querySelectorAll('[data-panel]')) if (names.includes(p.dataset.panel)) p.hidden = p.dataset.panel !== name;
+      if (onChange) onChange(name);
+    };
+    for (const b of btns) b.addEventListener('click', () => show(b.dataset.tab));
+    show(btns[0].dataset.tab);
+    return show;
+  }
+  const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
+  const sleep = ms => new Promise(r => setTimeout(r, ms));
+
+  // ---------- Événements ----------
+  const TYPES = [
+    ['click', 'target', 'bouton'], ['dblclick', 'target', 'bouton'], ['mouseover', 'zone', 'zone'], ['mouseout', 'zone', 'zone'],
+    ['input', 'field', 'champ'], ['change', 'choice', 'liste'], ['focus', 'field', 'champ'], ['blur', 'field', 'champ'], ['keydown', 'field', 'champ']
+  ];
+  const ON = new Set(['click', 'mouseover', 'mouseout', 'input', 'change']);
+  $('types').innerHTML = TYPES.map(([t]) => '<label class="check"><input type="checkbox" value="' + t + '"' + (ON.has(t) ? ' checked' : '') + '> ' + t + '</label>').join('');
+  let clicks = 0;
+  const lines = [];
+  function log(text){
+    const now = new Date();
+    lines.push(String(now.getMinutes()).padStart(2, '0') + ':' + String(now.getSeconds()).padStart(2, '0') + '  ' + text);
+    while (lines.length > 80) lines.shift();
+    $('log').textContent = lines.join('\n');
+    $('log').scrollTop = $('log').scrollHeight;
+  }
+  function showCode(){
+    const on = TYPES.filter(([t]) => ON.has(t));
+    const decl = [...new Set(on.map(x => x[2]))].map(v => 'const ' + v + " = document.getElementById('" + { bouton: 'target', zone: 'zone', champ: 'field', liste: 'choice' }[v] + "');");
+    const body = { click: "  compteur = compteur + 1;\n  bouton.textContent = 'Cliqué ' + compteur + ' fois';", mouseover: "  zone.classList.add('on');", mouseout: "  zone.classList.remove('on');",
+      input: "  console.log('Texte saisi :', champ.value);", change: "  console.log('Choix :', liste.value);" };
+    $('evCode').textContent = (on.length ? decl.join('\n') + '\n' + (ON.has('click') ? 'let compteur = 0;\n' : '') + '\n' : '// aucun événement écouté')
+      + on.map(([t, , v]) => v + ".addEventListener('" + t + "', function (evenement) {\n" + (body[t] || "  console.log('" + t + "');") + '\n});').join('\n\n');
+  }
+  for (const [t, id, v] of TYPES){
+    $(id).addEventListener(t, e => {
+      if (!ON.has(t)) return;
+      if (t === 'click'){ clicks++; $('target').textContent = 'Cliqué ' + clicks + ' fois'; }
+      if (t === 'mouseover') $('zone').classList.add('on');
+      if (t === 'mouseout') $('zone').classList.remove('on');
+      const detail = t === 'input' ? ' (valeur : « ' + $('field').value + ' »)' : t === 'change' ? ' (choix : ' + $('choice').value + ')' : t === 'keydown' ? ' (touche : ' + e.key + ')' : '';
+      log(t + ' sur ' + v + detail);
+    });
+  }
+  for (const c of $('types').querySelectorAll('input')) c.addEventListener('change', () => { if (c.checked) ON.add(c.value); else ON.delete(c.value); showCode(); });
+  $('clearLog').addEventListener('click', () => { lines.length = 0; $('log').textContent = ''; });
+  showCode();
+
+  // ---------- Formulaire ----------
+  const HOST = 'www.mon-lycee.fr';
+  // Ce que voit un espion d'une connexion HTTPS : seulement des octets chiffrés (simulés ici)
+  function noise(n){
+    let s = '';
+    for (let i = 0; i < n; i++) s += '0123456789abcdef'[Math.floor(Math.random() * 16)] + (i % 2 ? ' ' : '');
+    return s;
+  }
+  $('form').addEventListener('submit', e => {
+    e.preventDefault();
+    if (!$('fPrenom').value.trim()){
+      $('request').textContent = 'Aucune requête : le navigateur bloque l\'envoi car le champ obligatoire est vide.\nCette vérification a lieu côté client, avant tout échange avec le serveur.';
+      $('response').textContent = '';
+      setStatus('Formulaire incomplet', 'off');
+      $('fPrenom').focus();
+      return;
+    }
+    const data = new URLSearchParams(new FormData($('form')));
+    const body = data.toString(), method = $('method').value, https = $('https').checked;
+    const req = method === 'GET'
+      ? 'GET /inscription?' + body + ' HTTP/1.1\nHost: ' + HOST
+      : 'POST /inscription HTTP/1.1\nHost: ' + HOST + '\nContent-Type: application/x-www-form-urlencoded\nContent-Length: ' + new TextEncoder().encode(body).length + '\n\n' + body;
+    $('request').textContent = req;
+    $('response').innerHTML = '<strong>Inscription enregistrée</strong><br>Bonjour ' + esc(data.get('prenom')) + ', tu es inscrit·e en ' + esc(data.get('classe')) + '.'
+      + (data.get('infos') ? '<br>Tu recevras les informations du club.' : '');
+    $('spy').textContent = https
+      ? 'Connexion vers ' + HOST + ' (port 443)\n' + noise(Math.min(220, req.length))
+      : req;
+    const warn = [];
+    if (method === 'GET') warn.push('Avec GET, le mot de passe apparaît en clair dans l\'adresse : historique, favoris, journaux du serveur.');
+    if (!https) warn.push('Sans HTTPS, toute la requête, mot de passe compris, circule en clair sur le réseau.');
+    $('warning').hidden = !warn.length;
+    $('warning').textContent = warn.join(' ');
+    setStatus(method + (https ? ' en HTTPS' : ' en HTTP') + ' : réponse 200 OK', warn.length ? 'off' : 'ok');
+  });
+
+  tabs('part', p => { if (p === 'events') setStatus('Interagis avec les éléments ci-dessous'); else setStatus('Formulaire prêt'); });
+})();
+</script>
+<script>
+  // Compteur de visites GoatCounter (sans cookie), chargé uniquement sur le site en ligne
+  if (location.protocol === 'https:'){
+    const gc = document.createElement('script');
+    gc.async = true;
+    gc.src = 'https://gc.zgo.at/count.js';
+    gc.dataset.goatcounter = 'https://miyvi.goatcounter.com/count';
+    document.head.appendChild(gc);
+  }
+</script>
+</body>
+</html>

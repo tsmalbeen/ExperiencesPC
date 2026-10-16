@@ -1,0 +1,633 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Spécification et tests : trouve le bug</title>
+<style>
+  /* ---------- Thème (clair / sombre automatique) ---------- */
+  :root{
+    --bg:#f3ede1;
+    --paper:#fbf8f0;
+    --ink:#22242e;
+    --ink-soft:#5b5a52;
+    --line:#d9d0ba;
+    --wave:#b8362b;
+    --wave-glow:rgba(184,54,43,.14);
+    --accent:#2f6f4f;
+    --blue:#2c5f8a;
+    --brass:#a9793f;
+    --violet:#8a3fc0;
+    --pink:#cf5f8c;
+    --ok:#2f6f4f;
+    --warn:#b8362b;
+    --serif:"Iowan Old Style","Palatino Linotype",Palatino,Georgia,serif;
+    --sans:system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+    --mono:ui-monospace,"Cascadia Mono","SF Mono",Consolas,Menlo,monospace;
+    color-scheme: light dark;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{
+      --bg:#171a21;
+      --paper:#1e222b;
+      --ink:#eae6da;
+      --ink-soft:#9a9689;
+      --line:#33384a;
+      --wave:#ff8a72;
+      --wave-glow:rgba(255,138,114,.14);
+      --accent:#79d6a3;
+      --blue:#7fb4e0;
+      --brass:#c99a5b;
+      --violet:#c39af5;
+      --pink:#f29bbd;
+      --ok:#79d6a3;
+      --warn:#ff8a72;
+    }
+  }
+
+  /* ---------- Mise en page ---------- */
+  *{box-sizing:border-box;}
+  html, body{ margin:0; padding:0; }
+  body{
+    background:var(--bg);
+    color:var(--ink);
+    font-family:var(--sans);
+    padding:28px 16px;
+    display:flex;
+    justify-content:center;
+  }
+  main{
+    width:100%;
+    max-width:920px;
+    display:flex;
+    flex-direction:column;
+    gap:20px;
+  }
+  header{ display:flex; flex-direction:column; gap:4px; }
+  .kicker{
+    font-size:.72rem;
+    text-transform:uppercase;
+    letter-spacing:.08em;
+    color:var(--ink-soft);
+  }
+  h1{
+    font-family:var(--serif);
+    font-weight:600;
+    font-size:clamp(1.5rem, 1.1rem + 1.6vw, 2.2rem);
+    margin:0;
+    text-wrap:balance;
+  }
+  header p{
+    margin:0;
+    color:var(--ink-soft);
+    font-size:.92rem;
+    max-width:66ch;
+  }
+
+  /* ---------- Zone de simulation ---------- */
+  .scene{
+    background:var(--paper);
+    border:1px solid var(--line);
+    border-radius:14px;
+    padding:20px clamp(12px,3vw,28px) 8px;
+    display:flex;
+    flex-direction:column;
+    gap:6px;
+  }
+  .scene-top{
+    display:flex;
+    justify-content:space-between;
+    align-items:baseline;
+    gap:12px;
+    flex-wrap:wrap;
+  }
+  .scene-title{ font-family:var(--serif); font-weight:600; }
+  .status{
+    font-family:var(--mono);
+    font-size:.82rem;
+    padding:3px 10px;
+    border-radius:999px;
+    border:1px solid var(--line);
+    color:var(--ink-soft);
+  }
+  .status.ok{ color:var(--ok); border-color:var(--ok); }
+  .status.off{ color:var(--warn); border-color:var(--warn); }
+  canvas{
+    width:100%;
+    height:auto;
+    display:block;
+  }
+  canvas.draggable{ touch-action:none; cursor:grab; }
+  canvas.dragging{ cursor:grabbing; }
+  canvas.tappable{ touch-action:manipulation; }
+  .hint{ margin:0; font-size:.78rem; color:var(--ink-soft); }
+
+  /* ---------- Mesures ---------- */
+  .readouts{
+    display:grid;
+    grid-template-columns:repeat(auto-fit,minmax(150px,1fr));
+    gap:10px 18px;
+    padding-block:10px;
+    border-top:1px solid var(--line);
+    margin-top:6px;
+  }
+  .readout{ display:flex; flex-direction:column; gap:2px; }
+  .readout .label{
+    font-size:.78rem;
+    color:var(--ink-soft);
+  }
+  .readout .value{
+    font-family:var(--mono);
+    font-variant-numeric:tabular-nums;
+    font-size:1.05rem;
+    font-weight:500;
+  }
+  .readout .value em{ color:var(--blue); font-style:normal; font-size:.9rem; }
+
+  /* ---------- Contrôles ---------- */
+  .panel{
+    background:var(--paper);
+    border:1px solid var(--line);
+    border-radius:14px;
+    padding:18px clamp(14px,3vw,26px);
+    display:flex;
+    flex-direction:column;
+    gap:18px;
+  }
+  .controls{
+    display:grid;
+    grid-template-columns:repeat(auto-fit,minmax(240px,1fr));
+    gap:18px 32px;
+  }
+  .control{ display:flex; flex-direction:column; gap:6px; }
+  .control .row{
+    display:flex;
+    justify-content:space-between;
+    align-items:baseline;
+    gap:10px;
+  }
+  .control label{ font-size:.86rem; font-weight:500; }
+  .control .num{
+    font-family:var(--mono);
+    font-variant-numeric:tabular-nums;
+    color:var(--wave);
+    font-size:.92rem;
+  }
+  input[type=range]{
+    -webkit-appearance:none;
+    appearance:none;
+    width:100%;
+    height:4px;
+    margin:8px 0;
+    border-radius:999px;
+    background:var(--line);
+    outline:none;
+  }
+  input[type=range]::-webkit-slider-thumb{
+    -webkit-appearance:none;
+    width:20px; height:20px;
+    border-radius:50%;
+    background:var(--wave);
+    border:2px solid var(--paper);
+    box-shadow:0 0 0 1px var(--line);
+    cursor:pointer;
+  }
+  input[type=range]::-moz-range-thumb{
+    width:18px; height:18px;
+    border-radius:50%;
+    background:var(--wave);
+    border:2px solid var(--paper);
+    box-shadow:0 0 0 1px var(--line);
+    cursor:pointer;
+  }
+  select{
+    font-family:var(--sans);
+    font-size:.86rem;
+    padding:7px 10px;
+    border-radius:8px;
+    border:1px solid var(--line);
+    background:var(--paper);
+    color:var(--ink);
+    width:100%;
+  }
+  .check{
+    display:flex;
+    align-items:center;
+    gap:8px;
+    font-size:.86rem;
+    font-weight:500;
+    cursor:pointer;
+  }
+  .check input{ width:18px; height:18px; accent-color:var(--accent); margin:0; }
+  .buttons{ display:flex; gap:10px; flex-wrap:wrap; }
+  button{
+    font-family:var(--sans);
+    font-size:.86rem;
+    font-weight:500;
+    padding:9px 16px;
+    border-radius:8px;
+    border:1px solid var(--line);
+    background:transparent;
+    color:var(--ink);
+    cursor:pointer;
+  }
+  button.primary{
+    background:var(--accent);
+    border-color:var(--accent);
+    color:var(--paper);
+  }
+  button:focus-visible, input:focus-visible, select:focus-visible{
+    outline:2px solid var(--accent);
+    outline-offset:2px;
+  }
+
+  /* ---------- Formules ---------- */
+  .formula{
+    font-family:var(--mono);
+    font-size:.86rem;
+    color:var(--ink-soft);
+    border-top:1px solid var(--line);
+    padding-top:14px;
+    display:flex;
+    flex-wrap:wrap;
+    gap:6px 22px;
+  }
+  .formula b{ color:var(--ink); font-weight:600; }
+  footer{
+    font-size:.78rem;
+    color:var(--ink-soft);
+    text-align:center;
+    text-wrap:balance;
+  }
+
+  /* ---------- Éléments communs aux ressources d'informatique ---------- */
+  [hidden]{ display:none !important; }
+  .tabs{ display:flex; gap:6px; flex-wrap:wrap; }
+  .tabs button{ padding:7px 14px; }
+  .tabs button[aria-selected=true]{ background:var(--accent); border-color:var(--accent); color:var(--paper); }
+  input[type=text], input[type=number], textarea.field{
+    font-family:var(--mono);
+    font-size:.88rem;
+    padding:7px 10px;
+    border-radius:8px;
+    border:1px solid var(--line);
+    background:var(--paper);
+    color:var(--ink);
+    width:100%;
+  }
+  textarea.field{ resize:vertical; min-height:90px; line-height:1.45; }
+  .table-wrap{ overflow-x:auto; }
+  table.data{ border-collapse:collapse; width:100%; font-family:var(--mono); font-size:.82rem; }
+  table.data th, table.data td{ border:1px solid var(--line); padding:5px 9px; text-align:left; white-space:nowrap; }
+  table.data th{ font-family:var(--sans); font-weight:600; color:var(--ink-soft); }
+  table.data tr.hit td{ background:var(--wave-glow); }
+  pre.code{
+    font-family:var(--mono);
+    font-size:.84rem;
+    line-height:1.5;
+    background:var(--bg);
+    border:1px solid var(--line);
+    border-radius:8px;
+    padding:10px 12px;
+    overflow-x:auto;
+    margin:0;
+    white-space:pre;
+  }
+  pre.code .hl{ background:var(--wave-glow); display:inline-block; min-width:100%; }
+  .err{ color:var(--warn); }
+  .good{ color:var(--ok); }
+  .chips{ display:flex; flex-wrap:wrap; gap:6px; }
+  .chip{ font-family:var(--mono); font-size:.8rem; padding:3px 9px; border-radius:999px; border:1px solid var(--line); }
+  .row2{ display:grid; grid-template-columns:repeat(auto-fit,minmax(280px,1fr)); gap:16px; }
+  .stack{ display:flex; flex-direction:column; gap:10px; min-width:0; }
+  .inline{ display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
+  .inline input[type=text], .inline input[type=number]{ width:auto; flex:1 1 120px; }
+  h3{ font-family:var(--serif); font-weight:600; font-size:1.02rem; margin:0; }
+  .muted{ color:var(--ink-soft); font-size:.84rem; margin:0; }
+  .tests{ display:flex; flex-direction:column; gap:6px; font-family:var(--mono); font-size:.84rem; }
+  .tests div{ border:1px solid var(--line); border-radius:8px; padding:6px 10px; display:flex; justify-content:space-between; gap:10px; flex-wrap:wrap; }
+  .tests .pass{ border-color:var(--ok); }
+  .tests .fail{ border-color:var(--warn); }
+  .tests small{ font-family:var(--sans); color:var(--ink-soft); }
+  .verdict{ border-left:3px solid var(--accent); padding:6px 12px; margin:0; font-size:.9rem; }
+  .verdict.bad{ border-color:var(--warn); }
+</style>
+</head>
+<body>
+
+<main>
+  <header>
+    <span class="kicker">Informatique · NSI Première · Langages et programmation</span>
+    <h1>Spécification et tests : trouve le bug</h1>
+    <p>La spécification d'une fonction dit ce qu'elle doit faire ; un test vérifie qu'elle le fait sur un exemple. Chacune des fonctions ci-dessous contient une erreur cachée. Lis sa spécification, puis écris des tests jusqu'à en trouver un qui échoue : il révélera le bug.</p>
+  </header>
+
+  <section class="scene">
+    <div class="scene-top">
+      <div class="inline">
+        <label for="fn">Fonction</label>
+        <select id="fn">
+          <option value="maximum">maximum(t)</option>
+          <option value="bissextile">est_bissextile(annee)</option>
+          <option value="moyenne">moyenne(notes)</option>
+          <option value="position">position(t, x)</option>
+        </select>
+      </div>
+      <span id="status" class="status">—</span>
+    </div>
+    <div class="row2">
+      <div class="stack">
+        <span class="muted">Le code à tester</span>
+        <pre class="code" id="code"></pre>
+        <div class="stack" id="fixBox" hidden>
+          <span class="muted">Une version corrigée</span>
+          <pre class="code" id="fixed"></pre>
+        </div>
+      </div>
+      <div class="stack">
+        <span class="muted">Écrire un test</span>
+        <div class="inline" id="args"></div>
+        <div class="inline"><label for="expected">Résultat attendu</label><input type="text" id="expected"></div>
+        <div class="buttons"><button class="primary" id="run">Lancer le test</button><button id="clear">Effacer les tests</button></div>
+        <p class="verdict" id="verdict">Choisis des valeurs, indique le résultat que la spécification promet, puis lance le test.</p>
+        <span class="muted">Fichier de tests</span>
+        <div class="tests" id="tests"></div>
+      </div>
+    </div>
+    <div class="readouts">
+      <div class="readout"><span class="label">Tests écrits</span><span class="value" id="rN">0</span></div>
+      <div class="readout"><span class="label">Tests réussis</span><span class="value" id="rPass">0</span></div>
+      <div class="readout"><span class="label">Tests échoués</span><span class="value" id="rFail">0</span></div>
+      <div class="readout"><span class="label">Bug trouvé ?</span><span class="value" id="rBug">pas encore</span></div>
+    </div>
+  </section>
+
+  <section class="panel">
+    <div class="formula">
+      <span>spécification&nbsp;=&nbsp;<b>préconditions + ce que renvoie la fonction</b></span>
+      <span>test&nbsp;:&nbsp;<b>assert f(entrée) == résultat attendu</b></span>
+      <span>un test qui passe <b>ne prouve pas</b> que le code est juste&nbsp;; un test qui échoue <b>prouve</b> qu'il est faux</span>
+    </div>
+    <p class="muted">Bonne pratique : tester les cas limites (tableau d'un seul élément, valeurs négatives, égalités, valeur absente, années séculaires…).</p>
+  </section>
+
+  <footer>Les fonctions sont exécutées par la page en reproduisant exactement le code Python affiché, erreur comprise.</footer>
+</main>
+
+<script>
+(function(){
+  // ---------- Utilitaires ----------
+  const $ = id => document.getElementById(id);
+  const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
+  const fmt = (v, d) => Number.isFinite(v)
+    ? v.toLocaleString('fr-FR', {minimumFractionDigits:d, maximumFractionDigits:d})
+    : '—';
+  const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const MONO = 'ui-monospace, "Cascadia Mono", "SF Mono", Consolas, Menlo, monospace';
+  const SANS = 'system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif';
+
+  // Couleurs du thème, relues si le système bascule clair/sombre
+  const C = {};
+  function readColors(){
+    const s = getComputedStyle(document.documentElement);
+    for (const n of ['bg','paper','ink','ink-soft','line','wave','wave-glow','accent','blue','brass','violet','pink']){
+      C[n.replace(/-(.)/g, (_, c) => c.toUpperCase())] = s.getPropertyValue('--' + n).trim();
+    }
+  }
+  readColors();
+  window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', readColors);
+
+  // Canvas net sur tout écran : on dessine toujours dans un repère logique W × H
+  function setupCanvas(canvas, W, H){
+    const ctx = canvas.getContext('2d');
+    function fit(){
+      const dpr = Math.min(window.devicePixelRatio || 1, 3);
+      const cw = canvas.clientWidth || W;
+      canvas.width = Math.max(1, Math.round(cw * dpr));
+      canvas.height = Math.max(1, Math.round(cw * H / W * dpr));
+      ctx.setTransform(canvas.width / W, 0, 0, canvas.height / H, 0, 0);
+    }
+    window.addEventListener('resize', fit);
+    fit();
+    return ctx;
+  }
+  // Position du pointeur (souris ou doigt) dans le repère logique
+  function pointerPos(canvas, evt, W, H){
+    const r = canvas.getBoundingClientRect();
+    return { x: (evt.clientX - r.left) * W / r.width, y: (evt.clientY - r.top) * H / r.height };
+  }
+  function arrow(ctx, x1, y1, x2, y2, color, width){
+    const len = Math.hypot(x2 - x1, y2 - y1);
+    if (len < 3) return;
+    const a = Math.atan2(y2 - y1, x2 - x1), h = Math.min(10, len * 0.5);
+    ctx.strokeStyle = color; ctx.fillStyle = color; ctx.lineWidth = width || 2.5;
+    ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2 - Math.cos(a) * h * 0.8, y2 - Math.sin(a) * h * 0.8); ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(x2, y2);
+    ctx.lineTo(x2 - h * Math.cos(a - 0.42), y2 - h * Math.sin(a - 0.42));
+    ctx.lineTo(x2 - h * Math.cos(a + 0.42), y2 - h * Math.sin(a + 0.42));
+    ctx.closePath(); ctx.fill();
+  }
+  // Pas "rond" (1, 2, 5 × 10^n) pour graduer un axe
+  function niceStep(x){
+    if (!(x > 0)) return 1;
+    const p = Math.pow(10, Math.floor(Math.log10(x))), m = x / p;
+    return (m < 1.5 ? 1 : m < 3.5 ? 2 : m < 7.5 ? 5 : 10) * p;
+  }
+
+  // Relie un curseur, une liste ou une case à cocher à un paramètre (et affiche sa valeur)
+  function bind(id, onChange, format){
+    const el = $(id), label = $(id + 'Val');
+    const val = () => el.type === 'checkbox' ? el.checked : parseFloat(el.value);
+    const show = () => { if (label && format) label.textContent = format(val()); };
+    el.addEventListener(el.type === 'range' ? 'input' : 'change', () => { onChange(val()); show(); });
+    show();
+  }
+  const out = (id, text) => { $(id).textContent = text; };
+  function setStatus(text, cls){
+    const s = $('status');
+    s.textContent = text; s.className = 'status' + (cls ? ' ' + cls : '');
+  }
+  // Repère gradué dans le rectangle g ; renvoie les conversions X(x) et Y(y)
+  function axes(ctx, g, o){
+    const xMin = o.xMin || 0, yMin = o.yMin || 0;
+    const X = x => g.x + g.w * (x - xMin) / (o.xMax - xMin);
+    const Y = y => g.y + g.h - g.h * (y - yMin) / (o.yMax - yMin);
+    const ink = o.ink || C.ink, soft = o.soft || C.inkSoft, line = o.line || C.line;
+    const sx = niceStep((o.xMax - xMin) / (o.xTicks || 6)), sy = niceStep((o.yMax - yMin) / (o.yTicks || 4));
+    const dec = s => s >= 1 ? 0 : Math.min(4, Math.ceil(-Math.log10(s) - 1e-9));
+    ctx.save();
+    ctx.font = '13px ' + MONO; ctx.lineWidth = 1; ctx.textAlign = 'center';
+    for (let k = Math.ceil(xMin / sx - 1e-9); k * sx <= o.xMax + sx * 1e-6; k++){
+      ctx.strokeStyle = line; ctx.globalAlpha = 0.55;
+      ctx.beginPath(); ctx.moveTo(X(k * sx), g.y); ctx.lineTo(X(k * sx), g.y + g.h); ctx.stroke();
+      ctx.globalAlpha = 1; ctx.fillStyle = soft;
+      ctx.fillText(fmt(k * sx + 0, dec(sx)), X(k * sx), g.y + g.h + 18);
+    }
+    ctx.textAlign = 'right';
+    for (let k = Math.ceil(yMin / sy - 1e-9); k * sy <= o.yMax + sy * 1e-6; k++){
+      ctx.strokeStyle = line; ctx.globalAlpha = 0.55;
+      ctx.beginPath(); ctx.moveTo(g.x, Y(k * sy)); ctx.lineTo(g.x + g.w, Y(k * sy)); ctx.stroke();
+      ctx.globalAlpha = 1; ctx.fillStyle = soft;
+      ctx.fillText(fmt(k * sy + 0, dec(sy)), g.x - 8, Y(k * sy) + 4);
+    }
+    const y0 = yMin < 0 ? Y(0) : g.y + g.h;
+    ctx.strokeStyle = soft; ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.moveTo(g.x, g.y); ctx.lineTo(g.x, g.y + g.h); ctx.moveTo(g.x, y0); ctx.lineTo(g.x + g.w, y0); ctx.stroke();
+    ctx.fillStyle = ink; ctx.textAlign = 'left'; ctx.font = '14px ' + SANS;
+    if (o.title) ctx.fillText(o.title, g.x + 8, g.y - 10);
+    ctx.fillStyle = soft; ctx.textAlign = 'right'; ctx.font = '13px ' + MONO;
+    if (o.xLabel) ctx.fillText(o.xLabel, g.x + g.w, g.y + g.h + 36);
+    ctx.restore();
+    return { X, Y };
+  }
+  // Onglets : boutons [data-tab] dans #id, panneaux [data-panel] de même nom
+  function tabs(id, onChange){
+    const btns = [...document.querySelectorAll('#' + id + ' button')];
+    const names = btns.map(b => b.dataset.tab);
+    const show = name => {
+      for (const b of btns) b.setAttribute('aria-selected', String(b.dataset.tab === name));
+      for (const p of document.querySelectorAll('[data-panel]')) if (names.includes(p.dataset.panel)) p.hidden = p.dataset.panel !== name;
+      if (onChange) onChange(name);
+    };
+    for (const b of btns) b.addEventListener('click', () => show(b.dataset.tab));
+    show(btns[0].dataset.tab);
+    return show;
+  }
+  const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
+  const sleep = ms => new Promise(r => setTimeout(r, ms));
+
+  // ---------- Les fonctions : code Python affiché, version fautive et version juste ----------
+  const FUNCS = {
+    maximum: {
+      args: [['t', '[3, 8, 1]']], expected: '8',
+      code: 'def maximum(t):\n    """Renvoie le plus grand élément du tableau t.\n    Précondition : t est un tableau de nombres, non vide.\n    """\n    m = 0\n    for x in t:\n        if x > m:\n            m = x\n    return m',
+      fixed: 'def maximum(t):\n    m = t[0]          # on part du premier élément, pas de 0\n    for x in t:\n        if x > m:\n            m = x\n    return m',
+      why: 'm commence à 0 : si tous les nombres sont négatifs, aucun n\'est plus grand que 0 et la fonction renvoie 0, qui n\'est même pas dans le tableau.',
+      pre: ([t]) => Array.isArray(t) && t.length > 0 && t.every(x => typeof x === 'number') || 'il faut un tableau de nombres non vide',
+      bug: ([t]) => { let m = 0; for (const x of t) if (x > m) m = x; return m; },
+      ok: ([t]) => Math.max(...t)
+    },
+    bissextile: {
+      args: [['annee', '2024']], expected: 'True',
+      code: 'def est_bissextile(annee):\n    """Renvoie True si annee est bissextile, False sinon.\n    Une année est bissextile si elle est divisible par 4\n    mais pas par 100, ou si elle est divisible par 400.\n    """\n    return annee % 4 == 0 and annee % 100 != 0',
+      fixed: 'def est_bissextile(annee):\n    return (annee % 4 == 0 and annee % 100 != 0) or annee % 400 == 0',
+      why: 'La règle des 400 ans est oubliée : 2000 ou 2400 sont bissextiles, mais la fonction renvoie False.',
+      pre: ([a]) => Number.isInteger(a) || 'il faut un nombre entier',
+      bug: ([a]) => a % 4 === 0 && a % 100 !== 0,
+      ok: ([a]) => (a % 4 === 0 && a % 100 !== 0) || a % 400 === 0
+    },
+    moyenne: {
+      args: [['notes', '[12, 12, 12]']], expected: '12.0',
+      code: 'def moyenne(notes):\n    """Renvoie la moyenne des nombres du tableau notes.\n    Précondition : notes est un tableau de nombres, non vide.\n    """\n    total = 0\n    for i in range(1, len(notes)):\n        total = total + notes[i]\n    return total / len(notes)',
+      fixed: 'def moyenne(notes):\n    total = 0\n    for i in range(len(notes)):     # les indices commencent à 0\n        total = total + notes[i]\n    return total / len(notes)',
+      why: 'range(1, len(notes)) commence à l\'indice 1 : la première note n\'est jamais ajoutée au total.',
+      pre: ([t]) => Array.isArray(t) && t.length > 0 && t.every(x => typeof x === 'number') || 'il faut un tableau de nombres non vide',
+      bug: ([t]) => { let s = 0; for (let i = 1; i < t.length; i++) s += t[i]; return s / t.length; },
+      ok: ([t]) => t.reduce((a, b) => a + b, 0) / t.length
+    },
+    position: {
+      args: [['t', '[4, 7, 2]'], ['x', '7']], expected: '1',
+      code: 'def position(t, x):\n    """Renvoie l\'indice de la première occurrence de x dans t,\n    ou -1 si x n\'est pas dans t.\n    """\n    p = -1\n    for i in range(len(t)):\n        if t[i] == x:\n            p = i\n    return p',
+      fixed: 'def position(t, x):\n    for i in range(len(t)):\n        if t[i] == x:\n            return i      # on s\'arrête à la première occurrence\n    return -1',
+      why: 'La boucle continue après avoir trouvé x : si x apparaît plusieurs fois, la fonction renvoie la dernière occurrence au lieu de la première.',
+      pre: ([t]) => Array.isArray(t) || 'le premier argument doit être un tableau',
+      bug: ([t, x]) => { let p = -1; t.forEach((v, i) => { if (eq(v, x)) p = i; }); return p; },
+      ok: ([t, x]) => t.findIndex(v => eq(v, x))
+    }
+  };
+
+  // ---------- Valeurs Python ----------
+  function parsePy(s){
+    s = String(s).trim();
+    if (!s) throw new Error('valeur vide');
+    const json = s.replace(/\bTrue\b/g, 'true').replace(/\bFalse\b/g, 'false').replace(/'/g, '"');
+    return JSON.parse(json);
+  }
+  function repr(v, float){
+    if (Array.isArray(v)) return '[' + v.map(x => repr(x)).join(', ') + ']';
+    if (typeof v === 'boolean') return v ? 'True' : 'False';
+    if (typeof v === 'number') return float && Number.isInteger(v) ? v + '.0' : String(v);
+    return "'" + v + "'";
+  }
+  function eq(a, b){
+    if (Array.isArray(a) && Array.isArray(b)) return a.length === b.length && a.every((x, i) => eq(x, b[i]));
+    if (typeof a === 'number' && typeof b === 'number') return Math.abs(a - b) < 1e-9;
+    return a === b;
+  }
+
+  // ---------- État ----------
+  let key = 'maximum', tests = [], found = false;
+  const name = () => key === 'bissextile' ? 'est_bissextile' : key;
+
+  function choose(){
+    key = $('fn').value; tests = []; found = false;
+    const F = FUNCS[key];
+    $('code').textContent = F.code;
+    $('fixed').textContent = F.fixed;
+    $('fixBox').hidden = true;
+    $('args').innerHTML = F.args.map(([n, v], i) => '<label for="a' + i + '">' + n + '</label><input type="text" id="a' + i + '" value="' + esc(v) + '">').join('');
+    $('expected').value = F.expected;
+    $('verdict').className = 'verdict';
+    $('verdict').textContent = 'Choisis des valeurs, indique le résultat que la spécification promet, puis lance le test.';
+    render();
+  }
+  function run(){
+    const F = FUNCS[key];
+    let args, exp;
+    try { args = F.args.map((a, i) => parsePy($('a' + i).value)); exp = parsePy($('expected').value); }
+    catch (e) { $('verdict').className = 'verdict bad'; $('verdict').textContent = 'Valeur illisible : écris-la comme en Python, par exemple [3, -1, 2], 2000 ou True.'; return; }
+    const pre = F.pre(args);
+    const call = name() + '(' + args.map(a => repr(a)).join(', ') + ')';
+    if (pre !== true){
+      $('verdict').className = 'verdict bad';
+      $('verdict').textContent = 'Précondition non respectée : ' + pre + '. La spécification ne promet rien dans ce cas, ce test ne dit rien sur le code.';
+      return;
+    }
+    const got = F.bug(args), right = F.ok(args), isFloat = key === 'moyenne';
+    const pass = eq(got, exp);
+    tests.push({ line: 'assert ' + call + ' == ' + repr(exp, isFloat && typeof exp === 'number'), pass, got: repr(got, isFloat) });
+    let msg, bad = false;
+    if (!eq(exp, right)){
+      msg = 'Attention : d\'après la spécification, ' + call + ' doit renvoyer ' + repr(right, isFloat) + ', pas ' + repr(exp, isFloat) + '. C\'est ton test qui est faux, pas forcément le code.';
+      bad = true;
+    } else if (pass){
+      msg = 'Le test passe : la fonction renvoie bien ' + repr(got, isFloat) + '. Cela ne prouve pas qu\'elle est juste : essaie d\'autres cas.';
+    } else {
+      found = true;
+      msg = 'Le test échoue : la fonction renvoie ' + repr(got, isFloat) + ' au lieu de ' + repr(right, isFloat) + '. Bug trouvé ! ' + F.why;
+      bad = true;
+    }
+    $('verdict').className = 'verdict' + (bad ? ' bad' : '');
+    $('verdict').textContent = msg;
+    render();
+  }
+  function render(){
+    const nPass = tests.filter(t => t.pass).length;
+    $('tests').innerHTML = tests.length ? tests.map(t => '<div class="' + (t.pass ? 'pass' : 'fail') + '"><span>' + esc(t.line) + '</span><small>' + (t.pass ? 'réussi' : 'échoué (obtenu : ' + esc(t.got) + ')') + '</small></div>').join('')
+      : '<p class="muted">Aucun test pour l\'instant.</p>';
+    out('rN', String(tests.length)); out('rPass', String(nPass)); out('rFail', String(tests.length - nPass));
+    out('rBug', found ? 'oui' : 'pas encore');
+    $('fixBox').hidden = !found;
+    setStatus(found ? 'Bug trouvé et corrigé' : tests.length ? 'Cherche encore : ' + nPass + ' test(s) réussi(s)' : 'Aucun test lancé', found ? 'ok' : '');
+  }
+
+  $('fn').addEventListener('change', choose);
+  $('run').addEventListener('click', run);
+  $('expected').addEventListener('keydown', e => { if (e.key === 'Enter') run(); });
+  $('clear').addEventListener('click', () => { tests = []; found = false; render(); });
+  choose();
+})();
+</script>
+<script>
+  // Compteur de visites GoatCounter (sans cookie), chargé uniquement sur le site en ligne
+  if (location.protocol === 'https:'){
+    const gc = document.createElement('script');
+    gc.async = true;
+    gc.src = 'https://gc.zgo.at/count.js';
+    gc.dataset.goatcounter = 'https://miyvi.goatcounter.com/count';
+    document.head.appendChild(gc);
+  }
+</script>
+</body>
+</html>

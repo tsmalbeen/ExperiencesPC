@@ -1,0 +1,969 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Bases de données : requêtes SQL</title>
+<style>
+  /* ---------- Thème (clair / sombre automatique) ---------- */
+  :root{
+    --bg:#f3ede1;
+    --paper:#fbf8f0;
+    --ink:#22242e;
+    --ink-soft:#5b5a52;
+    --line:#d9d0ba;
+    --wave:#b8362b;
+    --wave-glow:rgba(184,54,43,.14);
+    --accent:#2f6f4f;
+    --blue:#2c5f8a;
+    --brass:#a9793f;
+    --violet:#8a3fc0;
+    --pink:#cf5f8c;
+    --ok:#2f6f4f;
+    --warn:#b8362b;
+    --serif:"Iowan Old Style","Palatino Linotype",Palatino,Georgia,serif;
+    --sans:system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+    --mono:ui-monospace,"Cascadia Mono","SF Mono",Consolas,Menlo,monospace;
+    color-scheme: light dark;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{
+      --bg:#171a21;
+      --paper:#1e222b;
+      --ink:#eae6da;
+      --ink-soft:#9a9689;
+      --line:#33384a;
+      --wave:#ff8a72;
+      --wave-glow:rgba(255,138,114,.14);
+      --accent:#79d6a3;
+      --blue:#7fb4e0;
+      --brass:#c99a5b;
+      --violet:#c39af5;
+      --pink:#f29bbd;
+      --ok:#79d6a3;
+      --warn:#ff8a72;
+    }
+  }
+
+  /* ---------- Mise en page ---------- */
+  *{box-sizing:border-box;}
+  html, body{ margin:0; padding:0; }
+  body{
+    background:var(--bg);
+    color:var(--ink);
+    font-family:var(--sans);
+    padding:28px 16px;
+    display:flex;
+    justify-content:center;
+  }
+  main{
+    width:100%;
+    max-width:920px;
+    display:flex;
+    flex-direction:column;
+    gap:20px;
+  }
+  header{ display:flex; flex-direction:column; gap:4px; }
+  .kicker{
+    font-size:.72rem;
+    text-transform:uppercase;
+    letter-spacing:.08em;
+    color:var(--ink-soft);
+  }
+  h1{
+    font-family:var(--serif);
+    font-weight:600;
+    font-size:clamp(1.5rem, 1.1rem + 1.6vw, 2.2rem);
+    margin:0;
+    text-wrap:balance;
+  }
+  header p{
+    margin:0;
+    color:var(--ink-soft);
+    font-size:.92rem;
+    max-width:66ch;
+  }
+
+  /* ---------- Zone de simulation ---------- */
+  .scene{
+    background:var(--paper);
+    border:1px solid var(--line);
+    border-radius:14px;
+    padding:20px clamp(12px,3vw,28px) 8px;
+    display:flex;
+    flex-direction:column;
+    gap:6px;
+  }
+  .scene-top{
+    display:flex;
+    justify-content:space-between;
+    align-items:baseline;
+    gap:12px;
+    flex-wrap:wrap;
+  }
+  .scene-title{ font-family:var(--serif); font-weight:600; }
+  .status{
+    font-family:var(--mono);
+    font-size:.82rem;
+    padding:3px 10px;
+    border-radius:999px;
+    border:1px solid var(--line);
+    color:var(--ink-soft);
+  }
+  .status.ok{ color:var(--ok); border-color:var(--ok); }
+  .status.off{ color:var(--warn); border-color:var(--warn); }
+  canvas{
+    width:100%;
+    height:auto;
+    display:block;
+  }
+  canvas.draggable{ touch-action:none; cursor:grab; }
+  canvas.dragging{ cursor:grabbing; }
+  canvas.tappable{ touch-action:manipulation; }
+  .hint{ margin:0; font-size:.78rem; color:var(--ink-soft); }
+
+  /* ---------- Mesures ---------- */
+  .readouts{
+    display:grid;
+    grid-template-columns:repeat(auto-fit,minmax(150px,1fr));
+    gap:10px 18px;
+    padding-block:10px;
+    border-top:1px solid var(--line);
+    margin-top:6px;
+  }
+  .readout{ display:flex; flex-direction:column; gap:2px; }
+  .readout .label{
+    font-size:.78rem;
+    color:var(--ink-soft);
+  }
+  .readout .value{
+    font-family:var(--mono);
+    font-variant-numeric:tabular-nums;
+    font-size:1.05rem;
+    font-weight:500;
+  }
+  .readout .value em{ color:var(--blue); font-style:normal; font-size:.9rem; }
+
+  /* ---------- Contrôles ---------- */
+  .panel{
+    background:var(--paper);
+    border:1px solid var(--line);
+    border-radius:14px;
+    padding:18px clamp(14px,3vw,26px);
+    display:flex;
+    flex-direction:column;
+    gap:18px;
+  }
+  .controls{
+    display:grid;
+    grid-template-columns:repeat(auto-fit,minmax(240px,1fr));
+    gap:18px 32px;
+  }
+  .control{ display:flex; flex-direction:column; gap:6px; }
+  .control .row{
+    display:flex;
+    justify-content:space-between;
+    align-items:baseline;
+    gap:10px;
+  }
+  .control label{ font-size:.86rem; font-weight:500; }
+  .control .num{
+    font-family:var(--mono);
+    font-variant-numeric:tabular-nums;
+    color:var(--wave);
+    font-size:.92rem;
+  }
+  input[type=range]{
+    -webkit-appearance:none;
+    appearance:none;
+    width:100%;
+    height:4px;
+    margin:8px 0;
+    border-radius:999px;
+    background:var(--line);
+    outline:none;
+  }
+  input[type=range]::-webkit-slider-thumb{
+    -webkit-appearance:none;
+    width:20px; height:20px;
+    border-radius:50%;
+    background:var(--wave);
+    border:2px solid var(--paper);
+    box-shadow:0 0 0 1px var(--line);
+    cursor:pointer;
+  }
+  input[type=range]::-moz-range-thumb{
+    width:18px; height:18px;
+    border-radius:50%;
+    background:var(--wave);
+    border:2px solid var(--paper);
+    box-shadow:0 0 0 1px var(--line);
+    cursor:pointer;
+  }
+  select{
+    font-family:var(--sans);
+    font-size:.86rem;
+    padding:7px 10px;
+    border-radius:8px;
+    border:1px solid var(--line);
+    background:var(--paper);
+    color:var(--ink);
+    width:100%;
+  }
+  .check{
+    display:flex;
+    align-items:center;
+    gap:8px;
+    font-size:.86rem;
+    font-weight:500;
+    cursor:pointer;
+  }
+  .check input{ width:18px; height:18px; accent-color:var(--accent); margin:0; }
+  .buttons{ display:flex; gap:10px; flex-wrap:wrap; }
+  button{
+    font-family:var(--sans);
+    font-size:.86rem;
+    font-weight:500;
+    padding:9px 16px;
+    border-radius:8px;
+    border:1px solid var(--line);
+    background:transparent;
+    color:var(--ink);
+    cursor:pointer;
+  }
+  button.primary{
+    background:var(--accent);
+    border-color:var(--accent);
+    color:var(--paper);
+  }
+  button:focus-visible, input:focus-visible, select:focus-visible{
+    outline:2px solid var(--accent);
+    outline-offset:2px;
+  }
+
+  /* ---------- Formules ---------- */
+  .formula{
+    font-family:var(--mono);
+    font-size:.86rem;
+    color:var(--ink-soft);
+    border-top:1px solid var(--line);
+    padding-top:14px;
+    display:flex;
+    flex-wrap:wrap;
+    gap:6px 22px;
+  }
+  .formula b{ color:var(--ink); font-weight:600; }
+  footer{
+    font-size:.78rem;
+    color:var(--ink-soft);
+    text-align:center;
+    text-wrap:balance;
+  }
+
+  /* ---------- Éléments communs aux ressources d'informatique ---------- */
+  [hidden]{ display:none !important; }
+  .tabs{ display:flex; gap:6px; flex-wrap:wrap; }
+  .tabs button{ padding:7px 14px; }
+  .tabs button[aria-selected=true]{ background:var(--accent); border-color:var(--accent); color:var(--paper); }
+  input[type=text], input[type=number], textarea.field{
+    font-family:var(--mono);
+    font-size:.88rem;
+    padding:7px 10px;
+    border-radius:8px;
+    border:1px solid var(--line);
+    background:var(--paper);
+    color:var(--ink);
+    width:100%;
+  }
+  textarea.field{ resize:vertical; min-height:90px; line-height:1.45; }
+  .table-wrap{ overflow-x:auto; }
+  table.data{ border-collapse:collapse; width:100%; font-family:var(--mono); font-size:.82rem; }
+  table.data th, table.data td{ border:1px solid var(--line); padding:5px 9px; text-align:left; white-space:nowrap; }
+  table.data th{ font-family:var(--sans); font-weight:600; color:var(--ink-soft); }
+  table.data tr.hit td{ background:var(--wave-glow); }
+  pre.code{
+    font-family:var(--mono);
+    font-size:.84rem;
+    line-height:1.5;
+    background:var(--bg);
+    border:1px solid var(--line);
+    border-radius:8px;
+    padding:10px 12px;
+    overflow-x:auto;
+    margin:0;
+    white-space:pre;
+  }
+  pre.code .hl{ background:var(--wave-glow); display:inline-block; min-width:100%; }
+  .err{ color:var(--warn); }
+  .good{ color:var(--ok); }
+  .chips{ display:flex; flex-wrap:wrap; gap:6px; }
+  .chip{ font-family:var(--mono); font-size:.8rem; padding:3px 9px; border-radius:999px; border:1px solid var(--line); }
+  .row2{ display:grid; grid-template-columns:repeat(auto-fit,minmax(280px,1fr)); gap:16px; }
+  .stack{ display:flex; flex-direction:column; gap:10px; min-width:0; }
+  .inline{ display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
+  .inline input[type=text], .inline input[type=number]{ width:auto; flex:1 1 120px; }
+  h3{ font-family:var(--serif); font-weight:600; font-size:1.02rem; margin:0; }
+  .muted{ color:var(--ink-soft); font-size:.84rem; margin:0; }
+  textarea.sql{ min-height:120px; font-size:.92rem; }
+  .schema{ display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:12px; }
+  .rel{ border:1px solid var(--line); border-radius:10px; padding:10px 12px; display:flex; flex-direction:column; gap:4px; font-family:var(--mono); font-size:.82rem; }
+  .rel button{ align-self:flex-start; font-family:var(--mono); font-weight:600; padding:4px 10px; }
+  .rel .pk{ text-decoration:underline; font-weight:600; }
+  .rel .fk{ color:var(--blue); }
+  .examples{ display:flex; flex-direction:column; gap:6px; }
+  .examples button{ text-align:left; font-family:var(--mono); font-size:.78rem; white-space:normal; }
+  .null{ color:var(--ink-soft); font-style:italic; }
+  .message{ border-left:3px solid var(--accent); padding:6px 12px; margin:0; font-size:.9rem; white-space:pre-wrap; }
+  .message.bad{ border-color:var(--warn); color:var(--warn); }
+</style>
+</head>
+<body>
+
+<main>
+  <header>
+    <span class="kicker">Informatique · NSI Terminale · Bases de données</span>
+    <h1>Bases de données : requêtes SQL</h1>
+    <p>La base d'une bibliothèque, en trois relations reliées par des clés étrangères. Écris des requêtes SQL pour interroger les données, les joindre, les regrouper, ou les modifier : le système de gestion vérifie au passage les contraintes d'intégrité.</p>
+  </header>
+
+  <section class="panel">
+    <h3>Schéma relationnel</h3>
+    <div class="schema" id="schema"></div>
+    <p class="muted">Souligné : clé primaire. En bleu : clé étrangère, qui doit correspondre à une clé primaire existante. Touche le nom d'une relation pour afficher son contenu.</p>
+  </section>
+
+  <section class="scene">
+    <div class="scene-top">
+      <strong class="scene-title">Requête</strong>
+      <span id="status" class="status">—</span>
+    </div>
+    <div class="row2">
+      <div class="stack">
+        <textarea class="field sql" id="sql" spellcheck="false" aria-label="Requête SQL">SELECT titre, annee
+FROM livres
+WHERE annee &lt; 1900
+ORDER BY annee;</textarea>
+        <div class="buttons"><button class="primary" id="run">Exécuter (Ctrl + Entrée)</button><button id="reset">Réinitialiser la base</button></div>
+        <p class="message" id="msg">Écris une requête, ou choisis un exemple.</p>
+      </div>
+      <div class="stack">
+        <span class="muted">Exemples</span>
+        <div class="examples" id="examples"></div>
+      </div>
+    </div>
+    <div class="table-wrap"><table class="data" id="result"></table></div>
+  </section>
+
+  <section class="panel">
+    <div class="formula">
+      <span><b>SELECT</b> colonnes <b>FROM</b> relation <b>WHERE</b> condition</span>
+      <span><b>JOIN</b> autre_relation <b>ON</b> clé_étrangère = clé_primaire</span>
+      <span><b>ORDER BY</b>, <b>GROUP BY</b>, <b>COUNT</b>, <b>AVG</b>, <b>SUM</b>, <b>MIN</b>, <b>MAX</b></span>
+      <span><b>INSERT INTO</b>, <b>UPDATE</b> … <b>SET</b>, <b>DELETE FROM</b></span>
+    </div>
+  </section>
+
+  <footer>Moteur SQL simplifié, écrit dans la page et inspiré de SQLite : il couvre les requêtes du programme, mais pas tout le langage. Les livres et les auteurs sont réels ; les emprunts sont fictifs. Les modifications ne sont pas enregistrées : recharger la page rend la base d'origine.</footer>
+</main>
+
+<script>
+(function(){
+  // ---------- Utilitaires ----------
+  const $ = id => document.getElementById(id);
+  const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
+  const fmt = (v, d) => Number.isFinite(v)
+    ? v.toLocaleString('fr-FR', {minimumFractionDigits:d, maximumFractionDigits:d})
+    : '—';
+  const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const MONO = 'ui-monospace, "Cascadia Mono", "SF Mono", Consolas, Menlo, monospace';
+  const SANS = 'system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif';
+
+  // Couleurs du thème, relues si le système bascule clair/sombre
+  const C = {};
+  function readColors(){
+    const s = getComputedStyle(document.documentElement);
+    for (const n of ['bg','paper','ink','ink-soft','line','wave','wave-glow','accent','blue','brass','violet','pink']){
+      C[n.replace(/-(.)/g, (_, c) => c.toUpperCase())] = s.getPropertyValue('--' + n).trim();
+    }
+  }
+  readColors();
+  window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', readColors);
+
+  // Canvas net sur tout écran : on dessine toujours dans un repère logique W × H
+  function setupCanvas(canvas, W, H){
+    const ctx = canvas.getContext('2d');
+    function fit(){
+      const dpr = Math.min(window.devicePixelRatio || 1, 3);
+      const cw = canvas.clientWidth || W;
+      canvas.width = Math.max(1, Math.round(cw * dpr));
+      canvas.height = Math.max(1, Math.round(cw * H / W * dpr));
+      ctx.setTransform(canvas.width / W, 0, 0, canvas.height / H, 0, 0);
+    }
+    window.addEventListener('resize', fit);
+    fit();
+    return ctx;
+  }
+  // Position du pointeur (souris ou doigt) dans le repère logique
+  function pointerPos(canvas, evt, W, H){
+    const r = canvas.getBoundingClientRect();
+    return { x: (evt.clientX - r.left) * W / r.width, y: (evt.clientY - r.top) * H / r.height };
+  }
+  function arrow(ctx, x1, y1, x2, y2, color, width){
+    const len = Math.hypot(x2 - x1, y2 - y1);
+    if (len < 3) return;
+    const a = Math.atan2(y2 - y1, x2 - x1), h = Math.min(10, len * 0.5);
+    ctx.strokeStyle = color; ctx.fillStyle = color; ctx.lineWidth = width || 2.5;
+    ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2 - Math.cos(a) * h * 0.8, y2 - Math.sin(a) * h * 0.8); ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(x2, y2);
+    ctx.lineTo(x2 - h * Math.cos(a - 0.42), y2 - h * Math.sin(a - 0.42));
+    ctx.lineTo(x2 - h * Math.cos(a + 0.42), y2 - h * Math.sin(a + 0.42));
+    ctx.closePath(); ctx.fill();
+  }
+  // Pas "rond" (1, 2, 5 × 10^n) pour graduer un axe
+  function niceStep(x){
+    if (!(x > 0)) return 1;
+    const p = Math.pow(10, Math.floor(Math.log10(x))), m = x / p;
+    return (m < 1.5 ? 1 : m < 3.5 ? 2 : m < 7.5 ? 5 : 10) * p;
+  }
+
+  // Relie un curseur, une liste ou une case à cocher à un paramètre (et affiche sa valeur)
+  function bind(id, onChange, format){
+    const el = $(id), label = $(id + 'Val');
+    const val = () => el.type === 'checkbox' ? el.checked : parseFloat(el.value);
+    const show = () => { if (label && format) label.textContent = format(val()); };
+    el.addEventListener(el.type === 'range' ? 'input' : 'change', () => { onChange(val()); show(); });
+    show();
+  }
+  const out = (id, text) => { $(id).textContent = text; };
+  function setStatus(text, cls){
+    const s = $('status');
+    s.textContent = text; s.className = 'status' + (cls ? ' ' + cls : '');
+  }
+  // Repère gradué dans le rectangle g ; renvoie les conversions X(x) et Y(y)
+  function axes(ctx, g, o){
+    const xMin = o.xMin || 0, yMin = o.yMin || 0;
+    const X = x => g.x + g.w * (x - xMin) / (o.xMax - xMin);
+    const Y = y => g.y + g.h - g.h * (y - yMin) / (o.yMax - yMin);
+    const ink = o.ink || C.ink, soft = o.soft || C.inkSoft, line = o.line || C.line;
+    const sx = niceStep((o.xMax - xMin) / (o.xTicks || 6)), sy = niceStep((o.yMax - yMin) / (o.yTicks || 4));
+    const dec = s => s >= 1 ? 0 : Math.min(4, Math.ceil(-Math.log10(s) - 1e-9));
+    ctx.save();
+    ctx.font = '13px ' + MONO; ctx.lineWidth = 1; ctx.textAlign = 'center';
+    for (let k = Math.ceil(xMin / sx - 1e-9); k * sx <= o.xMax + sx * 1e-6; k++){
+      ctx.strokeStyle = line; ctx.globalAlpha = 0.55;
+      ctx.beginPath(); ctx.moveTo(X(k * sx), g.y); ctx.lineTo(X(k * sx), g.y + g.h); ctx.stroke();
+      ctx.globalAlpha = 1; ctx.fillStyle = soft;
+      ctx.fillText(fmt(k * sx + 0, dec(sx)), X(k * sx), g.y + g.h + 18);
+    }
+    ctx.textAlign = 'right';
+    for (let k = Math.ceil(yMin / sy - 1e-9); k * sy <= o.yMax + sy * 1e-6; k++){
+      ctx.strokeStyle = line; ctx.globalAlpha = 0.55;
+      ctx.beginPath(); ctx.moveTo(g.x, Y(k * sy)); ctx.lineTo(g.x + g.w, Y(k * sy)); ctx.stroke();
+      ctx.globalAlpha = 1; ctx.fillStyle = soft;
+      ctx.fillText(fmt(k * sy + 0, dec(sy)), g.x - 8, Y(k * sy) + 4);
+    }
+    const y0 = yMin < 0 ? Y(0) : g.y + g.h;
+    ctx.strokeStyle = soft; ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.moveTo(g.x, g.y); ctx.lineTo(g.x, g.y + g.h); ctx.moveTo(g.x, y0); ctx.lineTo(g.x + g.w, y0); ctx.stroke();
+    ctx.fillStyle = ink; ctx.textAlign = 'left'; ctx.font = '14px ' + SANS;
+    if (o.title) ctx.fillText(o.title, g.x + 8, g.y - 10);
+    ctx.fillStyle = soft; ctx.textAlign = 'right'; ctx.font = '13px ' + MONO;
+    if (o.xLabel) ctx.fillText(o.xLabel, g.x + g.w, g.y + g.h + 36);
+    ctx.restore();
+    return { X, Y };
+  }
+  // Onglets : boutons [data-tab] dans #id, panneaux [data-panel] de même nom
+  function tabs(id, onChange){
+    const btns = [...document.querySelectorAll('#' + id + ' button')];
+    const names = btns.map(b => b.dataset.tab);
+    const show = name => {
+      for (const b of btns) b.setAttribute('aria-selected', String(b.dataset.tab === name));
+      for (const p of document.querySelectorAll('[data-panel]')) if (names.includes(p.dataset.panel)) p.hidden = p.dataset.panel !== name;
+      if (onChange) onChange(name);
+    };
+    for (const b of btns) b.addEventListener('click', () => show(b.dataset.tab));
+    show(btns[0].dataset.tab);
+    return show;
+  }
+  const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
+  const sleep = ms => new Promise(r => setTimeout(r, ms));
+
+  // =========================================================
+  // La base de données
+  // =========================================================
+  const SCHEMA = {
+    auteurs: { cols: ['id', 'nom', 'prenom', 'naissance', 'pays'], types: ['INTEGER', 'TEXT', 'TEXT', 'INTEGER', 'TEXT'], fk: {} },
+    livres: { cols: ['id', 'titre', 'annee', 'auteur_id', 'genre'], types: ['INTEGER', 'TEXT', 'INTEGER', 'INTEGER', 'TEXT'], fk: { auteur_id: 'auteurs' } },
+    emprunts: { cols: ['id', 'livre_id', 'eleve', 'date_retour'], types: ['INTEGER', 'INTEGER', 'TEXT', 'TEXT'], fk: { livre_id: 'livres' } }
+  };
+  const DATA = {
+    auteurs: [[1, 'Hugo', 'Victor', 1802, 'France'], [2, 'Verne', 'Jules', 1828, 'France'], [3, 'Zola', 'Émile', 1840, 'France'],
+      [4, 'Sand', 'George', 1804, 'France'], [5, 'Camus', 'Albert', 1913, 'France'], [6, 'Shelley', 'Mary', 1797, 'Royaume-Uni'],
+      [7, 'Asimov', 'Isaac', 1920, 'États-Unis'], [8, 'Tolkien', 'J. R. R.', 1892, 'Royaume-Uni'], [9, 'Saint-Exupéry', 'Antoine de', 1900, 'France'],
+      [10, 'Duras', 'Marguerite', 1914, 'France']],
+    livres: [[1, 'Les Misérables', 1862, 1, 'roman'], [2, 'Notre-Dame de Paris', 1831, 1, 'roman'], [3, 'Vingt mille lieues sous les mers', 1870, 2, 'aventure'],
+      [4, 'Le Tour du monde en quatre-vingts jours', 1872, 2, 'aventure'], [5, 'Germinal', 1885, 3, 'roman'], [6, 'La Mare au diable', 1846, 4, 'roman'],
+      [7, 'L\'Étranger', 1942, 5, 'roman'], [8, 'La Peste', 1947, 5, 'roman'], [9, 'Frankenstein', 1818, 6, 'fantastique'],
+      [10, 'Fondation', 1951, 7, 'science-fiction'], [11, 'Le Hobbit', 1937, 8, 'fantasy'], [12, 'Le Petit Prince', 1943, 9, 'conte'], [13, 'L\'Amant', 1984, 10, 'roman']],
+    emprunts: [[1, 3, 'Léa', '2026-11-02'], [2, 10, 'Hugo', '2026-10-28'], [3, 1, 'Inès', '2026-11-10'], [4, 7, 'Léa', '2026-11-05'],
+      [5, 11, 'Nathan', '2026-10-30'], [6, 3, 'Chloé', '2026-11-12']]
+  };
+  let DB;
+  function resetDB(){
+    DB = {};
+    for (const t in SCHEMA) DB[t] = DATA[t].map(r => Object.fromEntries(SCHEMA[t].cols.map((c, i) => [c, r[i]])));
+  }
+  class SqlError extends Error {}
+  const fail = m => { throw new SqlError(m); };
+
+  // =========================================================
+  // Analyse lexicale
+  // =========================================================
+  const KW = new Set(['SELECT', 'DISTINCT', 'FROM', 'WHERE', 'JOIN', 'INNER', 'ON', 'AS', 'GROUP', 'BY', 'ORDER', 'ASC', 'DESC', 'LIMIT',
+    'INSERT', 'INTO', 'VALUES', 'UPDATE', 'SET', 'DELETE', 'AND', 'OR', 'NOT', 'LIKE', 'IN', 'IS', 'NULL']);
+  function tokenize(sql){
+    const toks = [];
+    let i = 0;
+    while (i < sql.length){
+      const c = sql[i], s = i;
+      if (/\s/.test(c)){ i++; continue; }
+      if (c === '-' && sql[i + 1] === '-'){ while (i < sql.length && sql[i] !== '\n') i++; continue; }
+      if (c === "'"){
+        let v = ''; i++;
+        for (;;){
+          if (i >= sql.length) fail('Chaîne de caractères non terminée : il manque une apostrophe fermante.');
+          if (sql[i] === "'"){ if (sql[i + 1] === "'"){ v += "'"; i += 2; continue; } i++; break; }
+          v += sql[i++];
+        }
+        toks.push({ t: 'str', v, s, e: i }); continue;
+      }
+      let m = /^\d+(\.\d+)?/.exec(sql.slice(i));
+      if (m){ i += m[0].length; toks.push({ t: 'num', v: Number(m[0]), s, e: i }); continue; }
+      m = /^[A-Za-z_\u00C0-\u017F][A-Za-z0-9_\u00C0-\u017F]*/.exec(sql.slice(i));
+      if (m){ i += m[0].length; const up = m[0].toUpperCase(); toks.push({ t: KW.has(up) ? 'kw' : 'id', v: KW.has(up) ? up : m[0], s, e: i }); continue; }
+      m = /^(<=|>=|<>|!=|[=<>(),*+\-/;.])/.exec(sql.slice(i));
+      if (m){ i += m[0].length; toks.push({ t: 'op', v: m[0], s, e: i }); continue; }
+      fail('Caractère inattendu : « ' + c + ' ».');
+    }
+    return toks;
+  }
+
+  // =========================================================
+  // Analyse syntaxique
+  // =========================================================
+  function parseAll(sql){
+    const toks = tokenize(sql);
+    let p = 0;
+    const peek = (k = 0) => toks[p + k];
+    const isKw = (k, o = 0) => peek(o) && peek(o).t === 'kw' && peek(o).v === k;
+    const isOp = (k, o = 0) => peek(o) && peek(o).t === 'op' && peek(o).v === k;
+    const near = () => peek() ? ' près de « ' + sql.slice(peek().s, peek().e) + ' »' : ' en fin de requête';
+    const kw = k => { if (!isKw(k)) fail('Mot-clé ' + k + ' attendu' + near() + '.'); p++; };
+    const op = k => { if (!isOp(k)) fail('« ' + k + ' » attendu' + near() + '.'); p++; };
+    const ident = what => { const t = peek(); if (!t || t.t !== 'id') fail((what || 'Nom') + ' attendu' + near() + '.'); p++; return t.v; };
+
+    function expr(){ return or(); }
+    function or(){ let l = and(); while (isKw('OR')){ p++; l = { k: 'bin', op: 'OR', l, r: and() }; } return l; }
+    function and(){ let l = not(); while (isKw('AND')){ p++; l = { k: 'bin', op: 'AND', l, r: not() }; } return l; }
+    function not(){ if (isKw('NOT')){ p++; return { k: 'not', e: not() }; } return cmp(); }
+    function cmp(){
+      const l = add();
+      const t = peek();
+      if (t && t.t === 'op' && ['=', '<>', '!=', '<', '<=', '>', '>='].includes(t.v)){ p++; return { k: 'bin', op: t.v, l, r: add() }; }
+      if (isKw('IS')){ p++; const neg = isKw('NOT'); if (neg) p++; kw('NULL'); return { k: 'isnull', e: l, neg }; }
+      const neg = isKw('NOT') && (isKw('LIKE', 1) || isKw('IN', 1));
+      if (neg) p++;
+      if (isKw('LIKE')){ p++; return { k: 'like', l, r: add(), neg }; }
+      if (isKw('IN')){ p++; op('('); const list = [expr()]; while (isOp(',')){ p++; list.push(expr()); } op(')'); return { k: 'in', l, list, neg }; }
+      return l;
+    }
+    function add(){ let l = mul(); while (isOp('+') || isOp('-')){ const o = toks[p++].v; l = { k: 'bin', op: o, l, r: mul() }; } return l; }
+    function mul(){ let l = unary(); while (isOp('*') || isOp('/')){ const o = toks[p++].v; l = { k: 'bin', op: o, l, r: unary() }; } return l; }
+    function unary(){ if (isOp('-')){ p++; return { k: 'neg', e: unary() }; } return primary(); }
+    function primary(){
+      const t = peek();
+      if (!t) fail('Expression attendue en fin de requête.');
+      if (t.t === 'num' || t.t === 'str'){ p++; return { k: 'lit', v: t.v }; }
+      if (isKw('NULL')){ p++; return { k: 'lit', v: null }; }
+      if (isOp('(')){ p++; const e = expr(); op(')'); return e; }
+      if (t.t === 'id'){
+        p++;
+        if (isOp('(')){
+          p++;
+          const name = t.v.toUpperCase();
+          if (isOp('*')){ p++; op(')'); return { k: 'fn', name, star: true, args: [] }; }
+          const args = isOp(')') ? [] : [expr()];
+          while (isOp(',')){ p++; args.push(expr()); }
+          op(')');
+          return { k: 'fn', name, args };
+        }
+        if (isOp('.')){ p++; return { k: 'col', t: t.v, c: ident('Nom de colonne') }; }
+        return { k: 'col', t: null, c: t.v };
+      }
+      fail('Expression attendue' + near() + '.');
+    }
+    function tableRef(){
+      const name = ident('Nom de relation');
+      let alias = name;
+      if (isKw('AS')){ p++; alias = ident('Alias'); } else if (peek() && peek().t === 'id') alias = ident();
+      return { table: name, alias };
+    }
+    function select(){
+      kw('SELECT');
+      const q = { k: 'select', distinct: false, items: [], joins: [] };
+      if (isKw('DISTINCT')){ p++; q.distinct = true; }
+      do {
+        if (q.items.length) p++;
+        if (isOp('*')){ p++; q.items.push({ star: true }); continue; }
+        if (peek() && peek().t === 'id' && isOp('.', 1) && isOp('*', 2)){ const t = peek().v; p += 3; q.items.push({ star: true, t }); continue; }
+        const s = peek() ? peek().s : sql.length;
+        const e = expr();
+        const end = toks[p - 1].e;
+        let as = null;
+        if (isKw('AS')){ p++; as = ident('Alias'); } else if (peek() && peek().t === 'id') as = ident();
+        q.items.push({ e, name: as || sql.slice(s, end).replace(/\s+/g, ' ') });
+      } while (isOp(','));
+      kw('FROM');
+      q.from = tableRef();
+      while (isKw('JOIN') || isKw('INNER')){
+        if (isKw('INNER')) p++;
+        kw('JOIN');
+        const j = tableRef();
+        kw('ON');
+        j.on = expr();
+        q.joins.push(j);
+      }
+      if (isKw('WHERE')){ p++; q.where = expr(); }
+      if (isKw('GROUP')){ p++; kw('BY'); q.group = [expr()]; while (isOp(',')){ p++; q.group.push(expr()); } }
+      if (isKw('ORDER')){
+        p++; kw('BY'); q.order = [];
+        do { if (q.order.length) p++; const e = expr(); let desc = false; if (isKw('ASC')) p++; else if (isKw('DESC')){ p++; desc = true; } q.order.push({ e, desc }); } while (isOp(','));
+      }
+      if (isKw('LIMIT')){ p++; const t = peek(); if (!t || t.t !== 'num') fail('Nombre attendu après LIMIT.'); p++; q.limit = t.v; }
+      return q;
+    }
+    function insert(){
+      kw('INSERT'); kw('INTO');
+      const q = { k: 'insert', table: ident('Nom de relation'), rows: [] };
+      if (isOp('(')){ p++; q.cols = [ident('Nom de colonne')]; while (isOp(',')){ p++; q.cols.push(ident('Nom de colonne')); } op(')'); }
+      kw('VALUES');
+      do { if (q.rows.length) p++; op('('); const r = [expr()]; while (isOp(',')){ p++; r.push(expr()); } op(')'); q.rows.push(r); } while (isOp(','));
+      return q;
+    }
+    function update(){
+      kw('UPDATE');
+      const q = { k: 'update', table: ident('Nom de relation'), sets: [] };
+      kw('SET');
+      do { if (q.sets.length) p++; const c = ident('Nom de colonne'); op('='); q.sets.push([c, expr()]); } while (isOp(','));
+      if (isKw('WHERE')){ p++; q.where = expr(); }
+      return q;
+    }
+    function del(){
+      kw('DELETE'); kw('FROM');
+      const q = { k: 'delete', table: ident('Nom de relation') };
+      if (isKw('WHERE')){ p++; q.where = expr(); }
+      return q;
+    }
+    const out = [];
+    while (p < toks.length){
+      if (isOp(';')){ p++; continue; }
+      const st = isKw('SELECT') ? select() : isKw('INSERT') ? insert() : isKw('UPDATE') ? update() : isKw('DELETE') ? del()
+        : fail('Une requête commence par SELECT, INSERT, UPDATE ou DELETE' + near() + '.');
+      if (p < toks.length && !isOp(';')) fail('Fin de requête attendue' + near() + ' (il manque peut-être une virgule ou un mot-clé).');
+      out.push(st);
+    }
+    if (!out.length) fail('Aucune requête à exécuter.');
+    return out;
+  }
+
+  // =========================================================
+  // Évaluation
+  // =========================================================
+  const AGG = new Set(['COUNT', 'SUM', 'AVG', 'MIN', 'MAX']);
+  const hasAgg = n => !!n && typeof n === 'object' && ((n.k === 'fn' && AGG.has(n.name)) || ['l', 'r', 'e'].some(k => hasAgg(n[k])) || (n.list || []).some(hasAgg) || (n.args || []).some(hasAgg));
+  function table(name){
+    const key = Object.keys(SCHEMA).find(t => t.toLowerCase() === name.toLowerCase());
+    if (!key) fail('Relation inconnue : « ' + name + ' ». Relations disponibles : ' + Object.keys(SCHEMA).join(', ') + '.');
+    return key;
+  }
+  // Recherche d'une colonne dans les relations de la requête (scope = [{ alias, table }])
+  function resolve(n, scope){
+    if (n.t){
+      const s = scope.find(x => x.alias.toLowerCase() === n.t.toLowerCase());
+      if (!s) fail('Relation ou alias inconnu : « ' + n.t + ' ».');
+      const c = SCHEMA[s.table].cols.find(c => c.toLowerCase() === n.c.toLowerCase());
+      if (!c) fail('La relation ' + s.table + ' n\'a pas de colonne « ' + n.c + ' ».');
+      return s.alias + '.' + c;
+    }
+    const hits = scope.filter(s => SCHEMA[s.table].cols.some(c => c.toLowerCase() === n.c.toLowerCase()));
+    if (!hits.length) fail('Colonne inconnue : « ' + n.c + ' ».');
+    if (hits.length > 1) fail('Nom de colonne ambigu : « ' + n.c + ' » existe dans ' + hits.map(h => h.alias).join(' et ') + '. Précise la relation, par exemple ' + hits[0].alias + '.' + n.c + '.');
+    return hits[0].alias + '.' + SCHEMA[hits[0].table].cols.find(c => c.toLowerCase() === n.c.toLowerCase());
+  }
+  function check(n, scope, aliases){
+    if (!n || typeof n !== 'object') return;
+    if (n.k === 'col'){ if (!(aliases && !n.t && aliases.includes(n.c))) n.key = resolve(n, scope); return; }
+    if (n.k === 'fn' && !AGG.has(n.name) && !['UPPER', 'LOWER', 'LENGTH', 'ROUND', 'ABS'].includes(n.name)) fail('Fonction inconnue : ' + n.name + '.');
+    for (const k of ['l', 'r', 'e']) check(n[k], scope, aliases);
+    for (const x of (n.list || []).concat(n.args || [])) check(x, scope, aliases);
+  }
+  function cmpv(a, b){
+    if (typeof a === 'number' && typeof b === 'string' && b.trim() !== '' && Number.isFinite(+b)) b = +b;
+    if (typeof b === 'number' && typeof a === 'string' && a.trim() !== '' && Number.isFinite(+a)) a = +a;
+    if (typeof a === 'number' && typeof b === 'number') return a - b;
+    if (typeof a === 'number') return -1;
+    if (typeof b === 'number') return 1;
+    return a < b ? -1 : a > b ? 1 : 0;
+  }
+  const truthy = v => v !== null && v !== 0 && v !== '' && v !== '0';
+  function ev(n, env, group){
+    switch (n.k){
+      case 'lit': return n.v;
+      case 'col': return n.key in env ? env[n.key] : (env.__out && n.c in env.__out ? env.__out[n.c] : null);
+      case 'neg': { const v = ev(n.e, env, group); return v === null ? null : -v; }
+      case 'not': { const v = ev(n.e, env, group); return v === null ? null : truthy(v) ? 0 : 1; }
+      case 'isnull': { const v = ev(n.e, env, group) === null; return (n.neg ? !v : v) ? 1 : 0; }
+      case 'like': {
+        const a = ev(n.l, env, group), b = ev(n.r, env, group);
+        if (a === null || b === null) return null;
+        const re = new RegExp('^' + String(b).replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/%/g, '.*').replace(/_/g, '.') + '$', 'i');
+        return (re.test(String(a)) !== n.neg) ? 1 : 0;
+      }
+      case 'in': {
+        const a = ev(n.l, env, group);
+        if (a === null) return null;
+        return (n.list.some(x => cmpv(a, ev(x, env, group)) === 0) !== n.neg) ? 1 : 0;
+      }
+      case 'bin': {
+        if (n.op === 'AND'){ const a = ev(n.l, env, group); if (a !== null && !truthy(a)) return 0; const b = ev(n.r, env, group); if (b !== null && !truthy(b)) return 0; return a === null || b === null ? null : 1; }
+        if (n.op === 'OR'){ const a = ev(n.l, env, group); if (a !== null && truthy(a)) return 1; const b = ev(n.r, env, group); if (b !== null && truthy(b)) return 1; return a === null || b === null ? null : 0; }
+        const a = ev(n.l, env, group), b = ev(n.r, env, group);
+        if (a === null || b === null) return null;
+        if (['+', '-', '*', '/'].includes(n.op)){
+          const x = +a, y = +b;
+          if (!Number.isFinite(x) || !Number.isFinite(y)) return 0;
+          if (n.op === '+') return x + y;
+          if (n.op === '-') return x - y;
+          if (n.op === '*') return x * y;
+          if (y === 0) return null;
+          return Number.isInteger(x) && Number.isInteger(y) ? Math.trunc(x / y) : x / y;      // division entière entre entiers, comme SQLite
+        }
+        const c = cmpv(a, b);
+        return { '=': c === 0, '<>': c !== 0, '!=': c !== 0, '<': c < 0, '<=': c <= 0, '>': c > 0, '>=': c >= 0 }[n.op] ? 1 : 0;
+      }
+      case 'fn': {
+        if (AGG.has(n.name)){
+          if (!group) fail('La fonction ' + n.name + ' regroupe plusieurs lignes : elle ne peut pas servir dans WHERE.');
+          if (n.star){ if (n.name !== 'COUNT') fail(n.name + '(*) n\'existe pas : seule COUNT(*) est permise.'); return group.length; }
+          if (n.args.length !== 1) fail(n.name + ' attend un seul argument.');
+          const vals = group.map(r => ev(n.args[0], r, null)).filter(v => v !== null);
+          if (n.name === 'COUNT') return vals.length;
+          if (!vals.length) return null;
+          if (n.name === 'SUM') return vals.reduce((s, v) => s + +v, 0);
+          if (n.name === 'AVG') return vals.reduce((s, v) => s + +v, 0) / vals.length;
+          return vals.reduce((m, v) => (n.name === 'MIN' ? cmpv(v, m) < 0 : cmpv(v, m) > 0) ? v : m);
+        }
+        const a = n.args.map(x => ev(x, env, group));
+        if (a[0] === null || a[0] === undefined) return null;
+        if (n.name === 'UPPER') return String(a[0]).toUpperCase();
+        if (n.name === 'LOWER') return String(a[0]).toLowerCase();
+        if (n.name === 'LENGTH') return [...String(a[0])].length;
+        if (n.name === 'ABS') return Math.abs(+a[0]);
+        if (n.name === 'ROUND'){ const k = Math.pow(10, a[1] || 0); return Math.round(+a[0] * k) / k; }
+      }
+    }
+    return null;
+  }
+  const rowEnv = (alias, table, r) => Object.fromEntries(SCHEMA[table].cols.map(c => [alias + '.' + c, r[c]]));
+
+  function runSelect(q){
+    const scope = [{ alias: q.from.alias, table: table(q.from.table) }];
+    for (const j of q.joins) scope.push({ alias: j.alias, table: table(j.table) });
+    const names = scope.map(s => s.alias.toLowerCase());
+    if (new Set(names).size !== names.length) fail('Deux relations portent le même nom dans la requête : donne-leur des alias différents (AS).');
+    // Colonnes du résultat
+    const items = [];
+    for (const it of q.items){
+      if (it.star){
+        const ss = it.t ? scope.filter(s => s.alias.toLowerCase() === it.t.toLowerCase()) : scope;
+        if (!ss.length) fail('Relation ou alias inconnu : « ' + it.t + ' ».');
+        for (const s of ss) for (const c of SCHEMA[s.table].cols) items.push({ e: { k: 'col', key: s.alias + '.' + c }, name: scope.length > 1 ? s.alias + '.' + c : c });
+      } else { check(it.e, scope); items.push(it); }
+    }
+    for (const j of q.joins) check(j.on, scope.slice(0, q.joins.indexOf(j) + 2));
+    if (q.where){ check(q.where, scope); if (hasAgg(q.where)) fail('COUNT, SUM, AVG, MIN et MAX ne peuvent pas servir dans WHERE.'); }
+    (q.group || []).forEach(g => check(g, scope));
+    const aliases = items.map(i => i.name);
+    (q.order || []).forEach(o => check(o.e, scope, aliases));
+    // Lignes : produit filtré par les jointures, puis WHERE
+    let rows = DB[scope[0].table].map(r => rowEnv(scope[0].alias, scope[0].table, r));
+    q.joins.forEach((j, k) => {
+      const s = scope[k + 1], next = [];
+      for (const left of rows) for (const r of DB[s.table]){ const env = Object.assign({}, left, rowEnv(s.alias, s.table, r)); if (truthy(ev(j.on, env))) next.push(env); }
+      rows = next;
+    });
+    if (q.where) rows = rows.filter(r => truthy(ev(q.where, r)));
+    // Regroupement éventuel
+    const grouped = q.group || items.some(i => hasAgg(i.e)) || (q.order || []).some(o => hasAgg(o.e));
+    let out;
+    if (grouped){
+      const groups = new Map();
+      if (q.group) for (const r of rows){ const k = JSON.stringify(q.group.map(g => ev(g, r))); if (!groups.has(k)) groups.set(k, []); groups.get(k).push(r); }
+      else groups.set('all', rows);
+      out = [...groups.values()].map(g => {
+        const vals = items.map(i => ev(i.e, g[0] || {}, g));
+        const o = Object.fromEntries(items.map((i, k) => [i.name, vals[k]]));
+        return { vals, keys: (q.order || []).map(x => ev(x.e, Object.assign({ __out: o }, g[0] || {}), g)) };
+      });
+    } else {
+      out = rows.map(r => {
+        const vals = items.map(i => ev(i.e, r));
+        const o = Object.fromEntries(items.map((i, k) => [i.name, vals[k]]));
+        return { vals, keys: (q.order || []).map(x => ev(x.e, Object.assign({ __out: o }, r))) };
+      });
+    }
+    if (q.distinct){ const seen = new Set(); out = out.filter(r => { const k = JSON.stringify(r.vals); if (seen.has(k)) return false; seen.add(k); return true; }); }
+    if (q.order) out.sort((a, b) => {
+      for (let k = 0; k < q.order.length; k++){
+        const x = a.keys[k], y = b.keys[k];
+        const c = x === null && y === null ? 0 : x === null ? -1 : y === null ? 1 : cmpv(x, y);
+        if (c) return q.order[k].desc ? -c : c;
+      }
+      return 0;
+    });
+    if (q.limit !== undefined) out = out.slice(0, q.limit);
+    return { cols: items.map(i => i.name), rows: out.map(r => r.vals) };
+  }
+
+  // ---------- Modifications, avec vérification des contraintes ----------
+  function fkCheck(t, row){
+    for (const [c, ref] of Object.entries(SCHEMA[t].fk)){
+      if (row[c] !== null && !DB[ref].some(r => cmpv(r.id, row[c]) === 0))
+        fail('Contrainte de clé étrangère non respectée : ' + t + '.' + c + ' = ' + row[c] + ' ne correspond à aucun id de la relation ' + ref + '.');
+    }
+  }
+  function referencedBy(t, id){
+    for (const [u, s] of Object.entries(SCHEMA)) for (const [c, ref] of Object.entries(s.fk))
+      if (ref === t && DB[u].some(r => cmpv(r[c], id) === 0)) return u;
+    return null;
+  }
+  function coerce(t, c, v){
+    const type = SCHEMA[t].types[SCHEMA[t].cols.indexOf(c)];
+    if (type === 'INTEGER' && typeof v === 'string' && /^-?\d+$/.test(v.trim())) return parseInt(v, 10);
+    return v;
+  }
+  function runInsert(q){
+    const t = table(q.table), cols = SCHEMA[t].cols;
+    const target = q.cols ? q.cols.map(c => { const k = cols.find(x => x.toLowerCase() === c.toLowerCase()); if (!k) fail('La relation ' + t + ' n\'a pas de colonne « ' + c + ' ».'); return k; }) : cols;
+    const added = [];
+    for (const vals of q.rows){
+      if (vals.length !== target.length) fail(target.length + ' valeur(s) attendue(s), ' + vals.length + ' fournie(s).');
+      const row = Object.fromEntries(cols.map(c => [c, null]));
+      target.forEach((c, k) => { row[c] = coerce(t, c, ev(vals[k], {})); });
+      if (row.id === null) row.id = Math.max(0, ...DB[t].map(r => r.id), ...added.map(r => r.id)) + 1;      // clé primaire attribuée automatiquement
+      if (DB[t].concat(added).some(r => cmpv(r.id, row.id) === 0)) fail('Contrainte de clé primaire non respectée : il existe déjà une ligne d\'id ' + row.id + ' dans ' + t + '.');
+      fkCheck(t, row);
+      added.push(row);
+    }
+    DB[t].push(...added);
+    return added.length + ' ligne(s) insérée(s) dans ' + t + (added.length === 1 ? ' (id ' + added[0].id + ')' : '') + '.';
+  }
+  function runUpdate(q){
+    const t = table(q.table), scope = [{ alias: t, table: t }];
+    q.sets.forEach(([c, e]) => { if (!SCHEMA[t].cols.some(x => x.toLowerCase() === c.toLowerCase())) fail('La relation ' + t + ' n\'a pas de colonne « ' + c + ' ».'); check(e, scope); });
+    if (q.where) check(q.where, scope);
+    const changes = [];
+    for (const r of DB[t]){
+      const env = rowEnv(t, t, r);
+      if (q.where && !truthy(ev(q.where, env))) continue;
+      const nr = Object.assign({}, r);
+      for (const [c, e] of q.sets){ const k = SCHEMA[t].cols.find(x => x.toLowerCase() === c.toLowerCase()); nr[k] = coerce(t, k, ev(e, env)); }
+      fkCheck(t, nr);
+      if (nr.id !== r.id && (DB[t].some(x => x !== r && cmpv(x.id, nr.id) === 0) || referencedBy(t, r.id))) fail('Impossible de changer l\'id ' + r.id + ' : il est déjà pris ou référencé ailleurs.');
+      changes.push([r, nr]);
+    }
+    for (const [r, nr] of changes) Object.assign(r, nr);
+    return changes.length + ' ligne(s) modifiée(s) dans ' + t + '.';
+  }
+  function runDelete(q){
+    const t = table(q.table), scope = [{ alias: t, table: t }];
+    if (q.where) check(q.where, scope);
+    const gone = DB[t].filter(r => !q.where || truthy(ev(q.where, rowEnv(t, t, r))));
+    for (const r of gone){
+      const u = referencedBy(t, r.id);
+      if (u) fail('Suppression refusée par une contrainte de clé étrangère : la ligne d\'id ' + r.id + ' de ' + t + ' est référencée dans la relation ' + u + '.');
+    }
+    DB[t] = DB[t].filter(r => !gone.includes(r));
+    return gone.length + ' ligne(s) supprimée(s) de ' + t + '.';
+  }
+
+  // =========================================================
+  // Interface
+  // =========================================================
+  function showSchema(){
+    $('schema').innerHTML = Object.entries(SCHEMA).map(([t, s]) => '<div class="rel"><button data-t="' + t + '">' + t + '</button>'
+      + s.cols.map((c, i) => '<span>' + (c === 'id' ? '<span class="pk">id</span>' : s.fk[c] ? '<span class="fk">#' + c + '</span> → ' + s.fk[c] + '.id' : c) + ' <span class="muted">' + s.types[i] + '</span></span>').join('')
+      + '<span class="muted">' + DB[t].length + ' lignes</span></div>').join('');
+    for (const b of $('schema').querySelectorAll('button')) b.addEventListener('click', () => { $('sql').value = 'SELECT * FROM ' + b.dataset.t + ';'; execute(); });
+  }
+  const cell = v => v === null || v === undefined ? '<td class="null">NULL</td>' : '<td>' + esc(typeof v === 'number' && !Number.isInteger(v) ? Math.round(v * 1000) / 1000 : v) + '</td>';
+  function execute(){
+    const msg = $('msg');
+    try {
+      const stmts = parseAll($('sql').value);
+      const notes = [];
+      let res = null;
+      const backup = JSON.stringify(DB);
+      try {
+        for (const s of stmts){
+          if (s.k === 'select'){ res = runSelect(s); notes.push(res.rows.length + ' ligne(s) renvoyée(s).'); }
+          else notes.push(s.k === 'insert' ? runInsert(s) : s.k === 'update' ? runUpdate(s) : runDelete(s));
+        }
+      } catch (e) { DB = JSON.parse(backup); throw e; }      // une erreur annule toute la série de requêtes
+      msg.className = 'message'; msg.textContent = notes.join('\n');
+      $('result').innerHTML = res ? '<tr>' + res.cols.map(c => '<th>' + esc(c) + '</th>').join('') + '</tr>' + res.rows.map(r => '<tr>' + r.map(cell).join('') + '</tr>').join('') : '';
+      setStatus(notes[notes.length - 1], 'ok');
+    } catch (e) {
+      if (!(e instanceof SqlError)) throw e;
+      msg.className = 'message bad'; msg.textContent = 'Erreur : ' + e.message;
+      $('result').innerHTML = '';
+      setStatus('Requête refusée', 'off');
+    }
+    showSchema();
+  }
+
+  const EXAMPLES = [
+    ['Sélection et tri', 'SELECT titre, annee\nFROM livres\nWHERE annee < 1900\nORDER BY annee;'],
+    ['Condition sur du texte', "SELECT nom, prenom, naissance\nFROM auteurs\nWHERE pays = 'France';"],
+    ['Motif avec LIKE', "SELECT titre FROM livres\nWHERE titre LIKE 'L%';"],
+    ['Jointure', 'SELECT livres.titre, auteurs.nom\nFROM livres\nJOIN auteurs ON livres.auteur_id = auteurs.id;'],
+    ['Jointure avec alias, sur trois relations', 'SELECT e.eleve, l.titre, a.nom, e.date_retour\nFROM emprunts AS e\nJOIN livres AS l ON e.livre_id = l.id\nJOIN auteurs AS a ON l.auteur_id = a.id\nORDER BY e.date_retour;'],
+    ['Compter', "SELECT COUNT(*) AS nb_romans\nFROM livres\nWHERE genre = 'roman';"],
+    ['Regrouper', 'SELECT auteurs.nom, COUNT(*) AS nb_livres\nFROM livres\nJOIN auteurs ON livres.auteur_id = auteurs.id\nGROUP BY auteurs.nom\nORDER BY nb_livres DESC;'],
+    ['Insérer', "INSERT INTO livres (titre, annee, auteur_id, genre)\nVALUES ('Les Contemplations', 1856, 1, 'poésie');"],
+    ['Insérer avec une clé étrangère invalide', "INSERT INTO livres (titre, annee, auteur_id, genre)\nVALUES ('Livre mystère', 2000, 99, 'roman');"],
+    ['Modifier', "UPDATE emprunts\nSET date_retour = '2026-12-01'\nWHERE eleve = 'Léa';"],
+    ['Supprimer une ligne référencée', 'DELETE FROM auteurs WHERE id = 1;']
+  ];
+  $('examples').innerHTML = EXAMPLES.map(([t], i) => '<button data-i="' + i + '">' + esc(t) + '</button>').join('');
+  for (const b of $('examples').querySelectorAll('button')) b.addEventListener('click', () => { $('sql').value = EXAMPLES[+b.dataset.i][1]; execute(); });
+  $('run').addEventListener('click', execute);
+  $('sql').addEventListener('keydown', e => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)){ e.preventDefault(); execute(); } });
+  $('reset').addEventListener('click', () => { resetDB(); $('msg').className = 'message'; $('msg').textContent = 'Base remise dans son état de départ.'; $('result').innerHTML = ''; showSchema(); setStatus('Base réinitialisée', 'ok'); });
+  resetDB();
+  execute();
+})();
+</script>
+<script>
+  // Compteur de visites GoatCounter (sans cookie), chargé uniquement sur le site en ligne
+  if (location.protocol === 'https:'){
+    const gc = document.createElement('script');
+    gc.async = true;
+    gc.src = 'https://gc.zgo.at/count.js';
+    gc.dataset.goatcounter = 'https://miyvi.goatcounter.com/count';
+    document.head.appendChild(gc);
+  }
+</script>
+</body>
+</html>

@@ -1,0 +1,689 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Représentation des données : types construits</title>
+<style>
+  /* ---------- Thème (clair / sombre automatique) ---------- */
+  :root{
+    --bg:#f3ede1;
+    --paper:#fbf8f0;
+    --ink:#22242e;
+    --ink-soft:#5b5a52;
+    --line:#d9d0ba;
+    --wave:#b8362b;
+    --wave-glow:rgba(184,54,43,.14);
+    --accent:#2f6f4f;
+    --blue:#2c5f8a;
+    --brass:#a9793f;
+    --violet:#8a3fc0;
+    --pink:#cf5f8c;
+    --ok:#2f6f4f;
+    --warn:#b8362b;
+    --serif:"Iowan Old Style","Palatino Linotype",Palatino,Georgia,serif;
+    --sans:system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+    --mono:ui-monospace,"Cascadia Mono","SF Mono",Consolas,Menlo,monospace;
+    color-scheme: light dark;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{
+      --bg:#171a21;
+      --paper:#1e222b;
+      --ink:#eae6da;
+      --ink-soft:#9a9689;
+      --line:#33384a;
+      --wave:#ff8a72;
+      --wave-glow:rgba(255,138,114,.14);
+      --accent:#79d6a3;
+      --blue:#7fb4e0;
+      --brass:#c99a5b;
+      --violet:#c39af5;
+      --pink:#f29bbd;
+      --ok:#79d6a3;
+      --warn:#ff8a72;
+    }
+  }
+
+  /* ---------- Mise en page ---------- */
+  *{box-sizing:border-box;}
+  html, body{ margin:0; padding:0; }
+  body{
+    background:var(--bg);
+    color:var(--ink);
+    font-family:var(--sans);
+    padding:28px 16px;
+    display:flex;
+    justify-content:center;
+  }
+  main{
+    width:100%;
+    max-width:920px;
+    display:flex;
+    flex-direction:column;
+    gap:20px;
+  }
+  header{ display:flex; flex-direction:column; gap:4px; }
+  .kicker{
+    font-size:.72rem;
+    text-transform:uppercase;
+    letter-spacing:.08em;
+    color:var(--ink-soft);
+  }
+  h1{
+    font-family:var(--serif);
+    font-weight:600;
+    font-size:clamp(1.5rem, 1.1rem + 1.6vw, 2.2rem);
+    margin:0;
+    text-wrap:balance;
+  }
+  header p{
+    margin:0;
+    color:var(--ink-soft);
+    font-size:.92rem;
+    max-width:66ch;
+  }
+
+  /* ---------- Zone de simulation ---------- */
+  .scene{
+    background:var(--paper);
+    border:1px solid var(--line);
+    border-radius:14px;
+    padding:20px clamp(12px,3vw,28px) 8px;
+    display:flex;
+    flex-direction:column;
+    gap:6px;
+  }
+  .scene-top{
+    display:flex;
+    justify-content:space-between;
+    align-items:baseline;
+    gap:12px;
+    flex-wrap:wrap;
+  }
+  .scene-title{ font-family:var(--serif); font-weight:600; }
+  .status{
+    font-family:var(--mono);
+    font-size:.82rem;
+    padding:3px 10px;
+    border-radius:999px;
+    border:1px solid var(--line);
+    color:var(--ink-soft);
+  }
+  .status.ok{ color:var(--ok); border-color:var(--ok); }
+  .status.off{ color:var(--warn); border-color:var(--warn); }
+  canvas{
+    width:100%;
+    height:auto;
+    display:block;
+  }
+  canvas.draggable{ touch-action:none; cursor:grab; }
+  canvas.dragging{ cursor:grabbing; }
+  canvas.tappable{ touch-action:manipulation; }
+  .hint{ margin:0; font-size:.78rem; color:var(--ink-soft); }
+
+  /* ---------- Mesures ---------- */
+  .readouts{
+    display:grid;
+    grid-template-columns:repeat(auto-fit,minmax(150px,1fr));
+    gap:10px 18px;
+    padding-block:10px;
+    border-top:1px solid var(--line);
+    margin-top:6px;
+  }
+  .readout{ display:flex; flex-direction:column; gap:2px; }
+  .readout .label{
+    font-size:.78rem;
+    color:var(--ink-soft);
+  }
+  .readout .value{
+    font-family:var(--mono);
+    font-variant-numeric:tabular-nums;
+    font-size:1.05rem;
+    font-weight:500;
+  }
+  .readout .value em{ color:var(--blue); font-style:normal; font-size:.9rem; }
+
+  /* ---------- Contrôles ---------- */
+  .panel{
+    background:var(--paper);
+    border:1px solid var(--line);
+    border-radius:14px;
+    padding:18px clamp(14px,3vw,26px);
+    display:flex;
+    flex-direction:column;
+    gap:18px;
+  }
+  .controls{
+    display:grid;
+    grid-template-columns:repeat(auto-fit,minmax(240px,1fr));
+    gap:18px 32px;
+  }
+  .control{ display:flex; flex-direction:column; gap:6px; }
+  .control .row{
+    display:flex;
+    justify-content:space-between;
+    align-items:baseline;
+    gap:10px;
+  }
+  .control label{ font-size:.86rem; font-weight:500; }
+  .control .num{
+    font-family:var(--mono);
+    font-variant-numeric:tabular-nums;
+    color:var(--wave);
+    font-size:.92rem;
+  }
+  input[type=range]{
+    -webkit-appearance:none;
+    appearance:none;
+    width:100%;
+    height:4px;
+    margin:8px 0;
+    border-radius:999px;
+    background:var(--line);
+    outline:none;
+  }
+  input[type=range]::-webkit-slider-thumb{
+    -webkit-appearance:none;
+    width:20px; height:20px;
+    border-radius:50%;
+    background:var(--wave);
+    border:2px solid var(--paper);
+    box-shadow:0 0 0 1px var(--line);
+    cursor:pointer;
+  }
+  input[type=range]::-moz-range-thumb{
+    width:18px; height:18px;
+    border-radius:50%;
+    background:var(--wave);
+    border:2px solid var(--paper);
+    box-shadow:0 0 0 1px var(--line);
+    cursor:pointer;
+  }
+  select{
+    font-family:var(--sans);
+    font-size:.86rem;
+    padding:7px 10px;
+    border-radius:8px;
+    border:1px solid var(--line);
+    background:var(--paper);
+    color:var(--ink);
+    width:100%;
+  }
+  .check{
+    display:flex;
+    align-items:center;
+    gap:8px;
+    font-size:.86rem;
+    font-weight:500;
+    cursor:pointer;
+  }
+  .check input{ width:18px; height:18px; accent-color:var(--accent); margin:0; }
+  .buttons{ display:flex; gap:10px; flex-wrap:wrap; }
+  button{
+    font-family:var(--sans);
+    font-size:.86rem;
+    font-weight:500;
+    padding:9px 16px;
+    border-radius:8px;
+    border:1px solid var(--line);
+    background:transparent;
+    color:var(--ink);
+    cursor:pointer;
+  }
+  button.primary{
+    background:var(--accent);
+    border-color:var(--accent);
+    color:var(--paper);
+  }
+  button:focus-visible, input:focus-visible, select:focus-visible{
+    outline:2px solid var(--accent);
+    outline-offset:2px;
+  }
+
+  /* ---------- Formules ---------- */
+  .formula{
+    font-family:var(--mono);
+    font-size:.86rem;
+    color:var(--ink-soft);
+    border-top:1px solid var(--line);
+    padding-top:14px;
+    display:flex;
+    flex-wrap:wrap;
+    gap:6px 22px;
+  }
+  .formula b{ color:var(--ink); font-weight:600; }
+  footer{
+    font-size:.78rem;
+    color:var(--ink-soft);
+    text-align:center;
+    text-wrap:balance;
+  }
+
+  /* ---------- Éléments communs aux ressources d'informatique ---------- */
+  [hidden]{ display:none !important; }
+  .tabs{ display:flex; gap:6px; flex-wrap:wrap; }
+  .tabs button{ padding:7px 14px; }
+  .tabs button[aria-selected=true]{ background:var(--accent); border-color:var(--accent); color:var(--paper); }
+  input[type=text], input[type=number], textarea.field{
+    font-family:var(--mono);
+    font-size:.88rem;
+    padding:7px 10px;
+    border-radius:8px;
+    border:1px solid var(--line);
+    background:var(--paper);
+    color:var(--ink);
+    width:100%;
+  }
+  textarea.field{ resize:vertical; min-height:90px; line-height:1.45; }
+  .table-wrap{ overflow-x:auto; }
+  table.data{ border-collapse:collapse; width:100%; font-family:var(--mono); font-size:.82rem; }
+  table.data th, table.data td{ border:1px solid var(--line); padding:5px 9px; text-align:left; white-space:nowrap; }
+  table.data th{ font-family:var(--sans); font-weight:600; color:var(--ink-soft); }
+  table.data tr.hit td{ background:var(--wave-glow); }
+  pre.code{
+    font-family:var(--mono);
+    font-size:.84rem;
+    line-height:1.5;
+    background:var(--bg);
+    border:1px solid var(--line);
+    border-radius:8px;
+    padding:10px 12px;
+    overflow-x:auto;
+    margin:0;
+    white-space:pre;
+  }
+  pre.code .hl{ background:var(--wave-glow); display:inline-block; min-width:100%; }
+  .err{ color:var(--warn); }
+  .good{ color:var(--ok); }
+  .chips{ display:flex; flex-wrap:wrap; gap:6px; }
+  .chip{ font-family:var(--mono); font-size:.8rem; padding:3px 9px; border-radius:999px; border:1px solid var(--line); }
+  .row2{ display:grid; grid-template-columns:repeat(auto-fit,minmax(280px,1fr)); gap:16px; }
+  .stack{ display:flex; flex-direction:column; gap:10px; min-width:0; }
+  .inline{ display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
+  .inline input[type=text], .inline input[type=number]{ width:auto; flex:1 1 120px; }
+  h3{ font-family:var(--serif); font-weight:600; font-size:1.02rem; margin:0; }
+  .muted{ color:var(--ink-soft); font-size:.84rem; margin:0; }
+  .cells{ display:flex; gap:6px; flex-wrap:wrap; align-items:flex-end; min-height:92px; padding:6px 0; }
+  .cell{ display:flex; flex-direction:column; align-items:center; gap:3px; }
+  .cell .box{ min-width:56px; padding:12px 10px; border:2px solid var(--line); border-radius:8px; background:var(--paper);
+    font-family:var(--mono); font-size:1rem; text-align:center; transition:border-color .2s, background .2s; }
+  .cell small{ font-family:var(--mono); font-size:.72rem; color:var(--ink-soft); }
+  .cell small.neg{ color:var(--blue); }
+  .cell.hot .box{ border-color:var(--wave); background:var(--wave-glow); }
+  .cell.new .box{ border-color:var(--accent); }
+  .dict{ display:grid; grid-template-columns:auto auto; gap:6px 4px; justify-content:start; }
+  .dict .box{ min-width:90px; }
+  .dict .key{ color:var(--blue); }
+  .console{ height:230px; overflow:auto; }
+  .ops{ display:flex; gap:8px; flex-wrap:wrap; }
+  .ops button{ font-family:var(--mono); font-size:.82rem; }
+  .vars{ display:flex; gap:14px; flex-wrap:wrap; font-family:var(--mono); }
+</style>
+</head>
+<body>
+
+<main>
+  <header>
+    <span class="kicker">Informatique · NSI Première · Représentation des données</span>
+    <h1>Représentation des données : types construits</h1>
+    <p>Les types construits regroupent plusieurs valeurs : le tableau (list en Python) est modifiable et indexé à partir de 0, le p-uplet (tuple) ne se modifie pas, le dictionnaire associe des clés à des valeurs. Chaque bouton exécute une instruction Python et montre son effet.</p>
+  </header>
+
+  <section class="scene">
+    <div class="tabs" id="kind">
+      <button data-tab="list">Tableaux (list)</button>
+      <button data-tab="tuple">P-uplets (tuple)</button>
+      <button data-tab="dict">Dictionnaires (dict)</button>
+    </div>
+
+    <div class="stack" data-panel="list">
+      <div class="cells" id="listView"></div>
+      <div class="inline">
+        <label for="li">i</label><input type="number" id="li" value="1">
+        <label for="lj">j</label><input type="number" id="lj" value="3">
+        <label for="lv">v</label><input type="text" id="lv" value="7">
+      </div>
+      <div class="ops" id="listOps">
+        <button data-op="get">t[i]</button>
+        <button data-op="set">t[i] = v</button>
+        <button data-op="append">t.append(v)</button>
+        <button data-op="pop">t.pop()</button>
+        <button data-op="len">len(t)</button>
+        <button data-op="slice">t[i:j]</button>
+        <button data-op="in">v in t</button>
+        <button data-op="for">for x in t: print(x)</button>
+        <button data-op="comp">[2 * x for x in t]</button>
+        <button data-op="sum">sum(t)</button>
+        <button data-op="reset">t = [3, 8, 1, 5]</button>
+      </div>
+    </div>
+
+    <div class="stack" data-panel="tuple">
+      <div class="cells" id="tupleView"></div>
+      <div class="inline"><label for="ti">i</label><input type="number" id="ti" value="0"></div>
+      <div class="ops" id="tupleOps">
+        <button data-op="get">p[i]</button>
+        <button data-op="set">p[0] = 'Grace'</button>
+        <button data-op="len">len(p)</button>
+        <button data-op="unpack">prenom, nom, annee = p</button>
+        <button data-op="func">min_max([4, 9, 2])</button>
+      </div>
+      <div class="vars" id="tupleVars"></div>
+      <pre class="code">def min_max(t):
+    """Renvoie le plus petit et le plus grand élément de t, sous forme de p-uplet."""
+    return min(t), max(t)</pre>
+    </div>
+
+    <div class="stack" data-panel="dict">
+      <div class="dict" id="dictView"></div>
+      <div class="inline">
+        <label for="dk">clé k</label><input type="text" id="dk" value="kiwi">
+        <label for="dvv">valeur v</label><input type="text" id="dvv" value="4">
+      </div>
+      <div class="ops" id="dictOps">
+        <button data-op="get">d[k]</button>
+        <button data-op="set">d[k] = v</button>
+        <button data-op="del">del d[k]</button>
+        <button data-op="in">k in d</button>
+        <button data-op="len">len(d)</button>
+        <button data-op="keys">d.keys()</button>
+        <button data-op="values">d.values()</button>
+        <button data-op="items">for cle, valeur in d.items(): print(cle, valeur)</button>
+        <button data-op="reset">d = {'pomme': 3, 'poire': 5, 'kiwi': 2}</button>
+      </div>
+    </div>
+
+    <div class="stack">
+      <span class="muted">Console Python</span>
+      <pre class="code console" id="console"></pre>
+    </div>
+  </section>
+
+  <section class="panel">
+    <div class="formula">
+      <span>t[0]&nbsp;=&nbsp;<b>premier élément</b>, t[-1]&nbsp;=&nbsp;<b>dernier</b></span>
+      <span>t[i:j]&nbsp;=&nbsp;<b>éléments d'indice i à j − 1</b></span>
+      <span>tuple&nbsp;=&nbsp;<b>non modifiable</b></span>
+      <span>dict&nbsp;:&nbsp;<b>clé → valeur</b>, clés toutes différentes</span>
+    </div>
+  </section>
+
+  <footer>Les instructions sont simulées dans la page, en reproduisant le comportement de Python : mêmes résultats, mêmes messages d'erreur.</footer>
+</main>
+
+<script>
+(function(){
+  // ---------- Utilitaires ----------
+  const $ = id => document.getElementById(id);
+  const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
+  const fmt = (v, d) => Number.isFinite(v)
+    ? v.toLocaleString('fr-FR', {minimumFractionDigits:d, maximumFractionDigits:d})
+    : '—';
+  const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const MONO = 'ui-monospace, "Cascadia Mono", "SF Mono", Consolas, Menlo, monospace';
+  const SANS = 'system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif';
+
+  // Couleurs du thème, relues si le système bascule clair/sombre
+  const C = {};
+  function readColors(){
+    const s = getComputedStyle(document.documentElement);
+    for (const n of ['bg','paper','ink','ink-soft','line','wave','wave-glow','accent','blue','brass','violet','pink']){
+      C[n.replace(/-(.)/g, (_, c) => c.toUpperCase())] = s.getPropertyValue('--' + n).trim();
+    }
+  }
+  readColors();
+  window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', readColors);
+
+  // Canvas net sur tout écran : on dessine toujours dans un repère logique W × H
+  function setupCanvas(canvas, W, H){
+    const ctx = canvas.getContext('2d');
+    function fit(){
+      const dpr = Math.min(window.devicePixelRatio || 1, 3);
+      const cw = canvas.clientWidth || W;
+      canvas.width = Math.max(1, Math.round(cw * dpr));
+      canvas.height = Math.max(1, Math.round(cw * H / W * dpr));
+      ctx.setTransform(canvas.width / W, 0, 0, canvas.height / H, 0, 0);
+    }
+    window.addEventListener('resize', fit);
+    fit();
+    return ctx;
+  }
+  // Position du pointeur (souris ou doigt) dans le repère logique
+  function pointerPos(canvas, evt, W, H){
+    const r = canvas.getBoundingClientRect();
+    return { x: (evt.clientX - r.left) * W / r.width, y: (evt.clientY - r.top) * H / r.height };
+  }
+  function arrow(ctx, x1, y1, x2, y2, color, width){
+    const len = Math.hypot(x2 - x1, y2 - y1);
+    if (len < 3) return;
+    const a = Math.atan2(y2 - y1, x2 - x1), h = Math.min(10, len * 0.5);
+    ctx.strokeStyle = color; ctx.fillStyle = color; ctx.lineWidth = width || 2.5;
+    ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2 - Math.cos(a) * h * 0.8, y2 - Math.sin(a) * h * 0.8); ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(x2, y2);
+    ctx.lineTo(x2 - h * Math.cos(a - 0.42), y2 - h * Math.sin(a - 0.42));
+    ctx.lineTo(x2 - h * Math.cos(a + 0.42), y2 - h * Math.sin(a + 0.42));
+    ctx.closePath(); ctx.fill();
+  }
+  // Pas "rond" (1, 2, 5 × 10^n) pour graduer un axe
+  function niceStep(x){
+    if (!(x > 0)) return 1;
+    const p = Math.pow(10, Math.floor(Math.log10(x))), m = x / p;
+    return (m < 1.5 ? 1 : m < 3.5 ? 2 : m < 7.5 ? 5 : 10) * p;
+  }
+
+  // Relie un curseur, une liste ou une case à cocher à un paramètre (et affiche sa valeur)
+  function bind(id, onChange, format){
+    const el = $(id), label = $(id + 'Val');
+    const val = () => el.type === 'checkbox' ? el.checked : parseFloat(el.value);
+    const show = () => { if (label && format) label.textContent = format(val()); };
+    el.addEventListener(el.type === 'range' ? 'input' : 'change', () => { onChange(val()); show(); });
+    show();
+  }
+  const out = (id, text) => { $(id).textContent = text; };
+  function setStatus(text, cls){
+    const s = $('status');
+    s.textContent = text; s.className = 'status' + (cls ? ' ' + cls : '');
+  }
+  // Repère gradué dans le rectangle g ; renvoie les conversions X(x) et Y(y)
+  function axes(ctx, g, o){
+    const xMin = o.xMin || 0, yMin = o.yMin || 0;
+    const X = x => g.x + g.w * (x - xMin) / (o.xMax - xMin);
+    const Y = y => g.y + g.h - g.h * (y - yMin) / (o.yMax - yMin);
+    const ink = o.ink || C.ink, soft = o.soft || C.inkSoft, line = o.line || C.line;
+    const sx = niceStep((o.xMax - xMin) / (o.xTicks || 6)), sy = niceStep((o.yMax - yMin) / (o.yTicks || 4));
+    const dec = s => s >= 1 ? 0 : Math.min(4, Math.ceil(-Math.log10(s) - 1e-9));
+    ctx.save();
+    ctx.font = '13px ' + MONO; ctx.lineWidth = 1; ctx.textAlign = 'center';
+    for (let k = Math.ceil(xMin / sx - 1e-9); k * sx <= o.xMax + sx * 1e-6; k++){
+      ctx.strokeStyle = line; ctx.globalAlpha = 0.55;
+      ctx.beginPath(); ctx.moveTo(X(k * sx), g.y); ctx.lineTo(X(k * sx), g.y + g.h); ctx.stroke();
+      ctx.globalAlpha = 1; ctx.fillStyle = soft;
+      ctx.fillText(fmt(k * sx + 0, dec(sx)), X(k * sx), g.y + g.h + 18);
+    }
+    ctx.textAlign = 'right';
+    for (let k = Math.ceil(yMin / sy - 1e-9); k * sy <= o.yMax + sy * 1e-6; k++){
+      ctx.strokeStyle = line; ctx.globalAlpha = 0.55;
+      ctx.beginPath(); ctx.moveTo(g.x, Y(k * sy)); ctx.lineTo(g.x + g.w, Y(k * sy)); ctx.stroke();
+      ctx.globalAlpha = 1; ctx.fillStyle = soft;
+      ctx.fillText(fmt(k * sy + 0, dec(sy)), g.x - 8, Y(k * sy) + 4);
+    }
+    const y0 = yMin < 0 ? Y(0) : g.y + g.h;
+    ctx.strokeStyle = soft; ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.moveTo(g.x, g.y); ctx.lineTo(g.x, g.y + g.h); ctx.moveTo(g.x, y0); ctx.lineTo(g.x + g.w, y0); ctx.stroke();
+    ctx.fillStyle = ink; ctx.textAlign = 'left'; ctx.font = '14px ' + SANS;
+    if (o.title) ctx.fillText(o.title, g.x + 8, g.y - 10);
+    ctx.fillStyle = soft; ctx.textAlign = 'right'; ctx.font = '13px ' + MONO;
+    if (o.xLabel) ctx.fillText(o.xLabel, g.x + g.w, g.y + g.h + 36);
+    ctx.restore();
+    return { X, Y };
+  }
+  // Onglets : boutons [data-tab] dans #id, panneaux [data-panel] de même nom
+  function tabs(id, onChange){
+    const btns = [...document.querySelectorAll('#' + id + ' button')];
+    const names = btns.map(b => b.dataset.tab);
+    const show = name => {
+      for (const b of btns) b.setAttribute('aria-selected', String(b.dataset.tab === name));
+      for (const p of document.querySelectorAll('[data-panel]')) if (names.includes(p.dataset.panel)) p.hidden = p.dataset.panel !== name;
+      if (onChange) onChange(name);
+    };
+    for (const b of btns) b.addEventListener('click', () => show(b.dataset.tab));
+    show(btns[0].dataset.tab);
+    return show;
+  }
+  const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
+  const sleep = ms => new Promise(r => setTimeout(r, ms));
+
+  // ---------- Valeurs Python ----------
+  function parseVal(s){
+    s = String(s).trim();
+    if (/^-?\d+$/.test(s)) return parseInt(s, 10);
+    if (/^-?\d*\.\d+$/.test(s)) return parseFloat(s);
+    if (s === 'True' || s === 'False') return s === 'True';
+    return s.replace(/^['"]|['"]$/g, '');
+  }
+  function repr(v){
+    if (Array.isArray(v)) return '[' + v.map(repr).join(', ') + ']';
+    if (v && v.tuple) return '(' + v.tuple.map(repr).join(', ') + (v.tuple.length === 1 ? ',)' : ')');
+    if (typeof v === 'boolean') return v ? 'True' : 'False';
+    if (typeof v === 'number') return Number.isInteger(v) ? String(v) : String(v);
+    return "'" + String(v).replace(/'/g, "\\'") + "'";
+  }
+  const lines = [];
+  function say(code, result, isErr){
+    lines.push('>>> ' + code);
+    if (result !== undefined && result !== null) lines.push((isErr ? '!' : '') + result);
+    while (lines.length > 60) lines.shift();
+    $('console').innerHTML = lines.map(l => l[0] === '!' ? '<span class="err">' + esc(l.slice(1)) + '</span>' : esc(l)).join('\n');
+    $('console').scrollTop = $('console').scrollHeight;
+  }
+  const err = (code, msg) => say(code, 'Traceback (most recent call last):\n  ...\n' + msg, true);
+  function cells(id, values, opts){
+    opts = opts || {};
+    $(id).innerHTML = values.map((v, i) => '<div class="cell' + ((opts.hot || []).includes(i) ? ' hot' : '') + ((opts.fresh || []).includes(i) ? ' new' : '') + '">'
+      + (opts.neg ? '<small class="neg">' + (i - values.length) + '</small>' : '') + '<div class="box">' + esc(repr(v)) + '</div><small>' + i + '</small></div>').join('')
+      || '<span class="muted">tableau vide : []</span>';
+  }
+
+  // ---------- Tableaux ----------
+  let t = [3, 8, 1, 5];
+  const showList = o => cells('listView', t, Object.assign({ neg: true }, o));
+  function norm(i, n){ return i < 0 ? i + n : i; }
+  async function listOp(op){
+    const i = parseInt($('li').value, 10), j = parseInt($('lj').value, 10), v = parseVal($('lv').value);
+    const k = norm(i, t.length);
+    switch (op){
+      case 'get':
+        if (k < 0 || k >= t.length) return err('t[' + i + ']', 'IndexError: list index out of range');
+        showList({ hot: [k] }); return say('t[' + i + ']', repr(t[k]));
+      case 'set':
+        if (k < 0 || k >= t.length) return err('t[' + i + '] = ' + repr(v), 'IndexError: list assignment index out of range');
+        t[k] = v; showList({ fresh: [k] }); return say('t[' + i + '] = ' + repr(v) + '\n>>> t', repr(t));
+      case 'append':
+        t.push(v); showList({ fresh: [t.length - 1] }); return say('t.append(' + repr(v) + ')\n>>> t', repr(t));
+      case 'pop':
+        if (!t.length) return err('t.pop()', 'IndexError: pop from empty list');
+        { const x = t.pop(); showList(); return say('t.pop()', repr(x)); }
+      case 'len': showList(); return say('len(t)', String(t.length));
+      case 'slice': {
+        const a = clamp(norm(i, t.length), 0, t.length), b = clamp(norm(j, t.length), 0, t.length);
+        const idx = []; for (let x = a; x < b; x++) idx.push(x);
+        showList({ hot: idx }); return say('t[' + i + ':' + j + ']', repr(t.slice(a, Math.max(a, b))));
+      }
+      case 'in': {
+        const hit = t.findIndex(x => x === v);
+        showList({ hot: hit >= 0 ? [hit] : [] }); return say(repr(v) + ' in t', hit >= 0 ? 'True' : 'False');
+      }
+      case 'for':
+        say('for x in t:\n...     print(x)');
+        for (let x = 0; x < t.length; x++){ showList({ hot: [x] }); lines.push(repr(t[x]).replace(/^'|'$/g, '')); say_refresh(); await sleep(reduceMotion ? 0 : 450); }
+        return showList();
+      case 'comp':      // comme en Python, 2 * 'ab' donne 'abab'
+        showList(); return say('[2 * x for x in t]', repr(t.map(x => typeof x === 'number' ? 2 * x : String(x).repeat(2))));
+      case 'sum':
+        if (t.some(x => typeof x !== 'number')) return err('sum(t)', "TypeError: unsupported operand type(s) for +: 'int' and 'str'");
+        showList(); return say('sum(t)', String(t.reduce((a, b) => a + b, 0)));
+      case 'reset': t = [3, 8, 1, 5]; showList(); return say('t = [3, 8, 1, 5]');
+    }
+  }
+  function say_refresh(){
+    $('console').innerHTML = lines.map(l => l[0] === '!' ? '<span class="err">' + esc(l.slice(1)) + '</span>' : esc(l)).join('\n');
+    $('console').scrollTop = $('console').scrollHeight;
+  }
+
+  // ---------- P-uplets ----------
+  const p = { tuple: ['Ada', 'Lovelace', 1815] };
+  const showTuple = o => cells('tupleView', p.tuple, o);
+  function tupleOp(op){
+    const i = parseInt($('ti').value, 10), k = norm(i, p.tuple.length);
+    if (op === 'get'){
+      if (k < 0 || k >= p.tuple.length) return err('p[' + i + ']', 'IndexError: tuple index out of range');
+      showTuple({ hot: [k] }); return say('p[' + i + ']', repr(p.tuple[k]));
+    }
+    if (op === 'set'){ showTuple({ hot: [0] }); return err("p[0] = 'Grace'", "TypeError: 'tuple' object does not support item assignment"); }
+    if (op === 'len'){ showTuple(); return say('len(p)', '3'); }
+    if (op === 'unpack'){
+      showTuple({ hot: [0, 1, 2] });
+      $('tupleVars').innerHTML = ['prenom', 'nom', 'annee'].map((n, x) => '<span>' + n + ' = ' + esc(repr(p.tuple[x])) + '</span>').join('');
+      return say('prenom, nom, annee = p\n>>> nom', repr(p.tuple[1]));
+    }
+    if (op === 'func'){ showTuple(); return say('min_max([4, 9, 2])', repr({ tuple: [2, 9] })); }
+  }
+
+  // ---------- Dictionnaires ----------
+  let d = new Map([['pomme', 3], ['poire', 5], ['kiwi', 2]]);
+  function showDict(hot){
+    $('dictView').innerHTML = d.size ? [...d].map(([k, v]) => '<div class="cell' + (k === hot ? ' hot' : '') + '"><div class="box key">' + esc(repr(k)) + '</div></div>'
+      + '<div class="cell' + (k === hot ? ' hot' : '') + '"><div class="box">' + esc(repr(v)) + '</div></div>').join('') : '<span class="muted">dictionnaire vide : {}</span>';
+  }
+  const dictRepr = () => '{' + [...d].map(([k, v]) => repr(k) + ': ' + repr(v)).join(', ') + '}';
+  async function dictOp(op){
+    const k = String(parseVal($('dk').value)), v = parseVal($('dvv').value), rk = repr(k);
+    switch (op){
+      case 'get':
+        if (!d.has(k)) return err('d[' + rk + ']', 'KeyError: ' + rk);
+        showDict(k); return say('d[' + rk + ']', repr(d.get(k)));
+      case 'set': {
+        const existed = d.has(k);
+        d.set(k, v); showDict(k);
+        return say('d[' + rk + '] = ' + repr(v) + '\n>>> d', dictRepr() + (existed ? '      # valeur remplacée' : '      # nouvelle clé'));
+      }
+      case 'del':
+        if (!d.has(k)) return err('del d[' + rk + ']', 'KeyError: ' + rk);
+        d.delete(k); showDict(); return say('del d[' + rk + ']\n>>> d', dictRepr());
+      case 'in': showDict(d.has(k) ? k : null); return say(rk + ' in d', d.has(k) ? 'True' : 'False');
+      case 'len': showDict(); return say('len(d)', String(d.size));
+      case 'keys': showDict(); return say('d.keys()', 'dict_keys([' + [...d.keys()].map(repr).join(', ') + '])');
+      case 'values': showDict(); return say('d.values()', 'dict_values([' + [...d.values()].map(repr).join(', ') + '])');
+      case 'items':
+        say('for cle, valeur in d.items():\n...     print(cle, valeur)');
+        for (const [key, val] of d){ showDict(key); lines.push(key + ' ' + repr(val).replace(/^'|'$/g, '')); say_refresh(); await sleep(reduceMotion ? 0 : 450); }
+        return showDict();
+      case 'reset': d = new Map([['pomme', 3], ['poire', 5], ['kiwi', 2]]); showDict(); return say("d = {'pomme': 3, 'poire': 5, 'kiwi': 2}");
+    }
+  }
+
+  // ---------- Interactions ----------
+  for (const [box, fn] of [['listOps', listOp], ['tupleOps', tupleOp], ['dictOps', dictOp]]){
+    for (const b of $(box).querySelectorAll('button')) b.addEventListener('click', () => fn(b.dataset.op));
+  }
+  tabs('kind');
+  showList(); showTuple(); showDict();
+  say('t = [3, 8, 1, 5]');
+  say("p = ('Ada', 'Lovelace', 1815)");
+  say("d = {'pomme': 3, 'poire': 5, 'kiwi': 2}");
+})();
+</script>
+<script>
+  // Compteur de visites GoatCounter (sans cookie), chargé uniquement sur le site en ligne
+  if (location.protocol === 'https:'){
+    const gc = document.createElement('script');
+    gc.async = true;
+    gc.src = 'https://gc.zgo.at/count.js';
+    gc.dataset.goatcounter = 'https://miyvi.goatcounter.com/count';
+    document.head.appendChild(gc);
+  }
+</script>
+</body>
+</html>

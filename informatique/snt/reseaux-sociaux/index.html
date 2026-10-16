@@ -1,0 +1,689 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Les réseaux sociaux vus comme des graphes</title>
+<style>
+  /* ---------- Thème (clair / sombre automatique) ---------- */
+  :root{
+    --bg:#f3ede1;
+    --paper:#fbf8f0;
+    --ink:#22242e;
+    --ink-soft:#5b5a52;
+    --line:#d9d0ba;
+    --wave:#b8362b;
+    --wave-glow:rgba(184,54,43,.14);
+    --accent:#2f6f4f;
+    --blue:#2c5f8a;
+    --brass:#a9793f;
+    --violet:#8a3fc0;
+    --pink:#cf5f8c;
+    --ok:#2f6f4f;
+    --warn:#b8362b;
+    --serif:"Iowan Old Style","Palatino Linotype",Palatino,Georgia,serif;
+    --sans:system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+    --mono:ui-monospace,"Cascadia Mono","SF Mono",Consolas,Menlo,monospace;
+    color-scheme: light dark;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{
+      --bg:#171a21;
+      --paper:#1e222b;
+      --ink:#eae6da;
+      --ink-soft:#9a9689;
+      --line:#33384a;
+      --wave:#ff8a72;
+      --wave-glow:rgba(255,138,114,.14);
+      --accent:#79d6a3;
+      --blue:#7fb4e0;
+      --brass:#c99a5b;
+      --violet:#c39af5;
+      --pink:#f29bbd;
+      --ok:#79d6a3;
+      --warn:#ff8a72;
+    }
+  }
+
+  /* ---------- Mise en page ---------- */
+  *{box-sizing:border-box;}
+  html, body{ margin:0; padding:0; }
+  body{
+    background:var(--bg);
+    color:var(--ink);
+    font-family:var(--sans);
+    padding:28px 16px;
+    display:flex;
+    justify-content:center;
+  }
+  main{
+    width:100%;
+    max-width:920px;
+    display:flex;
+    flex-direction:column;
+    gap:20px;
+  }
+  header{ display:flex; flex-direction:column; gap:4px; }
+  .kicker{
+    font-size:.72rem;
+    text-transform:uppercase;
+    letter-spacing:.08em;
+    color:var(--ink-soft);
+  }
+  h1{
+    font-family:var(--serif);
+    font-weight:600;
+    font-size:clamp(1.5rem, 1.1rem + 1.6vw, 2.2rem);
+    margin:0;
+    text-wrap:balance;
+  }
+  header p{
+    margin:0;
+    color:var(--ink-soft);
+    font-size:.92rem;
+    max-width:66ch;
+  }
+
+  /* ---------- Zone de simulation ---------- */
+  .scene{
+    background:var(--paper);
+    border:1px solid var(--line);
+    border-radius:14px;
+    padding:20px clamp(12px,3vw,28px) 8px;
+    display:flex;
+    flex-direction:column;
+    gap:6px;
+  }
+  .scene-top{
+    display:flex;
+    justify-content:space-between;
+    align-items:baseline;
+    gap:12px;
+    flex-wrap:wrap;
+  }
+  .scene-title{ font-family:var(--serif); font-weight:600; }
+  .status{
+    font-family:var(--mono);
+    font-size:.82rem;
+    padding:3px 10px;
+    border-radius:999px;
+    border:1px solid var(--line);
+    color:var(--ink-soft);
+  }
+  .status.ok{ color:var(--ok); border-color:var(--ok); }
+  .status.off{ color:var(--warn); border-color:var(--warn); }
+  canvas{
+    width:100%;
+    height:auto;
+    display:block;
+  }
+  canvas.draggable{ touch-action:none; cursor:grab; }
+  canvas.dragging{ cursor:grabbing; }
+  canvas.tappable{ touch-action:manipulation; }
+  .hint{ margin:0; font-size:.78rem; color:var(--ink-soft); }
+
+  /* ---------- Mesures ---------- */
+  .readouts{
+    display:grid;
+    grid-template-columns:repeat(auto-fit,minmax(150px,1fr));
+    gap:10px 18px;
+    padding-block:10px;
+    border-top:1px solid var(--line);
+    margin-top:6px;
+  }
+  .readout{ display:flex; flex-direction:column; gap:2px; }
+  .readout .label{
+    font-size:.78rem;
+    color:var(--ink-soft);
+  }
+  .readout .value{
+    font-family:var(--mono);
+    font-variant-numeric:tabular-nums;
+    font-size:1.05rem;
+    font-weight:500;
+  }
+  .readout .value em{ color:var(--blue); font-style:normal; font-size:.9rem; }
+
+  /* ---------- Contrôles ---------- */
+  .panel{
+    background:var(--paper);
+    border:1px solid var(--line);
+    border-radius:14px;
+    padding:18px clamp(14px,3vw,26px);
+    display:flex;
+    flex-direction:column;
+    gap:18px;
+  }
+  .controls{
+    display:grid;
+    grid-template-columns:repeat(auto-fit,minmax(240px,1fr));
+    gap:18px 32px;
+  }
+  .control{ display:flex; flex-direction:column; gap:6px; }
+  .control .row{
+    display:flex;
+    justify-content:space-between;
+    align-items:baseline;
+    gap:10px;
+  }
+  .control label{ font-size:.86rem; font-weight:500; }
+  .control .num{
+    font-family:var(--mono);
+    font-variant-numeric:tabular-nums;
+    color:var(--wave);
+    font-size:.92rem;
+  }
+  input[type=range]{
+    -webkit-appearance:none;
+    appearance:none;
+    width:100%;
+    height:4px;
+    margin:8px 0;
+    border-radius:999px;
+    background:var(--line);
+    outline:none;
+  }
+  input[type=range]::-webkit-slider-thumb{
+    -webkit-appearance:none;
+    width:20px; height:20px;
+    border-radius:50%;
+    background:var(--wave);
+    border:2px solid var(--paper);
+    box-shadow:0 0 0 1px var(--line);
+    cursor:pointer;
+  }
+  input[type=range]::-moz-range-thumb{
+    width:18px; height:18px;
+    border-radius:50%;
+    background:var(--wave);
+    border:2px solid var(--paper);
+    box-shadow:0 0 0 1px var(--line);
+    cursor:pointer;
+  }
+  select{
+    font-family:var(--sans);
+    font-size:.86rem;
+    padding:7px 10px;
+    border-radius:8px;
+    border:1px solid var(--line);
+    background:var(--paper);
+    color:var(--ink);
+    width:100%;
+  }
+  .check{
+    display:flex;
+    align-items:center;
+    gap:8px;
+    font-size:.86rem;
+    font-weight:500;
+    cursor:pointer;
+  }
+  .check input{ width:18px; height:18px; accent-color:var(--accent); margin:0; }
+  .buttons{ display:flex; gap:10px; flex-wrap:wrap; }
+  button{
+    font-family:var(--sans);
+    font-size:.86rem;
+    font-weight:500;
+    padding:9px 16px;
+    border-radius:8px;
+    border:1px solid var(--line);
+    background:transparent;
+    color:var(--ink);
+    cursor:pointer;
+  }
+  button.primary{
+    background:var(--accent);
+    border-color:var(--accent);
+    color:var(--paper);
+  }
+  button:focus-visible, input:focus-visible, select:focus-visible{
+    outline:2px solid var(--accent);
+    outline-offset:2px;
+  }
+
+  /* ---------- Formules ---------- */
+  .formula{
+    font-family:var(--mono);
+    font-size:.86rem;
+    color:var(--ink-soft);
+    border-top:1px solid var(--line);
+    padding-top:14px;
+    display:flex;
+    flex-wrap:wrap;
+    gap:6px 22px;
+  }
+  .formula b{ color:var(--ink); font-weight:600; }
+  footer{
+    font-size:.78rem;
+    color:var(--ink-soft);
+    text-align:center;
+    text-wrap:balance;
+  }
+
+  /* ---------- Éléments communs aux ressources d'informatique ---------- */
+  [hidden]{ display:none !important; }
+  .tabs{ display:flex; gap:6px; flex-wrap:wrap; }
+  .tabs button{ padding:7px 14px; }
+  .tabs button[aria-selected=true]{ background:var(--accent); border-color:var(--accent); color:var(--paper); }
+  input[type=text], input[type=number], textarea.field{
+    font-family:var(--mono);
+    font-size:.88rem;
+    padding:7px 10px;
+    border-radius:8px;
+    border:1px solid var(--line);
+    background:var(--paper);
+    color:var(--ink);
+    width:100%;
+  }
+  textarea.field{ resize:vertical; min-height:90px; line-height:1.45; }
+  .table-wrap{ overflow-x:auto; }
+  table.data{ border-collapse:collapse; width:100%; font-family:var(--mono); font-size:.82rem; }
+  table.data th, table.data td{ border:1px solid var(--line); padding:5px 9px; text-align:left; white-space:nowrap; }
+  table.data th{ font-family:var(--sans); font-weight:600; color:var(--ink-soft); }
+  table.data tr.hit td{ background:var(--wave-glow); }
+  pre.code{
+    font-family:var(--mono);
+    font-size:.84rem;
+    line-height:1.5;
+    background:var(--bg);
+    border:1px solid var(--line);
+    border-radius:8px;
+    padding:10px 12px;
+    overflow-x:auto;
+    margin:0;
+    white-space:pre;
+  }
+  pre.code .hl{ background:var(--wave-glow); display:inline-block; min-width:100%; }
+  .err{ color:var(--warn); }
+  .good{ color:var(--ok); }
+  .chips{ display:flex; flex-wrap:wrap; gap:6px; }
+  .chip{ font-family:var(--mono); font-size:.8rem; padding:3px 9px; border-radius:999px; border:1px solid var(--line); }
+  .row2{ display:grid; grid-template-columns:repeat(auto-fit,minmax(280px,1fr)); gap:16px; }
+  .stack{ display:flex; flex-direction:column; gap:10px; min-width:0; }
+  .inline{ display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
+  .inline input[type=text], .inline input[type=number]{ width:auto; flex:1 1 120px; }
+  h3{ font-family:var(--serif); font-weight:600; font-size:1.02rem; margin:0; }
+  .muted{ color:var(--ink-soft); font-size:.84rem; margin:0; }
+</style>
+</head>
+<body>
+
+<main>
+  <header>
+    <span class="kicker">Informatique · SNT · Réseaux sociaux</span>
+    <h1>Les réseaux sociaux vus comme des graphes</h1>
+    <p>Un réseau social se représente par un graphe : chaque personne est un sommet, chaque lien d'amitié une arête. On peut alors mesurer la distance entre deux personnes, repérer les plus éloignées (le diamètre) et les mieux placées (le centre).</p>
+  </header>
+
+  <section class="scene">
+    <div class="scene-top">
+      <div class="tabs" id="mode">
+        <button data-tab="amis">Amis d'une personne</button>
+        <button data-tab="chemin">Distance entre deux personnes</button>
+        <button data-tab="liens">Créer ou supprimer un lien</button>
+      </div>
+      <span id="status" class="status">—</span>
+    </div>
+    <canvas id="stage" class="draggable" style="aspect-ratio:1000/520" aria-label="Graphe d'amitiés entre des élèves : chaque personne est un cercle, chaque amitié un trait."></canvas>
+    <p class="hint" id="hint"></p>
+    <div class="readouts">
+      <div class="readout"><span class="label">Personnes · liens</span><span class="value" id="rSize">—</span></div>
+      <div class="readout"><span class="label">Diamètre du réseau</span><span class="value" id="rDiam">—</span></div>
+      <div class="readout"><span class="label">Rayon du réseau</span><span class="value" id="rRad">—</span></div>
+      <div class="readout"><span class="label">Centre (personnes les mieux placées)</span><span class="value" id="rCenter">—</span></div>
+      <div class="readout"><span class="label" id="rSelLabel">Sélection</span><span class="value" id="rSel">—</span></div>
+    </div>
+  </section>
+
+  <section class="panel">
+    <div class="controls">
+      <div class="control">
+        <div class="row"><label for="n">Personnes dans un réseau au hasard</label><span class="num" id="nVal"></span></div>
+        <input type="range" id="n" min="6" max="16" step="1" value="12">
+      </div>
+      <div class="control">
+        <div class="row"><label for="extra">Liens en plus du minimum</label><span class="num" id="extraVal"></span></div>
+        <input type="range" id="extra" min="0" max="20" step="1" value="5">
+      </div>
+    </div>
+    <div class="buttons">
+      <button class="primary" id="random">Nouveau réseau au hasard</button>
+      <button id="initial">Réseau de départ</button>
+      <button id="layout">Réorganiser le dessin</button>
+    </div>
+    <div class="formula">
+      <span>distance&nbsp;=&nbsp;<b>nombre minimal de liens pour aller de l'un à l'autre</b></span>
+      <span>excentricité&nbsp;=&nbsp;<b>plus grande distance depuis une personne</b></span>
+      <span>diamètre&nbsp;=&nbsp;<b>excentricité maximale</b></span>
+      <span>rayon&nbsp;=&nbsp;<b>excentricité minimale</b>, atteinte par le <b>centre</b></span>
+    </div>
+  </section>
+
+  <footer>Effet petit monde : dans les grands réseaux sociaux réels, deux personnes quelconques sont en général reliées par une chaîne de quelques intermédiaires seulement. Les personnes de ce réseau sont fictives.</footer>
+</main>
+
+<script>
+(function(){
+  // ---------- Utilitaires ----------
+  const $ = id => document.getElementById(id);
+  const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
+  const fmt = (v, d) => Number.isFinite(v)
+    ? v.toLocaleString('fr-FR', {minimumFractionDigits:d, maximumFractionDigits:d})
+    : '—';
+  const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const MONO = 'ui-monospace, "Cascadia Mono", "SF Mono", Consolas, Menlo, monospace';
+  const SANS = 'system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif';
+
+  // Couleurs du thème, relues si le système bascule clair/sombre
+  const C = {};
+  function readColors(){
+    const s = getComputedStyle(document.documentElement);
+    for (const n of ['bg','paper','ink','ink-soft','line','wave','wave-glow','accent','blue','brass','violet','pink']){
+      C[n.replace(/-(.)/g, (_, c) => c.toUpperCase())] = s.getPropertyValue('--' + n).trim();
+    }
+  }
+  readColors();
+  window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', readColors);
+
+  // Canvas net sur tout écran : on dessine toujours dans un repère logique W × H
+  function setupCanvas(canvas, W, H){
+    const ctx = canvas.getContext('2d');
+    function fit(){
+      const dpr = Math.min(window.devicePixelRatio || 1, 3);
+      const cw = canvas.clientWidth || W;
+      canvas.width = Math.max(1, Math.round(cw * dpr));
+      canvas.height = Math.max(1, Math.round(cw * H / W * dpr));
+      ctx.setTransform(canvas.width / W, 0, 0, canvas.height / H, 0, 0);
+    }
+    window.addEventListener('resize', fit);
+    fit();
+    return ctx;
+  }
+  // Position du pointeur (souris ou doigt) dans le repère logique
+  function pointerPos(canvas, evt, W, H){
+    const r = canvas.getBoundingClientRect();
+    return { x: (evt.clientX - r.left) * W / r.width, y: (evt.clientY - r.top) * H / r.height };
+  }
+  function arrow(ctx, x1, y1, x2, y2, color, width){
+    const len = Math.hypot(x2 - x1, y2 - y1);
+    if (len < 3) return;
+    const a = Math.atan2(y2 - y1, x2 - x1), h = Math.min(10, len * 0.5);
+    ctx.strokeStyle = color; ctx.fillStyle = color; ctx.lineWidth = width || 2.5;
+    ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2 - Math.cos(a) * h * 0.8, y2 - Math.sin(a) * h * 0.8); ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(x2, y2);
+    ctx.lineTo(x2 - h * Math.cos(a - 0.42), y2 - h * Math.sin(a - 0.42));
+    ctx.lineTo(x2 - h * Math.cos(a + 0.42), y2 - h * Math.sin(a + 0.42));
+    ctx.closePath(); ctx.fill();
+  }
+  // Pas "rond" (1, 2, 5 × 10^n) pour graduer un axe
+  function niceStep(x){
+    if (!(x > 0)) return 1;
+    const p = Math.pow(10, Math.floor(Math.log10(x))), m = x / p;
+    return (m < 1.5 ? 1 : m < 3.5 ? 2 : m < 7.5 ? 5 : 10) * p;
+  }
+
+  // Relie un curseur, une liste ou une case à cocher à un paramètre (et affiche sa valeur)
+  function bind(id, onChange, format){
+    const el = $(id), label = $(id + 'Val');
+    const val = () => el.type === 'checkbox' ? el.checked : parseFloat(el.value);
+    const show = () => { if (label && format) label.textContent = format(val()); };
+    el.addEventListener(el.type === 'range' ? 'input' : 'change', () => { onChange(val()); show(); });
+    show();
+  }
+  const out = (id, text) => { $(id).textContent = text; };
+  function setStatus(text, cls){
+    const s = $('status');
+    s.textContent = text; s.className = 'status' + (cls ? ' ' + cls : '');
+  }
+  // Repère gradué dans le rectangle g ; renvoie les conversions X(x) et Y(y)
+  function axes(ctx, g, o){
+    const xMin = o.xMin || 0, yMin = o.yMin || 0;
+    const X = x => g.x + g.w * (x - xMin) / (o.xMax - xMin);
+    const Y = y => g.y + g.h - g.h * (y - yMin) / (o.yMax - yMin);
+    const ink = o.ink || C.ink, soft = o.soft || C.inkSoft, line = o.line || C.line;
+    const sx = niceStep((o.xMax - xMin) / (o.xTicks || 6)), sy = niceStep((o.yMax - yMin) / (o.yTicks || 4));
+    const dec = s => s >= 1 ? 0 : Math.min(4, Math.ceil(-Math.log10(s) - 1e-9));
+    ctx.save();
+    ctx.font = '13px ' + MONO; ctx.lineWidth = 1; ctx.textAlign = 'center';
+    for (let k = Math.ceil(xMin / sx - 1e-9); k * sx <= o.xMax + sx * 1e-6; k++){
+      ctx.strokeStyle = line; ctx.globalAlpha = 0.55;
+      ctx.beginPath(); ctx.moveTo(X(k * sx), g.y); ctx.lineTo(X(k * sx), g.y + g.h); ctx.stroke();
+      ctx.globalAlpha = 1; ctx.fillStyle = soft;
+      ctx.fillText(fmt(k * sx + 0, dec(sx)), X(k * sx), g.y + g.h + 18);
+    }
+    ctx.textAlign = 'right';
+    for (let k = Math.ceil(yMin / sy - 1e-9); k * sy <= o.yMax + sy * 1e-6; k++){
+      ctx.strokeStyle = line; ctx.globalAlpha = 0.55;
+      ctx.beginPath(); ctx.moveTo(g.x, Y(k * sy)); ctx.lineTo(g.x + g.w, Y(k * sy)); ctx.stroke();
+      ctx.globalAlpha = 1; ctx.fillStyle = soft;
+      ctx.fillText(fmt(k * sy + 0, dec(sy)), g.x - 8, Y(k * sy) + 4);
+    }
+    const y0 = yMin < 0 ? Y(0) : g.y + g.h;
+    ctx.strokeStyle = soft; ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.moveTo(g.x, g.y); ctx.lineTo(g.x, g.y + g.h); ctx.moveTo(g.x, y0); ctx.lineTo(g.x + g.w, y0); ctx.stroke();
+    ctx.fillStyle = ink; ctx.textAlign = 'left'; ctx.font = '14px ' + SANS;
+    if (o.title) ctx.fillText(o.title, g.x + 8, g.y - 10);
+    ctx.fillStyle = soft; ctx.textAlign = 'right'; ctx.font = '13px ' + MONO;
+    if (o.xLabel) ctx.fillText(o.xLabel, g.x + g.w, g.y + g.h + 36);
+    ctx.restore();
+    return { X, Y };
+  }
+  // Onglets : boutons [data-tab] dans #id, panneaux [data-panel] de même nom
+  function tabs(id, onChange){
+    const btns = [...document.querySelectorAll('#' + id + ' button')];
+    const names = btns.map(b => b.dataset.tab);
+    const show = name => {
+      for (const b of btns) b.setAttribute('aria-selected', String(b.dataset.tab === name));
+      for (const p of document.querySelectorAll('[data-panel]')) if (names.includes(p.dataset.panel)) p.hidden = p.dataset.panel !== name;
+      if (onChange) onChange(name);
+    };
+    for (const b of btns) b.addEventListener('click', () => show(b.dataset.tab));
+    show(btns[0].dataset.tab);
+    return show;
+  }
+  const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
+  const sleep = ms => new Promise(r => setTimeout(r, ms));
+
+  // ---------- Constantes ----------
+  const W = 1000, H = 520, R = 24;
+  const NAMES = ['Ada', 'Bilal', 'Chloé', 'Dylan', 'Emma', 'Farid', 'Gaël', 'Hugo', 'Inès', 'Jade', 'Kenza', 'Léo', 'Malik', 'Nina', 'Omar', 'Paula'];
+  const START = { n: 12, edges: [[0,1],[0,2],[1,2],[1,3],[2,4],[3,5],[4,5],[5,6],[6,7],[6,8],[7,9],[8,9],[9,10],[10,11],[3,4],[2,8]] };
+  const HINTS = {
+    amis: 'Touche une personne : ses amis s\'allument et chaque personne affiche sa distance à elle. Fais glisser une personne pour la déplacer.',
+    chemin: 'Touche deux personnes : le plus court chemin entre elles s\'affiche.',
+    liens: 'Touche deux personnes pour créer le lien d\'amitié entre elles, ou le supprimer s\'il existe.'
+  };
+
+  // ---------- État ----------
+  const canvas = $('stage');
+  const ctx = setupCanvas(canvas, W, H);
+  let nodes = [], edges = [], mode = 'amis', sel = [], drag = null;
+
+  const has = (a, b) => edges.some(([x, y]) => (x === a && y === b) || (x === b && y === a));
+  const neighbors = a => edges.filter(e => e.includes(a)).map(([x, y]) => x === a ? y : x);
+  function bfs(s){
+    const d = new Array(nodes.length).fill(Infinity), prev = new Array(nodes.length).fill(-1), q = [s];
+    d[s] = 0;
+    while (q.length){
+      const u = q.shift();
+      for (const v of neighbors(u)) if (d[v] === Infinity){ d[v] = d[u] + 1; prev[v] = u; q.push(v); }
+    }
+    return { d, prev };
+  }
+  const ecc = s => Math.max(...bfs(s).d);
+
+  // ---------- Construction et dessin du graphe (disposition par ressorts) ----------
+  function setGraph(n, list){
+    nodes = Array.from({ length: n }, (_, i) => ({ name: NAMES[i], x: W / 2 + 260 * Math.cos(i * 2 * Math.PI / n), y: H / 2 + 190 * Math.sin(i * 2 * Math.PI / n) }));
+    edges = list.map(e => e.slice());
+    sel = [];
+    relax(400);
+  }
+  function relax(steps){
+    for (let s = 0; s < steps; s++){
+      const f = nodes.map(() => ({ x: 0, y: 0 }));
+      for (let i = 0; i < nodes.length; i++) for (let j = i + 1; j < nodes.length; j++){
+        const dx = nodes[j].x - nodes[i].x, dy = nodes[j].y - nodes[i].y, d2 = Math.max(dx * dx + dy * dy, 100), d = Math.sqrt(d2);
+        const rep = 26000 / d2;
+        f[i].x -= rep * dx / d; f[i].y -= rep * dy / d; f[j].x += rep * dx / d; f[j].y += rep * dy / d;
+      }
+      for (const [a, b] of edges){
+        const dx = nodes[b].x - nodes[a].x, dy = nodes[b].y - nodes[a].y, d = Math.max(Math.hypot(dx, dy), 1), k = (d - 150) * 0.04;
+        f[a].x += k * dx / d; f[a].y += k * dy / d; f[b].x -= k * dx / d; f[b].y -= k * dy / d;
+      }
+      nodes.forEach((p, i) => {
+        if (p === drag) return;
+        p.x = clamp(p.x + clamp(f[i].x + (W / 2 - p.x) * 0.002, -12, 12), R + 10, W - R - 10);
+        p.y = clamp(p.y + clamp(f[i].y + (H / 2 - p.y) * 0.006, -12, 12), R + 10, H - R - 10);
+      });
+    }
+  }
+  // Réseau au hasard toujours connexe : un arbre couvrant, puis quelques liens en plus
+  function randomGraph(n, extra){
+    const list = [];
+    for (let i = 1; i < n; i++) list.push([i, Math.floor(Math.random() * i)]);
+    let tries = 0;
+    while (extra > 0 && tries++ < 500){
+      const a = Math.floor(Math.random() * n), b = Math.floor(Math.random() * n);
+      if (a !== b && !list.some(([x, y]) => (x === a && y === b) || (x === b && y === a))){ list.push([a, b]); extra--; }
+    }
+    setGraph(n, list);
+  }
+
+  // ---------- Affichage des mesures ----------
+  function updateReadouts(){
+    out('rSize', nodes.length + ' · ' + edges.length);
+    const e = nodes.map((_, i) => ecc(i));
+    const diam = Math.max(...e), rad = Math.min(...e);
+    if (diam === Infinity){
+      out('rDiam', 'infini'); out('rRad', rad === Infinity ? 'infini' : String(rad)); out('rCenter', '—');
+      setStatus('Réseau non connexe : certaines personnes ne sont pas reliées', 'off');
+    } else {
+      out('rDiam', diam + (diam > 1 ? ' liens' : ' lien')); out('rRad', rad + (rad > 1 ? ' liens' : ' lien'));
+      out('rCenter', nodes.filter((_, i) => e[i] === rad).map(p => p.name).join(', '));
+      setStatus('Réseau connexe', 'ok');
+    }
+    if (mode === 'amis' && sel.length){
+      const s = sel[0], f = neighbors(s).map(i => nodes[i].name);
+      out('rSelLabel', 'Amis de ' + nodes[s].name);
+      out('rSel', f.length + (f.length ? ' : ' + f.join(', ') : '') + ' · excentricité ' + (e[s] === Infinity ? 'infinie' : e[s]));
+    } else if (mode === 'chemin' && sel.length === 2){
+      const p = path(sel[0], sel[1]);
+      out('rSelLabel', 'Distance ' + nodes[sel[0]].name + ' → ' + nodes[sel[1]].name);
+      out('rSel', p ? (p.length - 1) + ' : ' + p.map(i => nodes[i].name).join(' → ') : 'aucun chemin');
+    } else {
+      out('rSelLabel', 'Sélection');
+      out('rSel', mode === 'chemin' && sel.length === 1 ? nodes[sel[0]].name + ' → ?' : mode === 'liens' && sel.length === 1 ? nodes[sel[0]].name + ' et… ?' : '—');
+    }
+  }
+  function path(a, b){
+    const { d, prev } = bfs(a);
+    if (d[b] === Infinity) return null;
+    const p = [b];
+    while (p[0] !== a) p.unshift(prev[p[0]]);
+    return p;
+  }
+
+  // ---------- Rendu ----------
+  function draw(){
+    updateReadouts();
+    ctx.clearRect(0, 0, W, H);
+    const e = nodes.map((_, i) => ecc(i)), rad = Math.min(...e);
+    let onPath = [], dist = null, friends = [];
+    if (mode === 'chemin' && sel.length === 2) onPath = path(sel[0], sel[1]) || [];
+    if (mode === 'amis' && sel.length){ dist = bfs(sel[0]).d; friends = neighbors(sel[0]); }
+    const inPath = (a, b) => onPath.some((v, i) => i && ((onPath[i - 1] === a && v === b) || (onPath[i - 1] === b && v === a)));
+    for (const [a, b] of edges){
+      const hot = inPath(a, b) || (dist && (a === sel[0] || b === sel[0]));
+      ctx.strokeStyle = inPath(a, b) ? C.wave : hot ? C.accent : C.line;
+      ctx.lineWidth = hot ? 5 : 3;
+      ctx.beginPath(); ctx.moveTo(nodes[a].x, nodes[a].y); ctx.lineTo(nodes[b].x, nodes[b].y); ctx.stroke();
+    }
+    nodes.forEach((p, i) => {
+      const chosen = sel.includes(i);
+      ctx.fillStyle = chosen ? C.accent : friends.includes(i) ? C.blue : C.paper;
+      ctx.strokeStyle = onPath.includes(i) ? C.wave : C.inkSoft; ctx.lineWidth = onPath.includes(i) ? 3 : 2;
+      ctx.beginPath(); ctx.arc(p.x, p.y, R, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+      if (e[i] === rad && rad !== Infinity){
+        ctx.strokeStyle = C.brass; ctx.lineWidth = 2; ctx.setLineDash([4, 4]);
+        ctx.beginPath(); ctx.arc(p.x, p.y, R + 6, 0, Math.PI * 2); ctx.stroke(); ctx.setLineDash([]);
+      }
+      ctx.fillStyle = chosen || friends.includes(i) ? C.paper : C.ink; ctx.font = '600 12px ' + SANS; ctx.textAlign = 'center';
+      ctx.fillText(p.name, p.x, p.y + 4);
+      if (dist && i !== sel[0]){
+        ctx.fillStyle = C.wave; ctx.font = '600 13px ' + MONO;
+        ctx.fillText(dist[i] === Infinity ? '∞' : String(dist[i]), p.x + R + 4, p.y - R + 2);
+      }
+    });
+    ctx.fillStyle = C.inkSoft; ctx.font = '13px ' + SANS; ctx.textAlign = 'left';
+    ctx.setLineDash([4, 4]); ctx.strokeStyle = C.brass; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.arc(22, H - 18, 8, 0, Math.PI * 2); ctx.stroke(); ctx.setLineDash([]);
+    ctx.fillText('centre du réseau', 38, H - 14);
+  }
+
+  // ---------- Interactions ----------
+  const nodeAt = q => nodes.findIndex(p => Math.hypot(p.x - q.x, p.y - q.y) < R + 4);
+  let down = null;
+  canvas.addEventListener('pointerdown', e => {
+    const q = pointerPos(canvas, e, W, H), i = nodeAt(q);
+    if (i < 0) return;
+    down = { i, x: q.x, y: q.y, moved: false };
+    drag = nodes[i];
+    canvas.classList.add('dragging');
+    canvas.setPointerCapture(e.pointerId);
+  });
+  canvas.addEventListener('pointermove', e => {
+    if (!down) return;
+    const q = pointerPos(canvas, e, W, H);
+    if (Math.hypot(q.x - down.x, q.y - down.y) > 6) down.moved = true;
+    if (down.moved){ drag.x = clamp(q.x, R, W - R); drag.y = clamp(q.y, R, H - R); }
+  });
+  function release(){
+    if (down && !down.moved) tapNode(down.i);
+    down = null; drag = null;
+    canvas.classList.remove('dragging');
+  }
+  canvas.addEventListener('pointerup', release);
+  canvas.addEventListener('pointercancel', () => { down = null; drag = null; canvas.classList.remove('dragging'); });
+  function tapNode(i){
+    if (mode === 'amis'){ sel = sel[0] === i ? [] : [i]; return; }
+    if (sel.length >= 2 || sel[0] === i){ sel = sel[0] === i && sel.length === 1 ? [] : [i]; return; }
+    sel.push(i);
+    if (mode === 'liens' && sel.length === 2){
+      const [a, b] = sel;
+      if (has(a, b)) edges = edges.filter(([x, y]) => !((x === a && y === b) || (x === b && y === a)));
+      else edges.push([a, b]);
+      sel = [];
+    }
+  }
+
+  tabs('mode', m => { mode = m; sel = []; $('hint').textContent = HINTS[m]; });
+  bind('n', () => {}, v => fmt(v, 0));
+  bind('extra', () => {}, v => fmt(v, 0));
+  $('random').addEventListener('click', () => randomGraph(+$('n').value, +$('extra').value));
+  $('initial').addEventListener('click', () => setGraph(START.n, START.edges));
+  $('layout').addEventListener('click', () => relax(300));
+  setGraph(START.n, START.edges);
+
+  // ---------- Boucle d'animation ----------
+  function loop(){
+    if (drag) relax(1);
+    draw();
+    requestAnimationFrame(loop);
+  }
+  requestAnimationFrame(loop);
+})();
+</script>
+<script>
+  // Compteur de visites GoatCounter (sans cookie), chargé uniquement sur le site en ligne
+  if (location.protocol === 'https:'){
+    const gc = document.createElement('script');
+    gc.async = true;
+    gc.src = 'https://gc.zgo.at/count.js';
+    gc.dataset.goatcounter = 'https://miyvi.goatcounter.com/count';
+    document.head.appendChild(gc);
+  }
+</script>
+</body>
+</html>

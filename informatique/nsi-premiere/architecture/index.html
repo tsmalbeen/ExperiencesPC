@@ -1,0 +1,782 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Portes logiques et machine de von Neumann</title>
+<style>
+  /* ---------- Thème (clair / sombre automatique) ---------- */
+  :root{
+    --bg:#f3ede1;
+    --paper:#fbf8f0;
+    --ink:#22242e;
+    --ink-soft:#5b5a52;
+    --line:#d9d0ba;
+    --wave:#b8362b;
+    --wave-glow:rgba(184,54,43,.14);
+    --accent:#2f6f4f;
+    --blue:#2c5f8a;
+    --brass:#a9793f;
+    --violet:#8a3fc0;
+    --pink:#cf5f8c;
+    --ok:#2f6f4f;
+    --warn:#b8362b;
+    --serif:"Iowan Old Style","Palatino Linotype",Palatino,Georgia,serif;
+    --sans:system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+    --mono:ui-monospace,"Cascadia Mono","SF Mono",Consolas,Menlo,monospace;
+    color-scheme: light dark;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{
+      --bg:#171a21;
+      --paper:#1e222b;
+      --ink:#eae6da;
+      --ink-soft:#9a9689;
+      --line:#33384a;
+      --wave:#ff8a72;
+      --wave-glow:rgba(255,138,114,.14);
+      --accent:#79d6a3;
+      --blue:#7fb4e0;
+      --brass:#c99a5b;
+      --violet:#c39af5;
+      --pink:#f29bbd;
+      --ok:#79d6a3;
+      --warn:#ff8a72;
+    }
+  }
+
+  /* ---------- Mise en page ---------- */
+  *{box-sizing:border-box;}
+  html, body{ margin:0; padding:0; }
+  body{
+    background:var(--bg);
+    color:var(--ink);
+    font-family:var(--sans);
+    padding:28px 16px;
+    display:flex;
+    justify-content:center;
+  }
+  main{
+    width:100%;
+    max-width:920px;
+    display:flex;
+    flex-direction:column;
+    gap:20px;
+  }
+  header{ display:flex; flex-direction:column; gap:4px; }
+  .kicker{
+    font-size:.72rem;
+    text-transform:uppercase;
+    letter-spacing:.08em;
+    color:var(--ink-soft);
+  }
+  h1{
+    font-family:var(--serif);
+    font-weight:600;
+    font-size:clamp(1.5rem, 1.1rem + 1.6vw, 2.2rem);
+    margin:0;
+    text-wrap:balance;
+  }
+  header p{
+    margin:0;
+    color:var(--ink-soft);
+    font-size:.92rem;
+    max-width:66ch;
+  }
+
+  /* ---------- Zone de simulation ---------- */
+  .scene{
+    background:var(--paper);
+    border:1px solid var(--line);
+    border-radius:14px;
+    padding:20px clamp(12px,3vw,28px) 8px;
+    display:flex;
+    flex-direction:column;
+    gap:6px;
+  }
+  .scene-top{
+    display:flex;
+    justify-content:space-between;
+    align-items:baseline;
+    gap:12px;
+    flex-wrap:wrap;
+  }
+  .scene-title{ font-family:var(--serif); font-weight:600; }
+  .status{
+    font-family:var(--mono);
+    font-size:.82rem;
+    padding:3px 10px;
+    border-radius:999px;
+    border:1px solid var(--line);
+    color:var(--ink-soft);
+  }
+  .status.ok{ color:var(--ok); border-color:var(--ok); }
+  .status.off{ color:var(--warn); border-color:var(--warn); }
+  canvas{
+    width:100%;
+    height:auto;
+    display:block;
+  }
+  canvas.draggable{ touch-action:none; cursor:grab; }
+  canvas.dragging{ cursor:grabbing; }
+  canvas.tappable{ touch-action:manipulation; }
+  .hint{ margin:0; font-size:.78rem; color:var(--ink-soft); }
+
+  /* ---------- Mesures ---------- */
+  .readouts{
+    display:grid;
+    grid-template-columns:repeat(auto-fit,minmax(150px,1fr));
+    gap:10px 18px;
+    padding-block:10px;
+    border-top:1px solid var(--line);
+    margin-top:6px;
+  }
+  .readout{ display:flex; flex-direction:column; gap:2px; }
+  .readout .label{
+    font-size:.78rem;
+    color:var(--ink-soft);
+  }
+  .readout .value{
+    font-family:var(--mono);
+    font-variant-numeric:tabular-nums;
+    font-size:1.05rem;
+    font-weight:500;
+  }
+  .readout .value em{ color:var(--blue); font-style:normal; font-size:.9rem; }
+
+  /* ---------- Contrôles ---------- */
+  .panel{
+    background:var(--paper);
+    border:1px solid var(--line);
+    border-radius:14px;
+    padding:18px clamp(14px,3vw,26px);
+    display:flex;
+    flex-direction:column;
+    gap:18px;
+  }
+  .controls{
+    display:grid;
+    grid-template-columns:repeat(auto-fit,minmax(240px,1fr));
+    gap:18px 32px;
+  }
+  .control{ display:flex; flex-direction:column; gap:6px; }
+  .control .row{
+    display:flex;
+    justify-content:space-between;
+    align-items:baseline;
+    gap:10px;
+  }
+  .control label{ font-size:.86rem; font-weight:500; }
+  .control .num{
+    font-family:var(--mono);
+    font-variant-numeric:tabular-nums;
+    color:var(--wave);
+    font-size:.92rem;
+  }
+  input[type=range]{
+    -webkit-appearance:none;
+    appearance:none;
+    width:100%;
+    height:4px;
+    margin:8px 0;
+    border-radius:999px;
+    background:var(--line);
+    outline:none;
+  }
+  input[type=range]::-webkit-slider-thumb{
+    -webkit-appearance:none;
+    width:20px; height:20px;
+    border-radius:50%;
+    background:var(--wave);
+    border:2px solid var(--paper);
+    box-shadow:0 0 0 1px var(--line);
+    cursor:pointer;
+  }
+  input[type=range]::-moz-range-thumb{
+    width:18px; height:18px;
+    border-radius:50%;
+    background:var(--wave);
+    border:2px solid var(--paper);
+    box-shadow:0 0 0 1px var(--line);
+    cursor:pointer;
+  }
+  select{
+    font-family:var(--sans);
+    font-size:.86rem;
+    padding:7px 10px;
+    border-radius:8px;
+    border:1px solid var(--line);
+    background:var(--paper);
+    color:var(--ink);
+    width:100%;
+  }
+  .check{
+    display:flex;
+    align-items:center;
+    gap:8px;
+    font-size:.86rem;
+    font-weight:500;
+    cursor:pointer;
+  }
+  .check input{ width:18px; height:18px; accent-color:var(--accent); margin:0; }
+  .buttons{ display:flex; gap:10px; flex-wrap:wrap; }
+  button{
+    font-family:var(--sans);
+    font-size:.86rem;
+    font-weight:500;
+    padding:9px 16px;
+    border-radius:8px;
+    border:1px solid var(--line);
+    background:transparent;
+    color:var(--ink);
+    cursor:pointer;
+  }
+  button.primary{
+    background:var(--accent);
+    border-color:var(--accent);
+    color:var(--paper);
+  }
+  button:focus-visible, input:focus-visible, select:focus-visible{
+    outline:2px solid var(--accent);
+    outline-offset:2px;
+  }
+
+  /* ---------- Formules ---------- */
+  .formula{
+    font-family:var(--mono);
+    font-size:.86rem;
+    color:var(--ink-soft);
+    border-top:1px solid var(--line);
+    padding-top:14px;
+    display:flex;
+    flex-wrap:wrap;
+    gap:6px 22px;
+  }
+  .formula b{ color:var(--ink); font-weight:600; }
+  footer{
+    font-size:.78rem;
+    color:var(--ink-soft);
+    text-align:center;
+    text-wrap:balance;
+  }
+
+  /* ---------- Éléments communs aux ressources d'informatique ---------- */
+  [hidden]{ display:none !important; }
+  .tabs{ display:flex; gap:6px; flex-wrap:wrap; }
+  .tabs button{ padding:7px 14px; }
+  .tabs button[aria-selected=true]{ background:var(--accent); border-color:var(--accent); color:var(--paper); }
+  input[type=text], input[type=number], textarea.field{
+    font-family:var(--mono);
+    font-size:.88rem;
+    padding:7px 10px;
+    border-radius:8px;
+    border:1px solid var(--line);
+    background:var(--paper);
+    color:var(--ink);
+    width:100%;
+  }
+  textarea.field{ resize:vertical; min-height:90px; line-height:1.45; }
+  .table-wrap{ overflow-x:auto; }
+  table.data{ border-collapse:collapse; width:100%; font-family:var(--mono); font-size:.82rem; }
+  table.data th, table.data td{ border:1px solid var(--line); padding:5px 9px; text-align:left; white-space:nowrap; }
+  table.data th{ font-family:var(--sans); font-weight:600; color:var(--ink-soft); }
+  table.data tr.hit td{ background:var(--wave-glow); }
+  pre.code{
+    font-family:var(--mono);
+    font-size:.84rem;
+    line-height:1.5;
+    background:var(--bg);
+    border:1px solid var(--line);
+    border-radius:8px;
+    padding:10px 12px;
+    overflow-x:auto;
+    margin:0;
+    white-space:pre;
+  }
+  pre.code .hl{ background:var(--wave-glow); display:inline-block; min-width:100%; }
+  .err{ color:var(--warn); }
+  .good{ color:var(--ok); }
+  .chips{ display:flex; flex-wrap:wrap; gap:6px; }
+  .chip{ font-family:var(--mono); font-size:.8rem; padding:3px 9px; border-radius:999px; border:1px solid var(--line); }
+  .row2{ display:grid; grid-template-columns:repeat(auto-fit,minmax(280px,1fr)); gap:16px; }
+  .stack{ display:flex; flex-direction:column; gap:10px; min-width:0; }
+  .inline{ display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
+  .inline input[type=text], .inline input[type=number]{ width:auto; flex:1 1 120px; }
+  h3{ font-family:var(--serif); font-weight:600; font-size:1.02rem; margin:0; }
+  .muted{ color:var(--ink-soft); font-size:.84rem; margin:0; }
+  .machine{ display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1.2fr); gap:16px; }
+  @media (max-width: 720px){ .machine{ grid-template-columns:minmax(0,1fr); } }
+  .cpu{ border:2px solid var(--line); border-radius:12px; padding:14px; display:flex; flex-direction:column; gap:10px; }
+  .reg{ display:flex; justify-content:space-between; align-items:baseline; gap:10px; border:1px solid var(--line); border-radius:8px; padding:8px 12px; transition:background .25s, border-color .25s; }
+  .reg span{ font-size:.82rem; color:var(--ink-soft); }
+  .reg b{ font-family:var(--mono); font-size:1.05rem; }
+  .hot{ background:var(--wave-glow); border-color:var(--wave) !important; }
+  table.mem td:nth-child(2){ font-weight:600; }
+  table.mem tr.pc td:first-child::before{ content:'PC → '; color:var(--wave); }
+  .phase{ border-left:3px solid var(--accent); padding:6px 12px; margin:0; font-size:.9rem; min-height:3em; }
+  .outbox{ font-family:var(--mono); }
+</style>
+</head>
+<body>
+
+<main>
+  <header>
+    <span class="kicker">Informatique · NSI Première · Architectures matérielles</span>
+    <h1>Portes logiques et machine de von Neumann</h1>
+    <p>À la base de tout processeur, des portes logiques combinent des bits ; assemblées, elles savent additionner. Au niveau au-dessus, la machine de von Neumann range programme et données dans la même mémoire et répète sans fin le même cycle : charger une instruction, la décoder, l'exécuter.</p>
+  </header>
+
+  <section class="scene">
+    <div class="scene-top">
+      <div class="tabs" id="part">
+        <button data-tab="gates">Portes logiques</button>
+        <button data-tab="vn">Machine de von Neumann</button>
+      </div>
+      <span id="status" class="status">—</span>
+    </div>
+
+    <div class="stack" data-panel="gates">
+      <div class="inline">
+        <label for="circuit">Circuit</label>
+        <select id="circuit">
+          <option value="and">porte ET</option><option value="or">porte OU</option><option value="not">porte NON</option>
+          <option value="xor">porte OU exclusif</option><option value="nand">porte NON-ET</option><option value="nor">porte NON-OU</option>
+          <option value="half">demi-additionneur</option><option value="full">additionneur complet</option>
+        </select>
+      </div>
+      <canvas id="stage" class="tappable" style="aspect-ratio:1000/460" aria-label="Schéma du circuit logique avec ses entrées cliquables et ses sorties."></canvas>
+      <p class="hint">Touche une entrée (à gauche) pour la faire passer de 0 à 1, ou une ligne de la table de vérité. Un fil allumé transporte un 1.</p>
+      <div class="table-wrap"><table class="data" id="truth"></table></div>
+    </div>
+
+    <div class="stack" data-panel="vn">
+      <div class="inline">
+        <label for="prog">Programme</label>
+        <select id="prog"><option value="add">addition de deux nombres</option><option value="count">compte à rebours</option><option value="mul">multiplication par additions successives</option></select>
+      </div>
+      <div class="machine">
+        <div class="stack">
+          <div class="cpu">
+            <strong>Processeur</strong>
+            <div class="reg" id="gPC"><span>Compteur de programme (PC)</span><b id="vPC">0</b></div>
+            <div class="reg" id="gIR"><span>Registre d'instruction</span><b id="vIR">—</b></div>
+            <div class="reg" id="gACC"><span>Accumulateur (ACC)</span><b id="vACC">0</b></div>
+            <div class="reg" id="gALU"><span>Unité arithmétique et logique</span><b id="vALU">—</b></div>
+          </div>
+          <p class="phase" id="phase">Prêt. Utilise « Phase suivante » pour suivre le cycle pas à pas.</p>
+          <div class="readouts">
+            <div class="readout"><span class="label">Cycles effectués</span><span class="value" id="vCyc">0</span></div>
+            <div class="readout"><span class="label">Sortie (OUT)</span><span class="value outbox" id="vOut">—</span></div>
+          </div>
+          <div class="buttons">
+            <button class="primary" id="phaseBtn">Phase suivante</button>
+            <button id="instrBtn">Instruction suivante</button>
+            <button id="runBtn">Tout exécuter</button>
+            <button id="resetBtn">Réinitialiser</button>
+          </div>
+        </div>
+        <div class="stack">
+          <span class="muted">Mémoire : le programme et les données au même endroit</span>
+          <div class="table-wrap"><table class="data mem" id="mem"></table></div>
+          <details>
+            <summary>Écrire son propre programme</summary>
+            <p class="muted">Une ligne par case mémoire, à partir de l'adresse 0 : une instruction (LOAD 10) ou un nombre. Instructions : LOAD, STORE, ADD, SUB, JMP, JZ (saut si ACC = 0), JN (saut si ACC &lt; 0), OUT, HALT.</p>
+            <textarea class="field" id="asm" spellcheck="false" style="min-height:220px"></textarea>
+            <div class="buttons"><button id="loadAsm">Charger en mémoire</button><span class="err" id="asmErr"></span></div>
+          </details>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="panel">
+    <div class="formula">
+      <span>ET&nbsp;:&nbsp;<b>1 si les deux entrées valent 1</b></span>
+      <span>OU&nbsp;:&nbsp;<b>1 si au moins une vaut 1</b></span>
+      <span>OU exclusif&nbsp;:&nbsp;<b>1 si elles sont différentes</b></span>
+      <span>cycle&nbsp;:&nbsp;<b>charger → décoder → exécuter</b></span>
+    </div>
+  </section>
+
+  <footer>Machine volontairement minimale : 16 cases de mémoire, un seul registre de calcul (l'accumulateur). Chaque instruction est codée par un nombre : le chiffre des centaines indique l'opération, les deux derniers chiffres l'adresse concernée.</footer>
+</main>
+
+<script>
+(function(){
+  // ---------- Utilitaires ----------
+  const $ = id => document.getElementById(id);
+  const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
+  const fmt = (v, d) => Number.isFinite(v)
+    ? v.toLocaleString('fr-FR', {minimumFractionDigits:d, maximumFractionDigits:d})
+    : '—';
+  const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const MONO = 'ui-monospace, "Cascadia Mono", "SF Mono", Consolas, Menlo, monospace';
+  const SANS = 'system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif';
+
+  // Couleurs du thème, relues si le système bascule clair/sombre
+  const C = {};
+  function readColors(){
+    const s = getComputedStyle(document.documentElement);
+    for (const n of ['bg','paper','ink','ink-soft','line','wave','wave-glow','accent','blue','brass','violet','pink']){
+      C[n.replace(/-(.)/g, (_, c) => c.toUpperCase())] = s.getPropertyValue('--' + n).trim();
+    }
+  }
+  readColors();
+  window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', readColors);
+
+  // Canvas net sur tout écran : on dessine toujours dans un repère logique W × H
+  function setupCanvas(canvas, W, H){
+    const ctx = canvas.getContext('2d');
+    function fit(){
+      const dpr = Math.min(window.devicePixelRatio || 1, 3);
+      const cw = canvas.clientWidth || W;
+      canvas.width = Math.max(1, Math.round(cw * dpr));
+      canvas.height = Math.max(1, Math.round(cw * H / W * dpr));
+      ctx.setTransform(canvas.width / W, 0, 0, canvas.height / H, 0, 0);
+    }
+    window.addEventListener('resize', fit);
+    fit();
+    return ctx;
+  }
+  // Position du pointeur (souris ou doigt) dans le repère logique
+  function pointerPos(canvas, evt, W, H){
+    const r = canvas.getBoundingClientRect();
+    return { x: (evt.clientX - r.left) * W / r.width, y: (evt.clientY - r.top) * H / r.height };
+  }
+  function arrow(ctx, x1, y1, x2, y2, color, width){
+    const len = Math.hypot(x2 - x1, y2 - y1);
+    if (len < 3) return;
+    const a = Math.atan2(y2 - y1, x2 - x1), h = Math.min(10, len * 0.5);
+    ctx.strokeStyle = color; ctx.fillStyle = color; ctx.lineWidth = width || 2.5;
+    ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2 - Math.cos(a) * h * 0.8, y2 - Math.sin(a) * h * 0.8); ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(x2, y2);
+    ctx.lineTo(x2 - h * Math.cos(a - 0.42), y2 - h * Math.sin(a - 0.42));
+    ctx.lineTo(x2 - h * Math.cos(a + 0.42), y2 - h * Math.sin(a + 0.42));
+    ctx.closePath(); ctx.fill();
+  }
+  // Pas "rond" (1, 2, 5 × 10^n) pour graduer un axe
+  function niceStep(x){
+    if (!(x > 0)) return 1;
+    const p = Math.pow(10, Math.floor(Math.log10(x))), m = x / p;
+    return (m < 1.5 ? 1 : m < 3.5 ? 2 : m < 7.5 ? 5 : 10) * p;
+  }
+
+  // Relie un curseur, une liste ou une case à cocher à un paramètre (et affiche sa valeur)
+  function bind(id, onChange, format){
+    const el = $(id), label = $(id + 'Val');
+    const val = () => el.type === 'checkbox' ? el.checked : parseFloat(el.value);
+    const show = () => { if (label && format) label.textContent = format(val()); };
+    el.addEventListener(el.type === 'range' ? 'input' : 'change', () => { onChange(val()); show(); });
+    show();
+  }
+  const out = (id, text) => { $(id).textContent = text; };
+  function setStatus(text, cls){
+    const s = $('status');
+    s.textContent = text; s.className = 'status' + (cls ? ' ' + cls : '');
+  }
+  // Repère gradué dans le rectangle g ; renvoie les conversions X(x) et Y(y)
+  function axes(ctx, g, o){
+    const xMin = o.xMin || 0, yMin = o.yMin || 0;
+    const X = x => g.x + g.w * (x - xMin) / (o.xMax - xMin);
+    const Y = y => g.y + g.h - g.h * (y - yMin) / (o.yMax - yMin);
+    const ink = o.ink || C.ink, soft = o.soft || C.inkSoft, line = o.line || C.line;
+    const sx = niceStep((o.xMax - xMin) / (o.xTicks || 6)), sy = niceStep((o.yMax - yMin) / (o.yTicks || 4));
+    const dec = s => s >= 1 ? 0 : Math.min(4, Math.ceil(-Math.log10(s) - 1e-9));
+    ctx.save();
+    ctx.font = '13px ' + MONO; ctx.lineWidth = 1; ctx.textAlign = 'center';
+    for (let k = Math.ceil(xMin / sx - 1e-9); k * sx <= o.xMax + sx * 1e-6; k++){
+      ctx.strokeStyle = line; ctx.globalAlpha = 0.55;
+      ctx.beginPath(); ctx.moveTo(X(k * sx), g.y); ctx.lineTo(X(k * sx), g.y + g.h); ctx.stroke();
+      ctx.globalAlpha = 1; ctx.fillStyle = soft;
+      ctx.fillText(fmt(k * sx + 0, dec(sx)), X(k * sx), g.y + g.h + 18);
+    }
+    ctx.textAlign = 'right';
+    for (let k = Math.ceil(yMin / sy - 1e-9); k * sy <= o.yMax + sy * 1e-6; k++){
+      ctx.strokeStyle = line; ctx.globalAlpha = 0.55;
+      ctx.beginPath(); ctx.moveTo(g.x, Y(k * sy)); ctx.lineTo(g.x + g.w, Y(k * sy)); ctx.stroke();
+      ctx.globalAlpha = 1; ctx.fillStyle = soft;
+      ctx.fillText(fmt(k * sy + 0, dec(sy)), g.x - 8, Y(k * sy) + 4);
+    }
+    const y0 = yMin < 0 ? Y(0) : g.y + g.h;
+    ctx.strokeStyle = soft; ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.moveTo(g.x, g.y); ctx.lineTo(g.x, g.y + g.h); ctx.moveTo(g.x, y0); ctx.lineTo(g.x + g.w, y0); ctx.stroke();
+    ctx.fillStyle = ink; ctx.textAlign = 'left'; ctx.font = '14px ' + SANS;
+    if (o.title) ctx.fillText(o.title, g.x + 8, g.y - 10);
+    ctx.fillStyle = soft; ctx.textAlign = 'right'; ctx.font = '13px ' + MONO;
+    if (o.xLabel) ctx.fillText(o.xLabel, g.x + g.w, g.y + g.h + 36);
+    ctx.restore();
+    return { X, Y };
+  }
+  // Onglets : boutons [data-tab] dans #id, panneaux [data-panel] de même nom
+  function tabs(id, onChange){
+    const btns = [...document.querySelectorAll('#' + id + ' button')];
+    const names = btns.map(b => b.dataset.tab);
+    const show = name => {
+      for (const b of btns) b.setAttribute('aria-selected', String(b.dataset.tab === name));
+      for (const p of document.querySelectorAll('[data-panel]')) if (names.includes(p.dataset.panel)) p.hidden = p.dataset.panel !== name;
+      if (onChange) onChange(name);
+    };
+    for (const b of btns) b.addEventListener('click', () => show(b.dataset.tab));
+    show(btns[0].dataset.tab);
+    return show;
+  }
+  const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
+  const sleep = ms => new Promise(r => setTimeout(r, ms));
+
+  // =========================================================
+  // Portes logiques
+  // =========================================================
+  const W = 1000, H = 460;
+  const OPS = { and: (a, b) => a & b, or: (a, b) => a | b, xor: (a, b) => a ^ b, nand: (a, b) => 1 - (a & b), nor: (a, b) => 1 - (a | b), not: a => 1 - a };
+  const NAMES = { and: 'ET', or: 'OU', xor: 'OU X', nand: 'NON-ET', nor: 'NON-OU', not: 'NON' };
+  const single = t => ({
+    inputs: t === 'not' ? [['A', 120, 230]] : [['A', 120, 150], ['B', 120, 310]],
+    gates: [{ id: 'g', t, x: 440, y: 230, in: t === 'not' ? ['A'] : ['A', 'B'] }],
+    outputs: [['S', 'g', 800, 230]]
+  });
+  const CIRCUITS = {
+    half: { inputs: [['A', 100, 140], ['B', 100, 330]],
+      gates: [{ id: 'x', t: 'xor', x: 470, y: 150, in: ['A', 'B'] }, { id: 'a', t: 'and', x: 470, y: 330, in: ['A', 'B'] }],
+      outputs: [['S (somme)', 'x', 820, 150], ['R (retenue)', 'a', 820, 330]] },
+    full: { inputs: [['A', 70, 100], ['B', 70, 210], ['Rₑ', 70, 400]],
+      gates: [{ id: 'x1', t: 'xor', x: 290, y: 130, in: ['A', 'B'] }, { id: 'a1', t: 'and', x: 290, y: 280, in: ['A', 'B'] },
+              { id: 'x2', t: 'xor', x: 560, y: 160, in: ['x1', 'Rₑ'] }, { id: 'a2', t: 'and', x: 560, y: 360, in: ['x1', 'Rₑ'] },
+              { id: 'o', t: 'or', x: 760, y: 320, in: ['a1', 'a2'] }],
+      outputs: [['S (somme)', 'x2', 900, 160], ['Rₛ (retenue)', 'o', 900, 320]] }
+  };
+  const canvas = $('stage');
+  const ctx = setupCanvas(canvas, W, H);
+  let circ, vals = {};
+
+  function load(){
+    const k = $('circuit').value;
+    circ = CIRCUITS[k] || single(k);
+    vals = {};
+    for (const [n] of circ.inputs) vals[n] = 0;
+    drawGates();
+  }
+  function evaluate(v){
+    const out = Object.assign({}, v);
+    for (const g of circ.gates) out[g.id] = OPS[g.t](...g.in.map(s => out[s]));
+    return out;
+  }
+  // Position du point de sortie d'une source (entrée ou porte)
+  function src(id){
+    const i = circ.inputs.find(x => x[0] === id);
+    if (i) return { x: i[1] + 26, y: i[2] };
+    const g = circ.gates.find(x => x.id === id);
+    return { x: bodyEnd(g) + (NEG.includes(g.t) ? 12 : 0), y: g.y };
+  }
+  // Abscisse du bout droit du dessin de la porte (avant l'éventuel rond de négation)
+  const NEG = ['nand', 'nor', 'not'];
+  const bodyEnd = g => g.x + (g.t === 'and' || g.t === 'nand' ? 40 : g.t === 'not' ? 50 : 60);
+  function gateShape(g, on){
+    const x = g.x - 60, y = g.y - 40, w = 120, h = 80;
+    ctx.fillStyle = C.paper; ctx.strokeStyle = on ? C.wave : C.ink; ctx.lineWidth = 2.5;
+    ctx.beginPath();
+    if (g.t === 'and' || g.t === 'nand'){
+      ctx.moveTo(x, y); ctx.lineTo(x + w / 2, y); ctx.arc(x + w / 2, y + h / 2, h / 2, -Math.PI / 2, Math.PI / 2); ctx.lineTo(x, y + h); ctx.closePath();
+    } else if (g.t === 'not'){
+      ctx.moveTo(x + 10, y + 5); ctx.lineTo(x + w - 10, y + h / 2); ctx.lineTo(x + 10, y + h - 5); ctx.closePath();
+    } else {
+      ctx.moveTo(x, y); ctx.quadraticCurveTo(x + w * 0.7, y, x + w, y + h / 2); ctx.quadraticCurveTo(x + w * 0.7, y + h, x, y + h);
+      ctx.quadraticCurveTo(x + w * 0.3, y + h / 2, x, y); ctx.closePath();
+    }
+    ctx.fill(); ctx.stroke();
+    if (g.t === 'xor'){ ctx.beginPath(); ctx.moveTo(x - 12, y); ctx.quadraticCurveTo(x + w * 0.3 - 12, y + h / 2, x - 12, y + h); ctx.stroke(); }
+    if (NEG.includes(g.t)){ ctx.beginPath(); ctx.arc(bodyEnd(g) + 6, g.y, 6, 0, Math.PI * 2); ctx.fill(); ctx.stroke(); }
+    ctx.fillStyle = C.ink; ctx.font = '600 14px ' + SANS; ctx.textAlign = 'center';
+    ctx.fillText(NAMES[g.t], x + (g.t === 'not' ? w / 2 - 14 : w / 2 - 8), y + h / 2 + 5);
+  }
+  function wire(a, b, on, k){
+    const mx = b.x - 40 - k * 14;
+    ctx.strokeStyle = on ? C.wave : C.inkSoft; ctx.lineWidth = on ? 4 : 2.5;
+    ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(mx, a.y); ctx.lineTo(mx, b.y); ctx.lineTo(b.x, b.y); ctx.stroke();
+    ctx.fillStyle = ctx.strokeStyle; ctx.beginPath(); ctx.arc(mx, a.y, 3.5, 0, Math.PI * 2); ctx.fill();
+  }
+  function drawGates(){
+    const v = evaluate(vals);
+    ctx.clearRect(0, 0, W, H);
+    for (const g of circ.gates){
+      g.in.forEach((s, k) => {
+        const pin = { x: g.x - 60 - (g.t === 'xor' ? 12 : 0) + (g.t === 'not' ? 10 : 0), y: g.in.length === 1 ? g.y : g.y + (k ? 20 : -20) };
+        wire(src(s), pin, v[s], k + circ.gates.indexOf(g) % 2);
+      });
+    }
+    for (const [name, s, x, y] of circ.outputs) wire(src(s), { x: x - 22, y }, v[s], 0);
+    for (const g of circ.gates) gateShape(g, v[g.id]);
+    for (const [n, x, y] of circ.inputs){
+      ctx.fillStyle = vals[n] ? C.wave : C.paper; ctx.strokeStyle = C.ink; ctx.lineWidth = 2;
+      ctx.fillRect(x - 26, y - 22, 52, 44); ctx.strokeRect(x - 26, y - 22, 52, 44);
+      ctx.fillStyle = vals[n] ? '#fff' : C.ink; ctx.font = '600 20px ' + MONO; ctx.textAlign = 'center';
+      ctx.fillText(String(vals[n]), x, y + 7);
+      ctx.fillStyle = C.ink; ctx.font = '600 15px ' + SANS; ctx.fillText(n, x, y - 30);
+    }
+    for (const [name, s, x, y] of circ.outputs){
+      ctx.fillStyle = v[s] ? C.brass : C.paper; ctx.strokeStyle = C.ink; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.arc(x, y, 22, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+      ctx.fillStyle = C.ink; ctx.font = '600 18px ' + MONO; ctx.textAlign = 'center'; ctx.fillText(String(v[s]), x, y + 6);
+      ctx.font = '600 14px ' + SANS; ctx.fillText(name, x, y - 32);
+    }
+    truth(v);
+    const outs = circ.outputs.map(o => v[o[1]]);
+    if (circ.outputs.length === 2) setStatus('En binaire : ' + circ.inputs.map(i => vals[i[0]]).join(' + ') + ' = ' + outs[1] + outs[0] + ' (soit ' + (outs[1] * 2 + outs[0]) + ')', 'ok');
+    else setStatus('Sortie : ' + outs[0], outs[0] ? 'ok' : '');
+  }
+  function truth(v){
+    const ins = circ.inputs.map(i => i[0]), n = ins.length;
+    let html = '<tr>' + ins.map(i => '<th>' + i + '</th>').join('') + circ.outputs.map(o => '<th>' + o[0] + '</th>').join('') + '</tr>';
+    for (let r = 0; r < (1 << n); r++){
+      const row = {};
+      ins.forEach((name, k) => { row[name] = (r >> (n - 1 - k)) & 1; });
+      const e = evaluate(row), cur = ins.every(i => row[i] === vals[i]);
+      html += '<tr data-r="' + r + '" style="cursor:pointer"' + (cur ? ' class="hit"' : '') + '>' + ins.map(i => '<td>' + row[i] + '</td>').join('') + circ.outputs.map(o => '<td>' + e[o[1]] + '</td>').join('') + '</tr>';
+    }
+    $('truth').innerHTML = html;
+    for (const tr of $('truth').querySelectorAll('tr[data-r]')){
+      tr.addEventListener('click', () => { const r = +tr.dataset.r; ins.forEach((name, k) => { vals[name] = (r >> (n - 1 - k)) & 1; }); drawGates(); });
+    }
+  }
+  canvas.addEventListener('pointerdown', e => {
+    const q = pointerPos(canvas, e, W, H);
+    for (const [n, x, y] of circ.inputs) if (Math.abs(q.x - x) < 34 && Math.abs(q.y - y) < 30){ vals[n] = 1 - vals[n]; drawGates(); }
+  });
+  $('circuit').addEventListener('change', load);
+  window.addEventListener('resize', () => drawGates());
+  window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => setTimeout(drawGates, 0));
+
+  // =========================================================
+  // Machine de von Neumann
+  // =========================================================
+  const OPC = { HALT: 0, LOAD: 1, STORE: 2, ADD: 3, SUB: 4, JMP: 5, JZ: 6, JN: 7, OUT: 8 };
+  const MNEMO = Object.fromEntries(Object.entries(OPC).map(([k, v]) => [v, k]));
+  const PROGS = {
+    add: ['LOAD 10', 'ADD 11', 'STORE 12', 'OUT', 'HALT', '0', '0', '0', '0', '0', '25', '17', '0'],
+    count: ['LOAD 10', 'OUT', 'SUB 11', 'STORE 10', 'JZ 6', 'JMP 0', 'OUT', 'HALT', '0', '0', '5', '1'],
+    mul: ['LOAD 14', 'ADD 12', 'STORE 14', 'LOAD 13', 'SUB 15', 'STORE 13', 'JZ 8', 'JMP 0', 'LOAD 14', 'OUT', 'HALT', '0', '6', '4', '0', '1']
+  };
+  const DATA = { add: [10, 11, 12], count: [10, 11], mul: [12, 13, 14, 15] };
+  let mem = new Array(16).fill(0), PC = 0, IR = null, ACC = 0, cycles = 0, phase = 0, outs = [], halted = false, running = null, dataCells = [];
+
+  function assemble(lines){
+    const m = new Array(16).fill(0);
+    lines = lines.map(l => l.replace(/#.*/, '').trim()).filter((l, i, a) => l || a.slice(i).some(Boolean));
+    if (lines.length > 16) throw new Error('Trop de lignes : la mémoire n\'a que 16 cases.');
+    lines.forEach((l, i) => {
+      if (!l) return;
+      const [op, arg] = l.toUpperCase().split(/\s+/);
+      if (/^-?\d+$/.test(op)){ m[i] = parseInt(op, 10); return; }
+      if (!(op in OPC)) throw new Error('Ligne ' + i + ' : instruction inconnue « ' + op + ' ».');
+      const needs = !['OUT', 'HALT'].includes(op);
+      const a = needs ? parseInt(arg, 10) : 0;
+      if (needs && !(a >= 0 && a <= 15)) throw new Error('Ligne ' + i + ' : il faut une adresse entre 0 et 15.');
+      m[i] = OPC[op] * 100 + a;
+    });
+    return m;
+  }
+  const decode = v => {
+    if (v < 0 || v > 899) return null;
+    const op = Math.floor(v / 100), a = v % 100;
+    if (!(op in MNEMO) || a > 15) return null;
+    return { op: MNEMO[op], a, text: MNEMO[op] + (['OUT', 'HALT'].includes(MNEMO[op]) ? '' : ' ' + a) };
+  };
+  function loadProg(key){
+    stop();
+    mem = assemble(PROGS[key]);
+    dataCells = DATA[key];
+    $('asm').value = PROGS[key].join('\n');
+    resetCPU();
+  }
+  function resetCPU(){
+    stop();
+    PC = 0; IR = null; ACC = 0; cycles = 0; phase = 0; outs = []; halted = false;
+    render([], 'Prêt. Utilise « Phase suivante » pour suivre le cycle pas à pas.');
+  }
+  // Une phase du cycle : 0 = chargement, 1 = décodage, 2 = exécution
+  function stepPhase(){
+    if (halted) return;
+    if (phase === 0){
+      IR = mem[PC];
+      const msg = 'Chargement : le processeur lit la case ' + PC + ' de la mémoire (' + IR + ') et la place dans le registre d\'instruction. PC passe à ' + ((PC + 1) % 16) + '.';
+      const at = PC;
+      PC = (PC + 1) % 16; phase = 1;
+      return render(['gIR', 'gPC'], msg, [at]);
+    }
+    if (phase === 1){
+      const d = decode(IR);
+      phase = 2;
+      return render(['gIR'], d ? 'Décodage : ' + IR + ' signifie « ' + d.text + ' » (opération ' + Math.floor(IR / 100) + ', adresse ' + (IR % 100) + ').' : 'Décodage : ' + IR + ' n\'est pas une instruction valide. La machine s\'arrête.');
+    }
+    const d = decode(IR);
+    phase = 0; cycles++;
+    if (!d){ halted = true; return render([], 'Arrêt : instruction invalide.'); }
+    let hot = [], cells = [], msg = '';
+    switch (d.op){
+      case 'LOAD': ACC = mem[d.a]; hot = ['gACC']; cells = [d.a]; msg = 'ACC reçoit le contenu de la case ' + d.a + ' : ' + ACC + '.'; break;
+      case 'STORE': mem[d.a] = ACC; hot = ['gACC']; cells = [d.a]; msg = 'La case ' + d.a + ' reçoit la valeur de ACC : ' + ACC + '.'; break;
+      case 'ADD': $('vALU').textContent = ACC + ' + ' + mem[d.a]; ACC += mem[d.a]; hot = ['gALU', 'gACC']; cells = [d.a]; msg = 'L\'UAL additionne ACC et la case ' + d.a + ' : ACC vaut ' + ACC + '.'; break;
+      case 'SUB': $('vALU').textContent = ACC + ' − ' + mem[d.a]; ACC -= mem[d.a]; hot = ['gALU', 'gACC']; cells = [d.a]; msg = 'L\'UAL soustrait la case ' + d.a + ' à ACC : ACC vaut ' + ACC + '.'; break;
+      case 'JMP': PC = d.a; hot = ['gPC']; msg = 'Saut : PC prend la valeur ' + d.a + '.'; break;
+      case 'JZ': if (ACC === 0){ PC = d.a; msg = 'ACC vaut 0 : saut à l\'adresse ' + d.a + '.'; } else msg = 'ACC ne vaut pas 0 : pas de saut.'; hot = ['gPC']; break;
+      case 'JN': if (ACC < 0){ PC = d.a; msg = 'ACC est négatif : saut à l\'adresse ' + d.a + '.'; } else msg = 'ACC n\'est pas négatif : pas de saut.'; hot = ['gPC']; break;
+      case 'OUT': outs.push(ACC); hot = ['gACC']; msg = 'Sortie : la machine affiche ' + ACC + '.'; break;
+      case 'HALT': halted = true; msg = 'HALT : fin du programme.'; break;
+    }
+    if (cycles > 500 && !halted){ halted = true; msg += ' Arrêt de sécurité après 500 instructions (boucle infinie ?).'; }
+    render(hot, 'Exécution : ' + msg, cells);
+  }
+  function render(hot, msg, cells){
+    cells = cells || [];
+    for (const id of ['gPC', 'gIR', 'gACC', 'gALU']) $(id).classList.toggle('hot', hot.includes(id));
+    $('vPC').textContent = PC;
+    const d = IR === null ? null : decode(IR);
+    $('vIR').textContent = IR === null ? '—' : IR + (d ? '  (' + d.text + ')' : '');
+    $('vACC').textContent = ACC;
+    if (!hot.includes('gALU')) $('vALU').textContent = '—';
+    $('vCyc').textContent = cycles;
+    $('vOut').textContent = outs.length ? outs.join(', ') : '—';
+    $('phase').textContent = msg;
+    $('mem').innerHTML = '<tr><th>Adresse</th><th>Contenu</th><th>Signification</th></tr>' + mem.map((v, i) => {
+      const dd = decode(v), isData = dataCells.includes(i);
+      return '<tr class="' + (i === PC && !halted ? 'pc ' : '') + (cells.includes(i) ? 'hit' : '') + '"><td>' + i + '</td><td>' + v + '</td><td>' + (isData ? 'donnée' : dd ? dd.text : 'donnée') + '</td></tr>';
+    }).join('');
+    setStatus(halted ? 'Programme terminé' : ['Prochaine phase : chargement', 'Prochaine phase : décodage', 'Prochaine phase : exécution'][phase], halted ? 'ok' : '');
+  }
+  function stop(){ if (running){ clearInterval(running); running = null; $('runBtn').textContent = 'Tout exécuter'; } }
+  $('phaseBtn').addEventListener('click', () => { stop(); stepPhase(); });
+  $('instrBtn').addEventListener('click', () => { stop(); do stepPhase(); while (phase !== 0 && !halted); });
+  $('runBtn').addEventListener('click', () => {
+    if (running) return stop();
+    if (halted) resetCPU();
+    running = setInterval(() => { stepPhase(); if (halted) stop(); }, reduceMotion ? 30 : 280);
+    $('runBtn').textContent = 'Arrêter';
+  });
+  $('resetBtn').addEventListener('click', () => { const k = $('prog').value; if (k !== 'custom') loadProg(k); else resetCPU(); });
+  $('prog').addEventListener('change', () => loadProg($('prog').value));
+  $('loadAsm').addEventListener('click', () => {
+    try {
+      mem = assemble($('asm').value.split('\n'));
+      dataCells = [];
+      $('asmErr').textContent = '';
+      resetCPU();
+    } catch (e) { $('asmErr').textContent = e.message; }
+  });
+
+  load();
+  loadProg('add');
+  tabs('part', p => { if (p === 'gates') drawGates(); else render([], $('phase').textContent); });
+})();
+</script>
+<script>
+  // Compteur de visites GoatCounter (sans cookie), chargé uniquement sur le site en ligne
+  if (location.protocol === 'https:'){
+    const gc = document.createElement('script');
+    gc.async = true;
+    gc.src = 'https://gc.zgo.at/count.js';
+    gc.dataset.goatcounter = 'https://miyvi.goatcounter.com/count';
+    document.head.appendChild(gc);
+  }
+</script>
+</body>
+</html>

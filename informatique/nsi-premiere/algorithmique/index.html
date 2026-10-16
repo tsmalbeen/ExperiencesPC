@@ -1,0 +1,799 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Algorithmique : tris, dichotomie, glouton, k plus proches voisins</title>
+<style>
+  /* ---------- Thème (clair / sombre automatique) ---------- */
+  :root{
+    --bg:#f3ede1;
+    --paper:#fbf8f0;
+    --ink:#22242e;
+    --ink-soft:#5b5a52;
+    --line:#d9d0ba;
+    --wave:#b8362b;
+    --wave-glow:rgba(184,54,43,.14);
+    --accent:#2f6f4f;
+    --blue:#2c5f8a;
+    --brass:#a9793f;
+    --violet:#8a3fc0;
+    --pink:#cf5f8c;
+    --ok:#2f6f4f;
+    --warn:#b8362b;
+    --serif:"Iowan Old Style","Palatino Linotype",Palatino,Georgia,serif;
+    --sans:system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+    --mono:ui-monospace,"Cascadia Mono","SF Mono",Consolas,Menlo,monospace;
+    color-scheme: light dark;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{
+      --bg:#171a21;
+      --paper:#1e222b;
+      --ink:#eae6da;
+      --ink-soft:#9a9689;
+      --line:#33384a;
+      --wave:#ff8a72;
+      --wave-glow:rgba(255,138,114,.14);
+      --accent:#79d6a3;
+      --blue:#7fb4e0;
+      --brass:#c99a5b;
+      --violet:#c39af5;
+      --pink:#f29bbd;
+      --ok:#79d6a3;
+      --warn:#ff8a72;
+    }
+  }
+
+  /* ---------- Mise en page ---------- */
+  *{box-sizing:border-box;}
+  html, body{ margin:0; padding:0; }
+  body{
+    background:var(--bg);
+    color:var(--ink);
+    font-family:var(--sans);
+    padding:28px 16px;
+    display:flex;
+    justify-content:center;
+  }
+  main{
+    width:100%;
+    max-width:920px;
+    display:flex;
+    flex-direction:column;
+    gap:20px;
+  }
+  header{ display:flex; flex-direction:column; gap:4px; }
+  .kicker{
+    font-size:.72rem;
+    text-transform:uppercase;
+    letter-spacing:.08em;
+    color:var(--ink-soft);
+  }
+  h1{
+    font-family:var(--serif);
+    font-weight:600;
+    font-size:clamp(1.5rem, 1.1rem + 1.6vw, 2.2rem);
+    margin:0;
+    text-wrap:balance;
+  }
+  header p{
+    margin:0;
+    color:var(--ink-soft);
+    font-size:.92rem;
+    max-width:66ch;
+  }
+
+  /* ---------- Zone de simulation ---------- */
+  .scene{
+    background:var(--paper);
+    border:1px solid var(--line);
+    border-radius:14px;
+    padding:20px clamp(12px,3vw,28px) 8px;
+    display:flex;
+    flex-direction:column;
+    gap:6px;
+  }
+  .scene-top{
+    display:flex;
+    justify-content:space-between;
+    align-items:baseline;
+    gap:12px;
+    flex-wrap:wrap;
+  }
+  .scene-title{ font-family:var(--serif); font-weight:600; }
+  .status{
+    font-family:var(--mono);
+    font-size:.82rem;
+    padding:3px 10px;
+    border-radius:999px;
+    border:1px solid var(--line);
+    color:var(--ink-soft);
+  }
+  .status.ok{ color:var(--ok); border-color:var(--ok); }
+  .status.off{ color:var(--warn); border-color:var(--warn); }
+  canvas{
+    width:100%;
+    height:auto;
+    display:block;
+  }
+  canvas.draggable{ touch-action:none; cursor:grab; }
+  canvas.dragging{ cursor:grabbing; }
+  canvas.tappable{ touch-action:manipulation; }
+  .hint{ margin:0; font-size:.78rem; color:var(--ink-soft); }
+
+  /* ---------- Mesures ---------- */
+  .readouts{
+    display:grid;
+    grid-template-columns:repeat(auto-fit,minmax(150px,1fr));
+    gap:10px 18px;
+    padding-block:10px;
+    border-top:1px solid var(--line);
+    margin-top:6px;
+  }
+  .readout{ display:flex; flex-direction:column; gap:2px; }
+  .readout .label{
+    font-size:.78rem;
+    color:var(--ink-soft);
+  }
+  .readout .value{
+    font-family:var(--mono);
+    font-variant-numeric:tabular-nums;
+    font-size:1.05rem;
+    font-weight:500;
+  }
+  .readout .value em{ color:var(--blue); font-style:normal; font-size:.9rem; }
+
+  /* ---------- Contrôles ---------- */
+  .panel{
+    background:var(--paper);
+    border:1px solid var(--line);
+    border-radius:14px;
+    padding:18px clamp(14px,3vw,26px);
+    display:flex;
+    flex-direction:column;
+    gap:18px;
+  }
+  .controls{
+    display:grid;
+    grid-template-columns:repeat(auto-fit,minmax(240px,1fr));
+    gap:18px 32px;
+  }
+  .control{ display:flex; flex-direction:column; gap:6px; }
+  .control .row{
+    display:flex;
+    justify-content:space-between;
+    align-items:baseline;
+    gap:10px;
+  }
+  .control label{ font-size:.86rem; font-weight:500; }
+  .control .num{
+    font-family:var(--mono);
+    font-variant-numeric:tabular-nums;
+    color:var(--wave);
+    font-size:.92rem;
+  }
+  input[type=range]{
+    -webkit-appearance:none;
+    appearance:none;
+    width:100%;
+    height:4px;
+    margin:8px 0;
+    border-radius:999px;
+    background:var(--line);
+    outline:none;
+  }
+  input[type=range]::-webkit-slider-thumb{
+    -webkit-appearance:none;
+    width:20px; height:20px;
+    border-radius:50%;
+    background:var(--wave);
+    border:2px solid var(--paper);
+    box-shadow:0 0 0 1px var(--line);
+    cursor:pointer;
+  }
+  input[type=range]::-moz-range-thumb{
+    width:18px; height:18px;
+    border-radius:50%;
+    background:var(--wave);
+    border:2px solid var(--paper);
+    box-shadow:0 0 0 1px var(--line);
+    cursor:pointer;
+  }
+  select{
+    font-family:var(--sans);
+    font-size:.86rem;
+    padding:7px 10px;
+    border-radius:8px;
+    border:1px solid var(--line);
+    background:var(--paper);
+    color:var(--ink);
+    width:100%;
+  }
+  .check{
+    display:flex;
+    align-items:center;
+    gap:8px;
+    font-size:.86rem;
+    font-weight:500;
+    cursor:pointer;
+  }
+  .check input{ width:18px; height:18px; accent-color:var(--accent); margin:0; }
+  .buttons{ display:flex; gap:10px; flex-wrap:wrap; }
+  button{
+    font-family:var(--sans);
+    font-size:.86rem;
+    font-weight:500;
+    padding:9px 16px;
+    border-radius:8px;
+    border:1px solid var(--line);
+    background:transparent;
+    color:var(--ink);
+    cursor:pointer;
+  }
+  button.primary{
+    background:var(--accent);
+    border-color:var(--accent);
+    color:var(--paper);
+  }
+  button:focus-visible, input:focus-visible, select:focus-visible{
+    outline:2px solid var(--accent);
+    outline-offset:2px;
+  }
+
+  /* ---------- Formules ---------- */
+  .formula{
+    font-family:var(--mono);
+    font-size:.86rem;
+    color:var(--ink-soft);
+    border-top:1px solid var(--line);
+    padding-top:14px;
+    display:flex;
+    flex-wrap:wrap;
+    gap:6px 22px;
+  }
+  .formula b{ color:var(--ink); font-weight:600; }
+  footer{
+    font-size:.78rem;
+    color:var(--ink-soft);
+    text-align:center;
+    text-wrap:balance;
+  }
+
+  /* ---------- Éléments communs aux ressources d'informatique ---------- */
+  [hidden]{ display:none !important; }
+  .tabs{ display:flex; gap:6px; flex-wrap:wrap; }
+  .tabs button{ padding:7px 14px; }
+  .tabs button[aria-selected=true]{ background:var(--accent); border-color:var(--accent); color:var(--paper); }
+  input[type=text], input[type=number], textarea.field{
+    font-family:var(--mono);
+    font-size:.88rem;
+    padding:7px 10px;
+    border-radius:8px;
+    border:1px solid var(--line);
+    background:var(--paper);
+    color:var(--ink);
+    width:100%;
+  }
+  textarea.field{ resize:vertical; min-height:90px; line-height:1.45; }
+  .table-wrap{ overflow-x:auto; }
+  table.data{ border-collapse:collapse; width:100%; font-family:var(--mono); font-size:.82rem; }
+  table.data th, table.data td{ border:1px solid var(--line); padding:5px 9px; text-align:left; white-space:nowrap; }
+  table.data th{ font-family:var(--sans); font-weight:600; color:var(--ink-soft); }
+  table.data tr.hit td{ background:var(--wave-glow); }
+  pre.code{
+    font-family:var(--mono);
+    font-size:.84rem;
+    line-height:1.5;
+    background:var(--bg);
+    border:1px solid var(--line);
+    border-radius:8px;
+    padding:10px 12px;
+    overflow-x:auto;
+    margin:0;
+    white-space:pre;
+  }
+  pre.code .hl{ background:var(--wave-glow); display:inline-block; min-width:100%; }
+  .err{ color:var(--warn); }
+  .good{ color:var(--ok); }
+  .chips{ display:flex; flex-wrap:wrap; gap:6px; }
+  .chip{ font-family:var(--mono); font-size:.8rem; padding:3px 9px; border-radius:999px; border:1px solid var(--line); }
+  .row2{ display:grid; grid-template-columns:repeat(auto-fit,minmax(280px,1fr)); gap:16px; }
+  .stack{ display:flex; flex-direction:column; gap:10px; min-width:0; }
+  .inline{ display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
+  .inline input[type=text], .inline input[type=number]{ width:auto; flex:1 1 120px; }
+  h3{ font-family:var(--serif); font-weight:600; font-size:1.02rem; margin:0; }
+  .muted{ color:var(--ink-soft); font-size:.84rem; margin:0; }
+  .cells{ display:flex; gap:4px; flex-wrap:wrap; }
+  .cells div{ min-width:40px; padding:8px 4px; border:2px solid var(--line); border-radius:6px; text-align:center; font-family:var(--mono); font-size:.9rem; position:relative; }
+  .cells div small{ position:absolute; top:-15px; left:0; right:0; font-size:.62rem; color:var(--ink-soft); }
+  .cells .out{ opacity:.3; }
+  .cells .mid{ border-color:var(--wave); background:var(--wave-glow); }
+  .cells .found{ border-color:var(--ok); background:var(--ok); color:var(--paper); }
+  .cells .lo, .cells .hi{ border-color:var(--blue); }
+  .coins{ display:flex; gap:8px; flex-wrap:wrap; }
+  .coin{ width:52px; height:52px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-family:var(--mono); font-weight:600; border:2px solid var(--brass); background:var(--paper); }
+  .steps{ font-family:var(--mono); font-size:.82rem; max-height:180px; overflow:auto; margin:0; padding-left:20px; }
+</style>
+</head>
+<body>
+
+<main>
+  <header>
+    <span class="kicker">Informatique · NSI Première · Algorithmique</span>
+    <h1>Algorithmique : tris, dichotomie, glouton, k plus proches voisins</h1>
+    <p>Les algorithmes du programme de Première, à exécuter pas à pas : deux tris dont on compte les opérations, la recherche dichotomique dans un tableau trié, l'algorithme glouton du rendu de monnaie et la classification par les k plus proches voisins.</p>
+  </header>
+
+  <section class="scene">
+    <div class="scene-top">
+      <div class="tabs" id="part">
+        <button data-tab="sort">Tris</button>
+        <button data-tab="dicho">Dichotomie</button>
+        <button data-tab="greedy">Rendu de monnaie</button>
+        <button data-tab="knn">k plus proches voisins</button>
+      </div>
+      <span id="status" class="status">—</span>
+    </div>
+
+    <!-- ===== Tris ===== -->
+    <div class="stack" data-panel="sort">
+      <div class="controls">
+        <div class="control"><div class="row"><label for="algo">Algorithme</label></div>
+          <select id="algo"><option value="sel">tri par sélection</option><option value="ins">tri par insertion</option></select></div>
+        <div class="control"><div class="row"><label for="order">Tableau de départ</label></div>
+          <select id="order"><option value="rand">mélangé</option><option value="almost">presque trié</option><option value="sorted">déjà trié</option><option value="rev">trié à l'envers</option></select></div>
+        <div class="control"><div class="row"><label for="size">Taille du tableau</label><span class="num" id="sizeVal"></span></div>
+          <input type="range" id="size" min="5" max="30" step="1" value="12"></div>
+      </div>
+      <canvas id="bars" style="aspect-ratio:1000/300" aria-label="Barres représentant les valeurs du tableau en cours de tri."></canvas>
+      <div class="row2">
+        <pre class="code" id="sortCode"></pre>
+        <div class="stack">
+          <div class="readouts">
+            <div class="readout"><span class="label">Comparaisons</span><span class="value" id="rCmp">0</span></div>
+            <div class="readout"><span class="label">Échanges ou décalages</span><span class="value" id="rMov">0</span></div>
+            <div class="readout"><span class="label">Au pire, pour n éléments</span><span class="value" id="rWorst">—</span></div>
+          </div>
+          <div class="buttons"><button class="primary" id="sPlay">Lancer</button><button id="sStep">Une étape</button><button id="sNew">Nouveau tableau</button></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===== Dichotomie ===== -->
+    <div class="stack" data-panel="dicho">
+      <div class="inline"><label for="target">Valeur cherchée</label><input type="number" id="target" value="42"><button class="primary" id="dStep">Une étape</button><button id="dAll">Jusqu'au bout</button><button id="dNew">Nouveau tableau</button></div>
+      <div class="cells" id="dCells" style="margin-top:14px"></div>
+      <div class="row2">
+        <pre class="code">def recherche_dichotomique(t, x):
+    gauche, droite = 0, len(t) - 1
+    while gauche &lt;= droite:
+        milieu = (gauche + droite) // 2
+        if t[milieu] == x:
+            return milieu
+        elif t[milieu] &lt; x:
+            gauche = milieu + 1
+        else:
+            droite = milieu - 1
+    return -1</pre>
+        <ol class="steps" id="dSteps"></ol>
+      </div>
+      <div class="readouts">
+        <div class="readout"><span class="label">Étapes de la dichotomie</span><span class="value" id="rD">0</span></div>
+        <div class="readout"><span class="label">Comparaisons d'une recherche case par case</span><span class="value" id="rLin">—</span></div>
+        <div class="readout"><span class="label">Au pire (n éléments)</span><span class="value" id="rLog">—</span></div>
+      </div>
+    </div>
+
+    <!-- ===== Glouton ===== -->
+    <div class="stack" data-panel="greedy">
+      <div class="controls">
+        <div class="control"><div class="row"><label for="system">Pièces et billets disponibles</label></div>
+          <select id="system">
+            <option value="200,100,50,20,10,5,2,1">euros : 200, 100, 50, 20, 10, 5, 2, 1</option>
+            <option value="4,3,1">système imaginaire : 4, 3, 1</option>
+            <option value="10,6,1">système imaginaire : 10, 6, 1</option>
+          </select></div>
+        <div class="control"><div class="row"><label for="amount">Somme à rendre</label><span class="num" id="amountVal"></span></div>
+          <input type="range" id="amount" min="1" max="400" step="1" value="87"></div>
+      </div>
+      <div class="row2">
+        <div class="stack"><h3>Algorithme glouton</h3><p class="muted">À chaque étape, on rend la plus grande valeur qui ne dépasse pas ce qu'il reste à rendre.</p><div class="coins" id="gCoins"></div><span class="value" id="gCount"></span></div>
+        <div class="stack"><h3>Meilleure solution possible</h3><p class="muted">Calculée en essayant toutes les combinaisons utiles (le moins de pièces possible).</p><div class="coins" id="oCoins"></div><span class="value" id="oCount"></span></div>
+      </div>
+      <pre class="code">def rendu_glouton(somme, valeurs):     # valeurs triées par ordre décroissant
+    rendu = []
+    for v in valeurs:
+        while somme &gt;= v:
+            rendu.append(v)
+            somme = somme - v
+    return rendu</pre>
+    </div>
+
+    <!-- ===== k plus proches voisins ===== -->
+    <div class="stack" data-panel="knn">
+      <div class="tabs" id="knnMode">
+        <button data-tab="query">Placer le point à classer</button>
+        <button data-tab="add0">Ajouter un exemple « A »</button>
+        <button data-tab="add1">Ajouter un exemple « B »</button>
+        <button data-tab="add2">Ajouter un exemple « C »</button>
+      </div>
+      <canvas id="knn" class="tappable" style="aspect-ratio:1000/420" aria-label="Nuage de points de trois classes, point à classer et ses plus proches voisins."></canvas>
+      <div class="controls">
+        <div class="control"><div class="row"><label for="k">Nombre de voisins k</label><span class="num" id="kVal"></span></div>
+          <input type="range" id="k" min="1" max="15" step="2" value="5"></div>
+        <div class="control"><div class="readout"><span class="label">Classe prédite</span><span class="value" id="rPred">—</span></div></div>
+        <div class="control"><div class="readout"><span class="label">Votes des voisins</span><span class="value" id="rVotes">—</span></div></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="panel">
+    <div class="formula" data-panel="sort"><span>sélection et insertion&nbsp;:&nbsp;<b>coût quadratique</b>, de l'ordre de n²</span><span>insertion sur un tableau déjà trié&nbsp;:&nbsp;<b>n − 1 comparaisons</b></span></div>
+    <div class="formula" data-panel="dicho"><span>chaque étape&nbsp;<b>divise par 2</b> la zone de recherche</span><span>nombre d'étapes&nbsp;≈&nbsp;<b>log₂(n)</b></span><span>condition&nbsp;:&nbsp;<b>tableau trié</b></span></div>
+    <div class="formula" data-panel="greedy"><span>glouton&nbsp;:&nbsp;<b>le meilleur choix immédiat</b>, sans revenir en arrière</span><span>optimal pour les euros, <b>pas pour tous les systèmes</b></span></div>
+    <div class="formula" data-panel="knn"><span>distance&nbsp;=&nbsp;<b>√((x₁ − x₂)² + (y₁ − y₂)²)</b></span><span>prédiction&nbsp;=&nbsp;<b>classe majoritaire parmi les k plus proches</b></span></div>
+  </section>
+
+  <footer>Les données des k plus proches voisins sont générées au hasard, en trois groupes. En cas d'égalité des votes, la classe du voisin le plus proche l'emporte.</footer>
+</main>
+
+<script>
+(function(){
+  // ---------- Utilitaires ----------
+  const $ = id => document.getElementById(id);
+  const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
+  const fmt = (v, d) => Number.isFinite(v)
+    ? v.toLocaleString('fr-FR', {minimumFractionDigits:d, maximumFractionDigits:d})
+    : '—';
+  const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const MONO = 'ui-monospace, "Cascadia Mono", "SF Mono", Consolas, Menlo, monospace';
+  const SANS = 'system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif';
+
+  // Couleurs du thème, relues si le système bascule clair/sombre
+  const C = {};
+  function readColors(){
+    const s = getComputedStyle(document.documentElement);
+    for (const n of ['bg','paper','ink','ink-soft','line','wave','wave-glow','accent','blue','brass','violet','pink']){
+      C[n.replace(/-(.)/g, (_, c) => c.toUpperCase())] = s.getPropertyValue('--' + n).trim();
+    }
+  }
+  readColors();
+  window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', readColors);
+
+  // Canvas net sur tout écran : on dessine toujours dans un repère logique W × H
+  function setupCanvas(canvas, W, H){
+    const ctx = canvas.getContext('2d');
+    function fit(){
+      const dpr = Math.min(window.devicePixelRatio || 1, 3);
+      const cw = canvas.clientWidth || W;
+      canvas.width = Math.max(1, Math.round(cw * dpr));
+      canvas.height = Math.max(1, Math.round(cw * H / W * dpr));
+      ctx.setTransform(canvas.width / W, 0, 0, canvas.height / H, 0, 0);
+    }
+    window.addEventListener('resize', fit);
+    fit();
+    return ctx;
+  }
+  // Position du pointeur (souris ou doigt) dans le repère logique
+  function pointerPos(canvas, evt, W, H){
+    const r = canvas.getBoundingClientRect();
+    return { x: (evt.clientX - r.left) * W / r.width, y: (evt.clientY - r.top) * H / r.height };
+  }
+  function arrow(ctx, x1, y1, x2, y2, color, width){
+    const len = Math.hypot(x2 - x1, y2 - y1);
+    if (len < 3) return;
+    const a = Math.atan2(y2 - y1, x2 - x1), h = Math.min(10, len * 0.5);
+    ctx.strokeStyle = color; ctx.fillStyle = color; ctx.lineWidth = width || 2.5;
+    ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2 - Math.cos(a) * h * 0.8, y2 - Math.sin(a) * h * 0.8); ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(x2, y2);
+    ctx.lineTo(x2 - h * Math.cos(a - 0.42), y2 - h * Math.sin(a - 0.42));
+    ctx.lineTo(x2 - h * Math.cos(a + 0.42), y2 - h * Math.sin(a + 0.42));
+    ctx.closePath(); ctx.fill();
+  }
+  // Pas "rond" (1, 2, 5 × 10^n) pour graduer un axe
+  function niceStep(x){
+    if (!(x > 0)) return 1;
+    const p = Math.pow(10, Math.floor(Math.log10(x))), m = x / p;
+    return (m < 1.5 ? 1 : m < 3.5 ? 2 : m < 7.5 ? 5 : 10) * p;
+  }
+
+  // Relie un curseur, une liste ou une case à cocher à un paramètre (et affiche sa valeur)
+  function bind(id, onChange, format){
+    const el = $(id), label = $(id + 'Val');
+    const val = () => el.type === 'checkbox' ? el.checked : parseFloat(el.value);
+    const show = () => { if (label && format) label.textContent = format(val()); };
+    el.addEventListener(el.type === 'range' ? 'input' : 'change', () => { onChange(val()); show(); });
+    show();
+  }
+  const out = (id, text) => { $(id).textContent = text; };
+  function setStatus(text, cls){
+    const s = $('status');
+    s.textContent = text; s.className = 'status' + (cls ? ' ' + cls : '');
+  }
+  // Repère gradué dans le rectangle g ; renvoie les conversions X(x) et Y(y)
+  function axes(ctx, g, o){
+    const xMin = o.xMin || 0, yMin = o.yMin || 0;
+    const X = x => g.x + g.w * (x - xMin) / (o.xMax - xMin);
+    const Y = y => g.y + g.h - g.h * (y - yMin) / (o.yMax - yMin);
+    const ink = o.ink || C.ink, soft = o.soft || C.inkSoft, line = o.line || C.line;
+    const sx = niceStep((o.xMax - xMin) / (o.xTicks || 6)), sy = niceStep((o.yMax - yMin) / (o.yTicks || 4));
+    const dec = s => s >= 1 ? 0 : Math.min(4, Math.ceil(-Math.log10(s) - 1e-9));
+    ctx.save();
+    ctx.font = '13px ' + MONO; ctx.lineWidth = 1; ctx.textAlign = 'center';
+    for (let k = Math.ceil(xMin / sx - 1e-9); k * sx <= o.xMax + sx * 1e-6; k++){
+      ctx.strokeStyle = line; ctx.globalAlpha = 0.55;
+      ctx.beginPath(); ctx.moveTo(X(k * sx), g.y); ctx.lineTo(X(k * sx), g.y + g.h); ctx.stroke();
+      ctx.globalAlpha = 1; ctx.fillStyle = soft;
+      ctx.fillText(fmt(k * sx + 0, dec(sx)), X(k * sx), g.y + g.h + 18);
+    }
+    ctx.textAlign = 'right';
+    for (let k = Math.ceil(yMin / sy - 1e-9); k * sy <= o.yMax + sy * 1e-6; k++){
+      ctx.strokeStyle = line; ctx.globalAlpha = 0.55;
+      ctx.beginPath(); ctx.moveTo(g.x, Y(k * sy)); ctx.lineTo(g.x + g.w, Y(k * sy)); ctx.stroke();
+      ctx.globalAlpha = 1; ctx.fillStyle = soft;
+      ctx.fillText(fmt(k * sy + 0, dec(sy)), g.x - 8, Y(k * sy) + 4);
+    }
+    const y0 = yMin < 0 ? Y(0) : g.y + g.h;
+    ctx.strokeStyle = soft; ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.moveTo(g.x, g.y); ctx.lineTo(g.x, g.y + g.h); ctx.moveTo(g.x, y0); ctx.lineTo(g.x + g.w, y0); ctx.stroke();
+    ctx.fillStyle = ink; ctx.textAlign = 'left'; ctx.font = '14px ' + SANS;
+    if (o.title) ctx.fillText(o.title, g.x + 8, g.y - 10);
+    ctx.fillStyle = soft; ctx.textAlign = 'right'; ctx.font = '13px ' + MONO;
+    if (o.xLabel) ctx.fillText(o.xLabel, g.x + g.w, g.y + g.h + 36);
+    ctx.restore();
+    return { X, Y };
+  }
+  // Onglets : boutons [data-tab] dans #id, panneaux [data-panel] de même nom
+  function tabs(id, onChange){
+    const btns = [...document.querySelectorAll('#' + id + ' button')];
+    const names = btns.map(b => b.dataset.tab);
+    const show = name => {
+      for (const b of btns) b.setAttribute('aria-selected', String(b.dataset.tab === name));
+      for (const p of document.querySelectorAll('[data-panel]')) if (names.includes(p.dataset.panel)) p.hidden = p.dataset.panel !== name;
+      if (onChange) onChange(name);
+    };
+    for (const b of btns) b.addEventListener('click', () => show(b.dataset.tab));
+    show(btns[0].dataset.tab);
+    return show;
+  }
+  const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
+  const sleep = ms => new Promise(r => setTimeout(r, ms));
+  const rnd = (a, b) => a + Math.floor(Math.random() * (b - a + 1));
+
+  // =========================================================
+  // Tris
+  // =========================================================
+  const SW = 1000, SH = 300;
+  const bars = $('bars'), bctx = setupCanvas(bars, SW, SH);
+  const CODE = {
+    sel: ['def tri_selection(t):', '    n = len(t)', '    for i in range(n - 1):', '        i_min = i', '        for j in range(i + 1, n):',
+          '            if t[j] < t[i_min]:', '                i_min = j', '        t[i], t[i_min] = t[i_min], t[i]'],
+    ins: ['def tri_insertion(t):', '    for i in range(1, len(t)):', '        x = t[i]', '        j = i', '        while j > 0 and t[j - 1] > x:',
+          '            t[j] = t[j - 1]', '            j = j - 1', '        t[j] = x']
+  };
+  let arr = [], gen = null, st = {}, cmp = 0, mov = 0, playing = null;
+
+  function* selection(t){
+    const n = t.length;
+    for (let i = 0; i < n - 1; i++){
+      let m = i;
+      for (let j = i + 1; j < n; j++){
+        cmp++;
+        yield { line: 5, a: j, b: m, done: i };
+        if (t[j] < t[m]) m = j;
+      }
+      [t[i], t[m]] = [t[m], t[i]]; mov++;
+      yield { line: 7, swap: [i, m], done: i + 1 };
+    }
+    yield { line: -1, done: n };
+  }
+  function* insertion(t){
+    for (let i = 1; i < t.length; i++){
+      const x = t[i];
+      let j = i;
+      while (j > 0){
+        cmp++;
+        yield { line: 4, a: j - 1, b: j, done: -1, key: i };
+        if (!(t[j - 1] > x)) break;
+        t[j] = t[j - 1]; mov++; j--;
+        t[j] = x;
+        yield { line: 5, swap: [j, j + 1], done: -1, key: i };
+      }
+      yield { line: 7, swap: [j, j], done: -1, key: i };
+    }
+    yield { line: -1, done: t.length };
+  }
+  function newArray(){
+    stopPlay();
+    const n = +$('size').value;
+    arr = Array.from({ length: n }, (_, i) => Math.round(8 + (i + 1) * 92 / n));
+    const o = $('order').value;
+    if (o === 'rand') for (let i = n - 1; i > 0; i--){ const j = rnd(0, i); [arr[i], arr[j]] = [arr[j], arr[i]]; }
+    if (o === 'rev') arr.reverse();
+    if (o === 'almost') for (let k = 0; k < Math.max(1, n / 6); k++){ const i = rnd(0, n - 2); [arr[i], arr[i + 1]] = [arr[i + 1], arr[i]]; }
+    cmp = 0; mov = 0; st = { line: 0, done: -1 };
+    gen = ($('algo').value === 'sel' ? selection : insertion)(arr);
+    drawSort();
+  }
+  function stepSort(){
+    if (!gen) return false;
+    const r = gen.next();
+    if (r.done){ gen = null; return false; }
+    st = r.value;
+    drawSort();
+    return st.line !== -1;
+  }
+  function stopPlay(){ if (playing){ clearInterval(playing); playing = null; } $('sPlay').textContent = 'Lancer'; }
+  function drawSort(){
+    bctx.clearRect(0, 0, SW, SH);
+    const n = arr.length, w = (SW - 40) / n;
+    arr.forEach((v, i) => {
+      const doneSel = $('algo').value === 'sel' ? i < st.done : st.done >= n;
+      let col = doneSel || st.line === -1 ? C.accent : C.line;
+      if (i === st.a || i === st.b) col = C.blue;
+      if (st.swap && st.swap.includes(i)) col = C.wave;
+      if ($('algo').value === 'ins' && i === st.key && st.line !== -1) col = st.swap && st.swap.includes(i) ? C.wave : col;
+      bctx.fillStyle = col;
+      const h = v / 100 * (SH - 40);
+      bctx.fillRect(20 + i * w + 2, SH - 20 - h, w - 4, h);
+      if (w > 26){ bctx.fillStyle = C.ink; bctx.font = '12px ' + MONO; bctx.textAlign = 'center'; bctx.fillText(String(v), 20 + i * w + w / 2, SH - 24 - h); }
+    });
+    $('sortCode').innerHTML = CODE[$('algo').value].map((l, i) => i === st.line ? '<span class="hl">' + esc(l) + '</span>' : esc(l)).join('\n');
+    out('rCmp', String(cmp)); out('rMov', String(mov));
+    out('rWorst', fmt(n * (n - 1) / 2, 0) + ' comparaisons');
+    if (st.line === -1) setStatus('Tableau trié', 'ok'); else setStatus('Tri en cours');
+  }
+  $('sStep').addEventListener('click', () => { stopPlay(); stepSort(); });
+  $('sPlay').addEventListener('click', () => {
+    if (playing) return stopPlay();
+    if (!gen) newArray();
+    playing = setInterval(() => { if (!stepSort()) stopPlay(); }, reduceMotion ? 20 : 140);
+    $('sPlay').textContent = 'Pause';
+  });
+  $('sNew').addEventListener('click', newArray);
+  for (const id of ['algo', 'order']) $(id).addEventListener('change', newArray);
+  bind('size', newArray, v => fmt(v, 0) + ' éléments');
+
+  // =========================================================
+  // Dichotomie
+  // =========================================================
+  let dArr = [], lo, hi, mid, dSteps = 0, dDone = false, foundAt = -1;
+  function dNew(){
+    const s = new Set();
+    while (s.size < 31) s.add(rnd(1, 99));
+    dArr = [...s].sort((a, b) => a - b);
+    if (!dArr.includes(+$('target').value)) $('target').value = dArr[rnd(0, 30)];
+    dReset();
+  }
+  function dReset(){ lo = 0; hi = dArr.length - 1; mid = -1; dSteps = 0; dDone = false; foundAt = -1; $('dSteps').innerHTML = ''; dRender(); }
+  function dStep(){
+    if (dDone) return false;
+    const x = +$('target').value;
+    if (lo > hi){ dDone = true; dLog('gauche > droite : la valeur n\'est pas dans le tableau, on renvoie -1'); dRender(); return false; }
+    mid = Math.floor((lo + hi) / 2); dSteps++;
+    let msg = 'gauche = ' + lo + ', droite = ' + hi + ', milieu = ' + mid + ' : t[' + mid + '] = ' + dArr[mid];
+    if (dArr[mid] === x){ foundAt = mid; dDone = true; msg += ' = ' + x + ', trouvé !'; }
+    else if (dArr[mid] < x){ msg += ' < ' + x + ' : on cherche à droite'; lo = mid + 1; }
+    else { msg += ' > ' + x + ' : on cherche à gauche'; hi = mid - 1; }
+    dLog(msg); dRender();
+    return !dDone;
+  }
+  function dLog(m){ const li = document.createElement('li'); li.textContent = m; $('dSteps').appendChild(li); $('dSteps').scrollTop = 1e6; }
+  function dRender(){
+    $('dCells').innerHTML = dArr.map((v, i) => {
+      let c = '';
+      if (i === foundAt) c = 'found';
+      else if (i === mid) c = 'mid';
+      else if (i < lo || i > hi) c = 'out';
+      return '<div class="' + c + '"><small>' + i + '</small>' + v + '</div>';
+    }).join('');
+    const x = +$('target').value, idx = dArr.indexOf(x);
+    out('rD', String(dSteps));
+    out('rLin', idx >= 0 ? String(idx + 1) : String(dArr.length) + ' (absente)');
+    out('rLog', Math.ceil(Math.log2(dArr.length + 1)) + ' étapes pour ' + dArr.length + ' éléments');
+    if (dDone) setStatus(foundAt >= 0 ? 'Trouvé à l\'indice ' + foundAt : 'Valeur absente', foundAt >= 0 ? 'ok' : 'off');
+    else setStatus('Zone de recherche : indices ' + lo + ' à ' + hi);
+  }
+  $('dStep').addEventListener('click', dStep);
+  $('dAll').addEventListener('click', () => { while (dStep()); dStep(); });
+  $('dNew').addEventListener('click', dNew);
+  $('target').addEventListener('input', dReset);
+
+  // =========================================================
+  // Rendu de monnaie
+  // =========================================================
+  function greedy(s, vals){ const r = []; for (const v of vals) while (s >= v){ r.push(v); s -= v; } return s ? null : r; }
+  function optimal(s, vals){
+    const best = new Array(s + 1).fill(null);
+    best[0] = [];
+    for (let x = 1; x <= s; x++) for (const v of vals) if (v <= x && best[x - v] && (!best[x] || best[x - v].length + 1 < best[x].length)) best[x] = best[x - v].concat([v]);
+    return best[s] && best[s].slice().sort((a, b) => b - a);
+  }
+  const coins = l => l.map(v => '<span class="coin">' + v + '</span>').join('');
+  function money(){
+    const vals = $('system').value.split(',').map(Number), s = +$('amount').value;
+    const g = greedy(s, vals), o = optimal(s, vals);
+    $('gCoins').innerHTML = coins(g); $('oCoins').innerHTML = coins(o);
+    $('gCount').textContent = g.length + (g.length > 1 ? ' pièces' : ' pièce');
+    $('oCount').textContent = o.length + (o.length > 1 ? ' pièces' : ' pièce');
+    if (g.length === o.length) setStatus('Le glouton trouve la meilleure solution', 'ok');
+    else setStatus('Le glouton n\'est pas optimal ici : ' + g.length + ' au lieu de ' + o.length, 'off');
+  }
+  $('system').addEventListener('change', () => { if ($('system').value !== '200,100,50,20,10,5,2,1' && +$('amount').value > 60) { $('amount').value = 12; $('amount').dispatchEvent(new Event('input')); } money(); });
+  bind('amount', money, v => fmt(v, 0));
+
+  // =========================================================
+  // k plus proches voisins
+  // =========================================================
+  const KW = 1000, KH = 420;
+  const kc = $('knn'), kctx = setupCanvas(kc, KW, KH);
+  const CLS = ['A', 'B', 'C'];
+  const col = c => [C.blue, C.wave, C.accent][c];
+  let pts = [], query = { x: 520, y: 210 }, kMode = 'query';
+  function gauss(){ return (Math.random() + Math.random() + Math.random() - 1.5) / 1.5; }
+  function makePoints(){
+    pts = [];
+    const centers = [[300, 140], [690, 150], [500, 320]];
+    centers.forEach(([cx, cy], c) => { for (let i = 0; i < 22; i++) pts.push({ x: clamp(cx + gauss() * 170, 20, KW - 20), y: clamp(cy + gauss() * 120, 20, KH - 20), c }); });
+  }
+  function neighbors(){
+    return pts.map(p => ({ p, d: Math.hypot(p.x - query.x, p.y - query.y) })).sort((a, b) => a.d - b.d).slice(0, +$('k').value);
+  }
+  function drawKnn(){
+    kctx.clearRect(0, 0, KW, KH);
+    const nb = neighbors();
+    const votes = [0, 0, 0];
+    nb.forEach(n => votes[n.p.c]++);
+    const top = Math.max(...votes), tied = [0, 1, 2].filter(c => votes[c] === top);
+    const pred = tied.length === 1 ? tied[0] : nb.find(n => tied.includes(n.p.c)).p.c;
+    const r = nb[nb.length - 1].d;
+    kctx.strokeStyle = C.inkSoft; kctx.setLineDash([5, 5]); kctx.lineWidth = 1.5;
+    kctx.beginPath(); kctx.arc(query.x, query.y, r, 0, Math.PI * 2); kctx.stroke(); kctx.setLineDash([]);
+    for (const n of nb){ kctx.strokeStyle = col(n.p.c); kctx.lineWidth = 2; kctx.beginPath(); kctx.moveTo(query.x, query.y); kctx.lineTo(n.p.x, n.p.y); kctx.stroke(); }
+    for (const p of pts){
+      kctx.fillStyle = col(p.c);
+      kctx.beginPath();
+      if (p.c === 0) kctx.arc(p.x, p.y, 7, 0, Math.PI * 2);
+      else if (p.c === 1) kctx.rect(p.x - 6, p.y - 6, 12, 12);
+      else { kctx.moveTo(p.x, p.y - 8); kctx.lineTo(p.x + 8, p.y + 6); kctx.lineTo(p.x - 8, p.y + 6); kctx.closePath(); }
+      kctx.fill();
+    }
+    kctx.fillStyle = col(pred); kctx.strokeStyle = C.ink; kctx.lineWidth = 3;
+    kctx.beginPath(); kctx.arc(query.x, query.y, 13, 0, Math.PI * 2); kctx.fill(); kctx.stroke();
+    kctx.fillStyle = C.paper; kctx.font = '600 13px ' + SANS; kctx.textAlign = 'center'; kctx.fillText('?', query.x, query.y + 5);
+    kctx.font = '13px ' + SANS; kctx.textAlign = 'left';
+    CLS.forEach((c, i) => { kctx.fillStyle = col(i); kctx.fillText('● classe ' + c, 14 + i * 110, KH - 12); });
+    out('rPred', 'classe ' + CLS[pred]);
+    out('rVotes', CLS.map((c, i) => c + ' : ' + votes[i]).join(' · '));
+    setStatus(tied.length > 1 ? 'Égalité : départagée par le voisin le plus proche' : 'Majorité nette', tied.length > 1 ? 'off' : 'ok');
+  }
+  kc.addEventListener('pointerdown', e => {
+    const q = pointerPos(kc, e, KW, KH);
+    if (kMode === 'query') query = q; else pts.push({ x: q.x, y: q.y, c: +kMode.slice(3) });
+    drawKnn();
+  });
+  bind('k', drawKnn, v => 'k = ' + fmt(v, 0));
+  tabs('knnMode', m => { kMode = m; });
+
+  // ---------- Onglets ----------
+  const refresh = { sort: drawSort, dicho: dRender, greedy: money, knn: drawKnn };
+  newArray(); dNew(); makePoints();
+  tabs('part', p => { stopPlay(); window.dispatchEvent(new Event('resize')); refresh[p](); });
+  window.addEventListener('resize', () => { drawSort(); drawKnn(); });
+  window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => setTimeout(() => { drawSort(); drawKnn(); }, 0));
+})();
+</script>
+<script>
+  // Compteur de visites GoatCounter (sans cookie), chargé uniquement sur le site en ligne
+  if (location.protocol === 'https:'){
+    const gc = document.createElement('script');
+    gc.async = true;
+    gc.src = 'https://gc.zgo.at/count.js';
+    gc.dataset.goatcounter = 'https://miyvi.goatcounter.com/count';
+    document.head.appendChild(gc);
+  }
+</script>
+</body>
+</html>

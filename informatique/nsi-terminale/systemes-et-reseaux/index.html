@@ -1,0 +1,723 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Ordonnancement des processus et routage</title>
+<style>
+  /* ---------- Thème (clair / sombre automatique) ---------- */
+  :root{
+    --bg:#f3ede1;
+    --paper:#fbf8f0;
+    --ink:#22242e;
+    --ink-soft:#5b5a52;
+    --line:#d9d0ba;
+    --wave:#b8362b;
+    --wave-glow:rgba(184,54,43,.14);
+    --accent:#2f6f4f;
+    --blue:#2c5f8a;
+    --brass:#a9793f;
+    --violet:#8a3fc0;
+    --pink:#cf5f8c;
+    --ok:#2f6f4f;
+    --warn:#b8362b;
+    --serif:"Iowan Old Style","Palatino Linotype",Palatino,Georgia,serif;
+    --sans:system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+    --mono:ui-monospace,"Cascadia Mono","SF Mono",Consolas,Menlo,monospace;
+    color-scheme: light dark;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{
+      --bg:#171a21;
+      --paper:#1e222b;
+      --ink:#eae6da;
+      --ink-soft:#9a9689;
+      --line:#33384a;
+      --wave:#ff8a72;
+      --wave-glow:rgba(255,138,114,.14);
+      --accent:#79d6a3;
+      --blue:#7fb4e0;
+      --brass:#c99a5b;
+      --violet:#c39af5;
+      --pink:#f29bbd;
+      --ok:#79d6a3;
+      --warn:#ff8a72;
+    }
+  }
+
+  /* ---------- Mise en page ---------- */
+  *{box-sizing:border-box;}
+  html, body{ margin:0; padding:0; }
+  body{
+    background:var(--bg);
+    color:var(--ink);
+    font-family:var(--sans);
+    padding:28px 16px;
+    display:flex;
+    justify-content:center;
+  }
+  main{
+    width:100%;
+    max-width:920px;
+    display:flex;
+    flex-direction:column;
+    gap:20px;
+  }
+  header{ display:flex; flex-direction:column; gap:4px; }
+  .kicker{
+    font-size:.72rem;
+    text-transform:uppercase;
+    letter-spacing:.08em;
+    color:var(--ink-soft);
+  }
+  h1{
+    font-family:var(--serif);
+    font-weight:600;
+    font-size:clamp(1.5rem, 1.1rem + 1.6vw, 2.2rem);
+    margin:0;
+    text-wrap:balance;
+  }
+  header p{
+    margin:0;
+    color:var(--ink-soft);
+    font-size:.92rem;
+    max-width:66ch;
+  }
+
+  /* ---------- Zone de simulation ---------- */
+  .scene{
+    background:var(--paper);
+    border:1px solid var(--line);
+    border-radius:14px;
+    padding:20px clamp(12px,3vw,28px) 8px;
+    display:flex;
+    flex-direction:column;
+    gap:6px;
+  }
+  .scene-top{
+    display:flex;
+    justify-content:space-between;
+    align-items:baseline;
+    gap:12px;
+    flex-wrap:wrap;
+  }
+  .scene-title{ font-family:var(--serif); font-weight:600; }
+  .status{
+    font-family:var(--mono);
+    font-size:.82rem;
+    padding:3px 10px;
+    border-radius:999px;
+    border:1px solid var(--line);
+    color:var(--ink-soft);
+  }
+  .status.ok{ color:var(--ok); border-color:var(--ok); }
+  .status.off{ color:var(--warn); border-color:var(--warn); }
+  canvas{
+    width:100%;
+    height:auto;
+    display:block;
+  }
+  canvas.draggable{ touch-action:none; cursor:grab; }
+  canvas.dragging{ cursor:grabbing; }
+  canvas.tappable{ touch-action:manipulation; }
+  .hint{ margin:0; font-size:.78rem; color:var(--ink-soft); }
+
+  /* ---------- Mesures ---------- */
+  .readouts{
+    display:grid;
+    grid-template-columns:repeat(auto-fit,minmax(150px,1fr));
+    gap:10px 18px;
+    padding-block:10px;
+    border-top:1px solid var(--line);
+    margin-top:6px;
+  }
+  .readout{ display:flex; flex-direction:column; gap:2px; }
+  .readout .label{
+    font-size:.78rem;
+    color:var(--ink-soft);
+  }
+  .readout .value{
+    font-family:var(--mono);
+    font-variant-numeric:tabular-nums;
+    font-size:1.05rem;
+    font-weight:500;
+  }
+  .readout .value em{ color:var(--blue); font-style:normal; font-size:.9rem; }
+
+  /* ---------- Contrôles ---------- */
+  .panel{
+    background:var(--paper);
+    border:1px solid var(--line);
+    border-radius:14px;
+    padding:18px clamp(14px,3vw,26px);
+    display:flex;
+    flex-direction:column;
+    gap:18px;
+  }
+  .controls{
+    display:grid;
+    grid-template-columns:repeat(auto-fit,minmax(240px,1fr));
+    gap:18px 32px;
+  }
+  .control{ display:flex; flex-direction:column; gap:6px; }
+  .control .row{
+    display:flex;
+    justify-content:space-between;
+    align-items:baseline;
+    gap:10px;
+  }
+  .control label{ font-size:.86rem; font-weight:500; }
+  .control .num{
+    font-family:var(--mono);
+    font-variant-numeric:tabular-nums;
+    color:var(--wave);
+    font-size:.92rem;
+  }
+  input[type=range]{
+    -webkit-appearance:none;
+    appearance:none;
+    width:100%;
+    height:4px;
+    margin:8px 0;
+    border-radius:999px;
+    background:var(--line);
+    outline:none;
+  }
+  input[type=range]::-webkit-slider-thumb{
+    -webkit-appearance:none;
+    width:20px; height:20px;
+    border-radius:50%;
+    background:var(--wave);
+    border:2px solid var(--paper);
+    box-shadow:0 0 0 1px var(--line);
+    cursor:pointer;
+  }
+  input[type=range]::-moz-range-thumb{
+    width:18px; height:18px;
+    border-radius:50%;
+    background:var(--wave);
+    border:2px solid var(--paper);
+    box-shadow:0 0 0 1px var(--line);
+    cursor:pointer;
+  }
+  select{
+    font-family:var(--sans);
+    font-size:.86rem;
+    padding:7px 10px;
+    border-radius:8px;
+    border:1px solid var(--line);
+    background:var(--paper);
+    color:var(--ink);
+    width:100%;
+  }
+  .check{
+    display:flex;
+    align-items:center;
+    gap:8px;
+    font-size:.86rem;
+    font-weight:500;
+    cursor:pointer;
+  }
+  .check input{ width:18px; height:18px; accent-color:var(--accent); margin:0; }
+  .buttons{ display:flex; gap:10px; flex-wrap:wrap; }
+  button{
+    font-family:var(--sans);
+    font-size:.86rem;
+    font-weight:500;
+    padding:9px 16px;
+    border-radius:8px;
+    border:1px solid var(--line);
+    background:transparent;
+    color:var(--ink);
+    cursor:pointer;
+  }
+  button.primary{
+    background:var(--accent);
+    border-color:var(--accent);
+    color:var(--paper);
+  }
+  button:focus-visible, input:focus-visible, select:focus-visible{
+    outline:2px solid var(--accent);
+    outline-offset:2px;
+  }
+
+  /* ---------- Formules ---------- */
+  .formula{
+    font-family:var(--mono);
+    font-size:.86rem;
+    color:var(--ink-soft);
+    border-top:1px solid var(--line);
+    padding-top:14px;
+    display:flex;
+    flex-wrap:wrap;
+    gap:6px 22px;
+  }
+  .formula b{ color:var(--ink); font-weight:600; }
+  footer{
+    font-size:.78rem;
+    color:var(--ink-soft);
+    text-align:center;
+    text-wrap:balance;
+  }
+
+  /* ---------- Éléments communs aux ressources d'informatique ---------- */
+  [hidden]{ display:none !important; }
+  .tabs{ display:flex; gap:6px; flex-wrap:wrap; }
+  .tabs button{ padding:7px 14px; }
+  .tabs button[aria-selected=true]{ background:var(--accent); border-color:var(--accent); color:var(--paper); }
+  input[type=text], input[type=number], textarea.field{
+    font-family:var(--mono);
+    font-size:.88rem;
+    padding:7px 10px;
+    border-radius:8px;
+    border:1px solid var(--line);
+    background:var(--paper);
+    color:var(--ink);
+    width:100%;
+  }
+  textarea.field{ resize:vertical; min-height:90px; line-height:1.45; }
+  .table-wrap{ overflow-x:auto; }
+  table.data{ border-collapse:collapse; width:100%; font-family:var(--mono); font-size:.82rem; }
+  table.data th, table.data td{ border:1px solid var(--line); padding:5px 9px; text-align:left; white-space:nowrap; }
+  table.data th{ font-family:var(--sans); font-weight:600; color:var(--ink-soft); }
+  table.data tr.hit td{ background:var(--wave-glow); }
+  pre.code{
+    font-family:var(--mono);
+    font-size:.84rem;
+    line-height:1.5;
+    background:var(--bg);
+    border:1px solid var(--line);
+    border-radius:8px;
+    padding:10px 12px;
+    overflow-x:auto;
+    margin:0;
+    white-space:pre;
+  }
+  pre.code .hl{ background:var(--wave-glow); display:inline-block; min-width:100%; }
+  .err{ color:var(--warn); }
+  .good{ color:var(--ok); }
+  .chips{ display:flex; flex-wrap:wrap; gap:6px; }
+  .chip{ font-family:var(--mono); font-size:.8rem; padding:3px 9px; border-radius:999px; border:1px solid var(--line); }
+  .row2{ display:grid; grid-template-columns:repeat(auto-fit,minmax(280px,1fr)); gap:16px; }
+  .stack{ display:flex; flex-direction:column; gap:10px; min-width:0; }
+  .inline{ display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
+  .inline input[type=text], .inline input[type=number]{ width:auto; flex:1 1 120px; }
+  h3{ font-family:var(--serif); font-weight:600; font-size:1.02rem; margin:0; }
+  .muted{ color:var(--ink-soft); font-size:.84rem; margin:0; }
+  table.data input{ width:70px; padding:4px 6px; }
+  table.data input.name{ width:80px; }
+  table.data td button{ padding:3px 9px; }
+</style>
+</head>
+<body>
+
+<main>
+  <header>
+    <span class="kicker">Informatique · NSI Terminale · Architectures, systèmes d'exploitation et réseaux</span>
+    <h1>Ordonnancement des processus et routage</h1>
+    <p>Le système d'exploitation partage un seul processeur entre plusieurs processus : l'ordonnanceur décide, à chaque instant, lequel s'exécute. Sur un réseau, chaque routeur tient une table qui indique par où envoyer les paquets ; les protocoles RIP et OSPF ne choisissent pas forcément le même chemin.</p>
+  </header>
+
+  <section class="scene">
+    <div class="scene-top">
+      <div class="tabs" id="part">
+        <button data-tab="sched">Ordonnancement</button>
+        <button data-tab="route">Routage RIP et OSPF</button>
+      </div>
+      <span id="status" class="status">—</span>
+    </div>
+
+    <!-- ===== Ordonnancement ===== -->
+    <div class="stack" data-panel="sched">
+      <div class="controls">
+        <div class="control"><div class="row"><label for="algo">Algorithme d'ordonnancement</label></div>
+          <select id="algo">
+            <option value="fifo">premier arrivé, premier servi</option>
+            <option value="sjf">plus court d'abord (sans interruption)</option>
+            <option value="srtf">plus court temps restant (avec interruption)</option>
+            <option value="rr" selected>tourniquet (temps partagé)</option>
+          </select></div>
+        <div class="control"><div class="row"><label for="quantum">Quantum du tourniquet</label><span class="num" id="quantumVal"></span></div>
+          <input type="range" id="quantum" min="1" max="6" step="1" value="2"></div>
+        <div class="control"><div class="row"><label for="tcur">Instant observé</label><span class="num" id="tcurVal"></span></div>
+          <input type="range" id="tcur" min="0" max="20" step="1" value="0"></div>
+      </div>
+      <canvas id="gantt" style="aspect-ratio:1000/300" aria-label="Diagramme de Gantt : quel processus occupe le processeur à chaque instant."></canvas>
+      <div class="row2">
+        <div class="stack">
+          <span class="muted">Processus (modifiables)</span>
+          <div class="table-wrap"><table class="data" id="procs"></table></div>
+          <div class="buttons"><button id="addP">Ajouter un processus</button><button class="primary" id="play">Animer</button></div>
+        </div>
+        <div class="stack">
+          <span class="muted">Résultats</span>
+          <div class="table-wrap"><table class="data" id="metrics"></table></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===== Routage ===== -->
+    <div class="stack" data-panel="route">
+      <div class="controls">
+        <div class="control"><div class="row"><label for="proto">Protocole</label></div>
+          <select id="proto"><option value="rip">RIP : le moins de sauts</option><option value="ospf">OSPF : le coût le plus faible</option></select></div>
+        <div class="control"><div class="row"><label for="src">Table de routage du routeur</label></div><select id="src"></select></div>
+        <div class="control"><div class="row"><label for="dst">Chemin vers</label></div><select id="dst"></select></div>
+      </div>
+      <canvas id="net" class="tappable" style="aspect-ratio:1000/420" aria-label="Réseau de routeurs reliés par des liaisons de débits différents."></canvas>
+      <p class="hint">Touche une liaison pour la couper ou la rétablir, et un routeur pour en faire la destination.</p>
+      <div class="table-wrap"><table class="data" id="rtable"></table></div>
+    </div>
+  </section>
+
+  <section class="panel">
+    <div class="formula" data-panel="sched">
+      <span>temps de séjour&nbsp;=&nbsp;<b>fin − arrivée</b></span>
+      <span>temps d'attente&nbsp;=&nbsp;<b>séjour − durée d'exécution</b></span>
+      <span>états d'un processus&nbsp;:&nbsp;<b>prêt, élu, terminé</b></span>
+    </div>
+    <div class="formula" data-panel="route">
+      <span>RIP&nbsp;:&nbsp;<b>distance = nombre de sauts</b></span>
+      <span>OSPF&nbsp;:&nbsp;<b>coût d'une liaison = 10<sup>8</sup>&nbsp;/&nbsp;débit en bit/s</b></span>
+      <span>chemin choisi&nbsp;:&nbsp;<b>somme minimale</b> (algorithme de Dijkstra pour OSPF)</span>
+    </div>
+  </section>
+
+  <footer>Modèles simplifiés : un seul processeur, pas d'entrées-sorties ni de changement de contexte coûteux ; dans le tourniquet, un processus qui arrive pendant un quantum passe dans la file avant celui qui vient d'être interrompu. Pour le routage, les tables sont calculées comme si le protocole avait déjà convergé.</footer>
+</main>
+
+<script>
+(function(){
+  // ---------- Utilitaires ----------
+  const $ = id => document.getElementById(id);
+  const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
+  const fmt = (v, d) => Number.isFinite(v)
+    ? v.toLocaleString('fr-FR', {minimumFractionDigits:d, maximumFractionDigits:d})
+    : '—';
+  const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const MONO = 'ui-monospace, "Cascadia Mono", "SF Mono", Consolas, Menlo, monospace';
+  const SANS = 'system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif';
+
+  // Couleurs du thème, relues si le système bascule clair/sombre
+  const C = {};
+  function readColors(){
+    const s = getComputedStyle(document.documentElement);
+    for (const n of ['bg','paper','ink','ink-soft','line','wave','wave-glow','accent','blue','brass','violet','pink']){
+      C[n.replace(/-(.)/g, (_, c) => c.toUpperCase())] = s.getPropertyValue('--' + n).trim();
+    }
+  }
+  readColors();
+  window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', readColors);
+
+  // Canvas net sur tout écran : on dessine toujours dans un repère logique W × H
+  function setupCanvas(canvas, W, H){
+    const ctx = canvas.getContext('2d');
+    function fit(){
+      const dpr = Math.min(window.devicePixelRatio || 1, 3);
+      const cw = canvas.clientWidth || W;
+      canvas.width = Math.max(1, Math.round(cw * dpr));
+      canvas.height = Math.max(1, Math.round(cw * H / W * dpr));
+      ctx.setTransform(canvas.width / W, 0, 0, canvas.height / H, 0, 0);
+    }
+    window.addEventListener('resize', fit);
+    fit();
+    return ctx;
+  }
+  // Position du pointeur (souris ou doigt) dans le repère logique
+  function pointerPos(canvas, evt, W, H){
+    const r = canvas.getBoundingClientRect();
+    return { x: (evt.clientX - r.left) * W / r.width, y: (evt.clientY - r.top) * H / r.height };
+  }
+  function arrow(ctx, x1, y1, x2, y2, color, width){
+    const len = Math.hypot(x2 - x1, y2 - y1);
+    if (len < 3) return;
+    const a = Math.atan2(y2 - y1, x2 - x1), h = Math.min(10, len * 0.5);
+    ctx.strokeStyle = color; ctx.fillStyle = color; ctx.lineWidth = width || 2.5;
+    ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2 - Math.cos(a) * h * 0.8, y2 - Math.sin(a) * h * 0.8); ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(x2, y2);
+    ctx.lineTo(x2 - h * Math.cos(a - 0.42), y2 - h * Math.sin(a - 0.42));
+    ctx.lineTo(x2 - h * Math.cos(a + 0.42), y2 - h * Math.sin(a + 0.42));
+    ctx.closePath(); ctx.fill();
+  }
+  // Pas "rond" (1, 2, 5 × 10^n) pour graduer un axe
+  function niceStep(x){
+    if (!(x > 0)) return 1;
+    const p = Math.pow(10, Math.floor(Math.log10(x))), m = x / p;
+    return (m < 1.5 ? 1 : m < 3.5 ? 2 : m < 7.5 ? 5 : 10) * p;
+  }
+
+  // Relie un curseur, une liste ou une case à cocher à un paramètre (et affiche sa valeur)
+  function bind(id, onChange, format){
+    const el = $(id), label = $(id + 'Val');
+    const val = () => el.type === 'checkbox' ? el.checked : parseFloat(el.value);
+    const show = () => { if (label && format) label.textContent = format(val()); };
+    el.addEventListener(el.type === 'range' ? 'input' : 'change', () => { onChange(val()); show(); });
+    show();
+  }
+  const out = (id, text) => { $(id).textContent = text; };
+  function setStatus(text, cls){
+    const s = $('status');
+    s.textContent = text; s.className = 'status' + (cls ? ' ' + cls : '');
+  }
+  // Repère gradué dans le rectangle g ; renvoie les conversions X(x) et Y(y)
+  function axes(ctx, g, o){
+    const xMin = o.xMin || 0, yMin = o.yMin || 0;
+    const X = x => g.x + g.w * (x - xMin) / (o.xMax - xMin);
+    const Y = y => g.y + g.h - g.h * (y - yMin) / (o.yMax - yMin);
+    const ink = o.ink || C.ink, soft = o.soft || C.inkSoft, line = o.line || C.line;
+    const sx = niceStep((o.xMax - xMin) / (o.xTicks || 6)), sy = niceStep((o.yMax - yMin) / (o.yTicks || 4));
+    const dec = s => s >= 1 ? 0 : Math.min(4, Math.ceil(-Math.log10(s) - 1e-9));
+    ctx.save();
+    ctx.font = '13px ' + MONO; ctx.lineWidth = 1; ctx.textAlign = 'center';
+    for (let k = Math.ceil(xMin / sx - 1e-9); k * sx <= o.xMax + sx * 1e-6; k++){
+      ctx.strokeStyle = line; ctx.globalAlpha = 0.55;
+      ctx.beginPath(); ctx.moveTo(X(k * sx), g.y); ctx.lineTo(X(k * sx), g.y + g.h); ctx.stroke();
+      ctx.globalAlpha = 1; ctx.fillStyle = soft;
+      ctx.fillText(fmt(k * sx + 0, dec(sx)), X(k * sx), g.y + g.h + 18);
+    }
+    ctx.textAlign = 'right';
+    for (let k = Math.ceil(yMin / sy - 1e-9); k * sy <= o.yMax + sy * 1e-6; k++){
+      ctx.strokeStyle = line; ctx.globalAlpha = 0.55;
+      ctx.beginPath(); ctx.moveTo(g.x, Y(k * sy)); ctx.lineTo(g.x + g.w, Y(k * sy)); ctx.stroke();
+      ctx.globalAlpha = 1; ctx.fillStyle = soft;
+      ctx.fillText(fmt(k * sy + 0, dec(sy)), g.x - 8, Y(k * sy) + 4);
+    }
+    const y0 = yMin < 0 ? Y(0) : g.y + g.h;
+    ctx.strokeStyle = soft; ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.moveTo(g.x, g.y); ctx.lineTo(g.x, g.y + g.h); ctx.moveTo(g.x, y0); ctx.lineTo(g.x + g.w, y0); ctx.stroke();
+    ctx.fillStyle = ink; ctx.textAlign = 'left'; ctx.font = '14px ' + SANS;
+    if (o.title) ctx.fillText(o.title, g.x + 8, g.y - 10);
+    ctx.fillStyle = soft; ctx.textAlign = 'right'; ctx.font = '13px ' + MONO;
+    if (o.xLabel) ctx.fillText(o.xLabel, g.x + g.w, g.y + g.h + 36);
+    ctx.restore();
+    return { X, Y };
+  }
+  // Onglets : boutons [data-tab] dans #id, panneaux [data-panel] de même nom
+  function tabs(id, onChange){
+    const btns = [...document.querySelectorAll('#' + id + ' button')];
+    const names = btns.map(b => b.dataset.tab);
+    const show = name => {
+      for (const b of btns) b.setAttribute('aria-selected', String(b.dataset.tab === name));
+      for (const p of document.querySelectorAll('[data-panel]')) if (names.includes(p.dataset.panel)) p.hidden = p.dataset.panel !== name;
+      if (onChange) onChange(name);
+    };
+    for (const b of btns) b.addEventListener('click', () => show(b.dataset.tab));
+    show(btns[0].dataset.tab);
+    return show;
+  }
+  const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
+  const sleep = ms => new Promise(r => setTimeout(r, ms));
+
+  // =========================================================
+  // Ordonnancement
+  // =========================================================
+  const GW = 1000, GH = 300;
+  const gc = $('gantt'), gctx = setupCanvas(gc, GW, GH);
+  let procs = [{ n: 'P1', a: 0, d: 5 }, { n: 'P2', a: 1, d: 3 }, { n: 'P3', a: 2, d: 6 }, { n: 'P4', a: 4, d: 2 }];
+  let plan = [], playing = null, atEnd = true;      // atEnd : l'instant observé suit la fin du planning
+  const COLS = () => [C.blue, C.wave, C.accent, C.brass, C.violet, C.pink, C.inkSoft];
+
+  // Renvoie la suite des tranches { p, s, e } (p = -1 : processeur inoccupé)
+  function schedule(){
+    const P = procs.map((p, i) => ({ i, a: Math.max(0, p.a | 0), d: Math.max(1, p.d | 0), left: Math.max(1, p.d | 0) }));
+    const segs = [], push = (p, s, e) => { const l = segs[segs.length - 1]; if (l && l.p === p && l.e === s) l.e = e; else segs.push({ p, s, e }); };
+    let t = 0, done = 0;
+    const algo = $('algo').value, q = +$('quantum').value;
+    if (algo === 'rr'){
+      const queue = [], seen = new Set();
+      const arrive = upTo => P.filter(p => p.a <= upTo && !seen.has(p.i)).sort((x, y) => x.a - y.a || x.i - y.i).forEach(p => { seen.add(p.i); queue.push(p); });
+      arrive(0);
+      while (done < P.length){
+        if (!queue.length){ const nxt = Math.min(...P.filter(p => !seen.has(p.i)).map(p => p.a)); push(-1, t, nxt); t = nxt; arrive(t); continue; }
+        const p = queue.shift(), run = Math.min(q, p.left);
+        push(p.i, t, t + run); t += run; p.left -= run;
+        arrive(t);
+        if (p.left > 0) queue.push(p); else { p.end = t; done++; }
+      }
+    } else {
+      while (done < P.length){
+        const ready = P.filter(p => p.a <= t && p.left > 0);
+        if (!ready.length){ const nxt = Math.min(...P.filter(p => p.left > 0).map(p => p.a)); push(-1, t, nxt); t = nxt; continue; }
+        const key = algo === 'fifo' ? p => p.a : algo === 'sjf' ? p => p.d : p => p.left;
+        ready.sort((x, y) => key(x) - key(y) || x.a - y.a || x.i - y.i);
+        const p = ready[0];
+        // Sans interruption : jusqu'au bout ; avec interruption : une unité de temps, puis on réexamine
+        const run = algo === 'srtf' ? 1 : p.left;
+        push(p.i, t, t + run); t += run; p.left -= run;
+        if (!p.left){ p.end = t; done++; }
+      }
+    }
+    return { segs, P };
+  }
+  function procTable(){
+    $('procs').innerHTML = '<tr><th>Nom</th><th>Arrivée</th><th>Durée</th><th></th></tr>' + procs.map((p, i) =>
+      '<tr><td><input class="name" type="text" data-i="' + i + '" data-k="n" value="' + esc(p.n) + '"></td><td><input type="number" min="0" max="30" data-i="' + i + '" data-k="a" value="' + p.a + '"></td>'
+      + '<td><input type="number" min="1" max="15" data-i="' + i + '" data-k="d" value="' + p.d + '"></td><td>' + (procs.length > 1 ? '<button data-del="' + i + '" aria-label="Supprimer">×</button>' : '') + '</td></tr>').join('');
+    for (const inp of $('procs').querySelectorAll('input')) inp.addEventListener('input', () => {
+      const p = procs[+inp.dataset.i];
+      p[inp.dataset.k] = inp.dataset.k === 'n' ? inp.value : clamp(parseInt(inp.value, 10) || 0, inp.dataset.k === 'd' ? 1 : 0, 30);
+      sched();
+    });
+    for (const b of $('procs').querySelectorAll('[data-del]')) b.addEventListener('click', () => { procs.splice(+b.dataset.del, 1); procTable(); sched(); });
+  }
+  function sched(){
+    const { segs, P } = schedule();
+    plan = segs;
+    const end = segs[segs.length - 1].e;
+    $('tcur').max = end;
+    if (atEnd || +$('tcur').value > end) $('tcur').value = end;
+    out('tcurVal', 't = ' + $('tcur').value);
+    drawGantt(P, end);
+    let html = '<tr><th>Processus</th><th>Fin</th><th>Temps de séjour</th><th>Temps d\'attente</th></tr>', sj = 0, at = 0;
+    P.forEach(p => { const s = p.end - p.a, w = s - p.d; sj += s; at += w; html += '<tr><td>' + esc(procs[p.i].n) + '</td><td>' + p.end + '</td><td>' + s + '</td><td>' + w + '</td></tr>'; });
+    html += '<tr class="hit"><td>Moyenne</td><td>' + end + '</td><td>' + fmt(sj / P.length, 2) + '</td><td>' + fmt(at / P.length, 2) + '</td></tr>';
+    $('metrics').innerHTML = html;
+    setStatus('Attente moyenne : ' + fmt(at / P.length, 2) + ' unités de temps');
+  }
+  function drawGantt(P, end){
+    gctx.clearRect(0, 0, GW, GH);
+    const x0 = 90, w = (GW - x0 - 30) / Math.max(1, end), rowH = Math.min(40, (GH - 70) / (P.length + 1)), cols = COLS();
+    const t = +$('tcur').value;
+    gctx.font = '600 13px ' + SANS; gctx.textAlign = 'right';
+    P.forEach((p, k) => {
+      const y = 20 + k * rowH;
+      gctx.fillStyle = C.ink; gctx.fillText(procs[p.i].n, x0 - 12, y + rowH / 2 + 4);
+      gctx.strokeStyle = C.line; gctx.lineWidth = 1; gctx.strokeRect(x0, y + 4, end * w, rowH - 8);
+      gctx.fillStyle = C.inkSoft; gctx.beginPath(); gctx.moveTo(x0 + p.a * w, y + 2); gctx.lineTo(x0 + p.a * w - 5, y - 6); gctx.lineTo(x0 + p.a * w + 5, y - 6); gctx.fill();
+      for (const s of plan.filter(s => s.p === p.i && s.s < t)){
+        gctx.fillStyle = cols[p.i % cols.length];
+        gctx.fillRect(x0 + s.s * w, y + 4, (Math.min(s.e, t) - s.s) * w, rowH - 8);
+      }
+      const running = plan.find(s => s.s <= t && t < s.e);
+      const state = t < p.a ? 'pas arrivé' : p.end <= t ? 'terminé' : running && running.p === p.i ? 'élu' : 'prêt';
+      gctx.fillStyle = state === 'élu' ? C.wave : C.inkSoft; gctx.textAlign = 'left'; gctx.font = '12px ' + SANS;
+      gctx.fillText(state, x0 + end * w + 6 > GW - 60 ? GW - 60 : x0 + end * w + 6, y + rowH / 2 + 4);
+      gctx.textAlign = 'right'; gctx.font = '600 13px ' + SANS;
+    });
+    const yAx = 24 + P.length * rowH;
+    gctx.fillStyle = C.ink; gctx.fillText('processeur', x0 - 12, yAx + rowH / 2 + 4);
+    for (const s of plan.filter(s => s.s < t)){
+      gctx.fillStyle = s.p < 0 ? C.line : cols[s.p % cols.length];
+      gctx.fillRect(x0 + s.s * w, yAx + 4, (Math.min(s.e, t) - s.s) * w, rowH - 8);
+      if (s.p >= 0 && (Math.min(s.e, t) - s.s) * w > 26){ gctx.fillStyle = '#fff'; gctx.textAlign = 'center'; gctx.fillText(procs[s.p].n, x0 + (s.s + Math.min(s.e, t)) / 2 * w, yAx + rowH / 2 + 4); }
+    }
+    gctx.strokeStyle = C.line; gctx.strokeRect(x0, yAx + 4, end * w, rowH - 8);
+    gctx.fillStyle = C.inkSoft; gctx.font = '12px ' + MONO; gctx.textAlign = 'center';
+    const step = end > 25 ? 5 : end > 12 ? 2 : 1;
+    for (let k = 0; k <= end; k += step) gctx.fillText(String(k), x0 + k * w, yAx + rowH + 16);
+    gctx.strokeStyle = C.wave; gctx.lineWidth = 2;
+    gctx.beginPath(); gctx.moveTo(x0 + t * w, 10); gctx.lineTo(x0 + t * w, yAx + rowH); gctx.stroke();
+  }
+  $('addP').addEventListener('click', () => { if (procs.length < 7){ procs.push({ n: 'P' + (procs.length + 1), a: procs.length * 2, d: 3 }); procTable(); sched(); } });
+  $('play').addEventListener('click', () => {
+    if (playing){ clearInterval(playing); playing = null; $('play').textContent = 'Animer'; return; }
+    atEnd = false; $('tcur').value = 0; $('play').textContent = 'Arrêter';
+    playing = setInterval(() => {
+      const v = +$('tcur').value + 1;
+      $('tcur').value = v; sched();
+      if (v >= +$('tcur').max){ clearInterval(playing); playing = null; atEnd = true; $('play').textContent = 'Animer'; }
+    }, reduceMotion ? 60 : 450);
+  });
+  bind('quantum', sched, v => fmt(v, 0) + (v > 1 ? ' unités' : ' unité'));
+  bind('tcur', v => { atEnd = v >= +$('tcur').max; sched(); }, v => 't = ' + fmt(v, 0));
+  $('algo').addEventListener('change', sched);
+
+  // =========================================================
+  // Routage
+  // =========================================================
+  const NW = 1000, NH = 420;
+  const nc = $('net'), nctx = setupCanvas(nc, NW, NH);
+  const R = { R1: [90, 210], R2: [280, 90], R3: [280, 330], R4: [500, 210], R5: [720, 90], R6: [720, 330], R7: [910, 210] };
+  // [routeur, routeur, débit en Mb/s]
+  const LINKS = [['R1','R2',10],['R2','R5',10],['R5','R7',10],['R1','R3',1000],['R3','R4',1000],['R4','R6',1000],['R6','R7',1000],
+                 ['R2','R4',100],['R4','R5',100],['R3','R6',100],['R2','R3',100]];
+  const cut = new Set();
+  const names = Object.keys(R);
+  $('src').innerHTML = names.map(n => '<option>' + n + '</option>').join('');
+  $('dst').innerHTML = names.map(n => '<option>' + n + '</option>').join('');
+  $('dst').value = 'R7';
+  const cost = l => $('proto').value === 'rip' ? 1 : 1e8 / (l[2] * 1e6);
+  const label = l => l[2] >= 1000 ? (l[2] / 1000) + ' Gb/s' : l[2] + ' Mb/s';
+  // Dijkstra depuis s : distance et premier routeur à emprunter pour chaque destination
+  function routes(s){
+    const d = Object.fromEntries(names.map(n => [n, Infinity])), first = {}, prev = {}, done = new Set();
+    d[s] = 0;
+    while (done.size < names.length){
+      let u = null;
+      for (const n of names) if (!done.has(n) && (u === null || d[n] < d[u] || (d[n] === d[u] && n < u))) u = n;
+      if (d[u] === Infinity) break;
+      done.add(u);
+      LINKS.forEach((l, k) => {
+        if (cut.has(k) || (l[0] !== u && l[1] !== u)) return;
+        const v = l[0] === u ? l[1] : l[0], nd = d[u] + cost(l);
+        if (nd < d[v] - 1e-9){ d[v] = nd; prev[v] = u; first[v] = u === s ? v : first[u]; }
+      });
+    }
+    return { d, first, prev };
+  }
+  function drawNet(){
+    const s = $('src').value, t = $('dst').value, r = routes(s);
+    const path = [];
+    if (r.d[t] < Infinity){ let x = t; while (x !== s){ path.unshift(x); x = r.prev[x]; } path.unshift(s); }
+    const onPath = (a, b) => path.some((v, i) => i && ((path[i - 1] === a && v === b) || (path[i - 1] === b && v === a)));
+    nctx.clearRect(0, 0, NW, NH);
+    LINKS.forEach((l, k) => {
+      const [a, b] = [R[l[0]], R[l[1]]], hot = !cut.has(k) && onPath(l[0], l[1]);
+      nctx.strokeStyle = cut.has(k) ? C.line : hot ? C.wave : l[2] >= 1000 ? C.blue : l[2] >= 100 ? C.inkSoft : C.line;
+      nctx.lineWidth = hot ? 7 : l[2] >= 1000 ? 5 : l[2] >= 100 ? 3 : 2;
+      nctx.setLineDash(cut.has(k) ? [6, 8] : []);
+      nctx.beginPath(); nctx.moveTo(a[0], a[1]); nctx.lineTo(b[0], b[1]); nctx.stroke();
+      nctx.setLineDash([]);
+      const mx = (a[0] + b[0]) / 2, my = (a[1] + b[1]) / 2;
+      nctx.fillStyle = C.paper; nctx.fillRect(mx - 40, my - 19, 80, 36);
+      nctx.fillStyle = cut.has(k) ? C.wave : C.ink; nctx.font = '12px ' + MONO; nctx.textAlign = 'center';
+      nctx.fillText(cut.has(k) ? 'coupée' : label(l), mx, my - 4);
+      nctx.fillStyle = C.inkSoft; nctx.fillText($('proto').value === 'rip' ? '1 saut' : 'coût ' + fmt(cost(l), cost(l) < 1 ? 1 : 0), mx, my + 11);
+    });
+    for (const n of names){
+      const [x, y] = R[n];
+      nctx.fillStyle = n === s ? C.accent : n === t ? C.wave : C.paper; nctx.strokeStyle = C.inkSoft; nctx.lineWidth = 2;
+      nctx.beginPath(); nctx.arc(x, y, 24, 0, Math.PI * 2); nctx.fill(); nctx.stroke();
+      nctx.fillStyle = n === s || n === t ? C.paper : C.ink; nctx.font = '600 14px ' + MONO; nctx.fillText(n, x, y + 5);
+    }
+    const unit = $('proto').value === 'rip' ? 'sauts' : 'coût';
+    $('rtable').innerHTML = '<tr><th>Destination</th><th>Passerelle (routeur suivant)</th><th>Distance (' + unit + ')</th></tr>'
+      + names.filter(n => n !== s).map(n => '<tr' + (n === t ? ' class="hit"' : '') + '><td>' + n + '</td><td>' + (r.d[n] < Infinity ? r.first[n] : '—') + '</td><td>' + (r.d[n] < Infinity ? fmt(r.d[n], Number.isInteger(r.d[n]) ? 0 : 1) : 'injoignable') + '</td></tr>').join('');
+    if (r.d[t] === Infinity) setStatus(t + ' est injoignable depuis ' + s, 'off');
+    else if (s === t) setStatus('Choisis une destination différente');
+    else setStatus(path.join(' → ') + ' : ' + (path.length - 1) + ' sauts, coût ' + fmt(path.slice(1).reduce((c, v, i) => c + 1e8 / (LINKS.find(l => (l[0] === v && l[1] === path[i]) || (l[1] === v && l[0] === path[i]))[2] * 1e6), 0), 1), 'ok');
+  }
+  function segDist(p, a, b){
+    const dx = b[0] - a[0], dy = b[1] - a[1], t = clamp(((p.x - a[0]) * dx + (p.y - a[1]) * dy) / (dx * dx + dy * dy), 0, 1);
+    return Math.hypot(p.x - a[0] - t * dx, p.y - a[1] - t * dy);
+  }
+  nc.addEventListener('pointerdown', e => {
+    const p = pointerPos(nc, e, NW, NH);
+    const n = names.find(k => Math.hypot(R[k][0] - p.x, R[k][1] - p.y) < 30);
+    if (n){ $('dst').value = n; drawNet(); return; }
+    let best = -1, bd = 16;
+    LINKS.forEach((l, k) => { const d = segDist(p, R[l[0]], R[l[1]]); if (d < bd){ bd = d; best = k; } });
+    if (best >= 0){ if (cut.has(best)) cut.delete(best); else cut.add(best); drawNet(); }
+  });
+  for (const id of ['proto', 'src', 'dst']) $(id).addEventListener('change', drawNet);
+
+  // ---------- Onglets ----------
+  procTable(); sched();
+  tabs('part', p => { window.dispatchEvent(new Event('resize')); if (p === 'sched') sched(); else drawNet(); });
+  window.addEventListener('resize', () => { sched(); drawNet(); });
+  window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => setTimeout(() => { sched(); drawNet(); }, 0));
+})();
+</script>
+<script>
+  // Compteur de visites GoatCounter (sans cookie), chargé uniquement sur le site en ligne
+  if (location.protocol === 'https:'){
+    const gc = document.createElement('script');
+    gc.async = true;
+    gc.src = 'https://gc.zgo.at/count.js';
+    gc.dataset.goatcounter = 'https://miyvi.goatcounter.com/count';
+    document.head.appendChild(gc);
+  }
+</script>
+</body>
+</html>

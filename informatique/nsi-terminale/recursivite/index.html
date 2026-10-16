@@ -1,0 +1,750 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Récursivité : pile d'appels, arbre d'appels, tours de Hanoï</title>
+<style>
+  /* ---------- Thème (clair / sombre automatique) ---------- */
+  :root{
+    --bg:#f3ede1;
+    --paper:#fbf8f0;
+    --ink:#22242e;
+    --ink-soft:#5b5a52;
+    --line:#d9d0ba;
+    --wave:#b8362b;
+    --wave-glow:rgba(184,54,43,.14);
+    --accent:#2f6f4f;
+    --blue:#2c5f8a;
+    --brass:#a9793f;
+    --violet:#8a3fc0;
+    --pink:#cf5f8c;
+    --ok:#2f6f4f;
+    --warn:#b8362b;
+    --serif:"Iowan Old Style","Palatino Linotype",Palatino,Georgia,serif;
+    --sans:system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+    --mono:ui-monospace,"Cascadia Mono","SF Mono",Consolas,Menlo,monospace;
+    color-scheme: light dark;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{
+      --bg:#171a21;
+      --paper:#1e222b;
+      --ink:#eae6da;
+      --ink-soft:#9a9689;
+      --line:#33384a;
+      --wave:#ff8a72;
+      --wave-glow:rgba(255,138,114,.14);
+      --accent:#79d6a3;
+      --blue:#7fb4e0;
+      --brass:#c99a5b;
+      --violet:#c39af5;
+      --pink:#f29bbd;
+      --ok:#79d6a3;
+      --warn:#ff8a72;
+    }
+  }
+
+  /* ---------- Mise en page ---------- */
+  *{box-sizing:border-box;}
+  html, body{ margin:0; padding:0; }
+  body{
+    background:var(--bg);
+    color:var(--ink);
+    font-family:var(--sans);
+    padding:28px 16px;
+    display:flex;
+    justify-content:center;
+  }
+  main{
+    width:100%;
+    max-width:920px;
+    display:flex;
+    flex-direction:column;
+    gap:20px;
+  }
+  header{ display:flex; flex-direction:column; gap:4px; }
+  .kicker{
+    font-size:.72rem;
+    text-transform:uppercase;
+    letter-spacing:.08em;
+    color:var(--ink-soft);
+  }
+  h1{
+    font-family:var(--serif);
+    font-weight:600;
+    font-size:clamp(1.5rem, 1.1rem + 1.6vw, 2.2rem);
+    margin:0;
+    text-wrap:balance;
+  }
+  header p{
+    margin:0;
+    color:var(--ink-soft);
+    font-size:.92rem;
+    max-width:66ch;
+  }
+
+  /* ---------- Zone de simulation ---------- */
+  .scene{
+    background:var(--paper);
+    border:1px solid var(--line);
+    border-radius:14px;
+    padding:20px clamp(12px,3vw,28px) 8px;
+    display:flex;
+    flex-direction:column;
+    gap:6px;
+  }
+  .scene-top{
+    display:flex;
+    justify-content:space-between;
+    align-items:baseline;
+    gap:12px;
+    flex-wrap:wrap;
+  }
+  .scene-title{ font-family:var(--serif); font-weight:600; }
+  .status{
+    font-family:var(--mono);
+    font-size:.82rem;
+    padding:3px 10px;
+    border-radius:999px;
+    border:1px solid var(--line);
+    color:var(--ink-soft);
+  }
+  .status.ok{ color:var(--ok); border-color:var(--ok); }
+  .status.off{ color:var(--warn); border-color:var(--warn); }
+  canvas{
+    width:100%;
+    height:auto;
+    display:block;
+  }
+  canvas.draggable{ touch-action:none; cursor:grab; }
+  canvas.dragging{ cursor:grabbing; }
+  canvas.tappable{ touch-action:manipulation; }
+  .hint{ margin:0; font-size:.78rem; color:var(--ink-soft); }
+
+  /* ---------- Mesures ---------- */
+  .readouts{
+    display:grid;
+    grid-template-columns:repeat(auto-fit,minmax(150px,1fr));
+    gap:10px 18px;
+    padding-block:10px;
+    border-top:1px solid var(--line);
+    margin-top:6px;
+  }
+  .readout{ display:flex; flex-direction:column; gap:2px; }
+  .readout .label{
+    font-size:.78rem;
+    color:var(--ink-soft);
+  }
+  .readout .value{
+    font-family:var(--mono);
+    font-variant-numeric:tabular-nums;
+    font-size:1.05rem;
+    font-weight:500;
+  }
+  .readout .value em{ color:var(--blue); font-style:normal; font-size:.9rem; }
+
+  /* ---------- Contrôles ---------- */
+  .panel{
+    background:var(--paper);
+    border:1px solid var(--line);
+    border-radius:14px;
+    padding:18px clamp(14px,3vw,26px);
+    display:flex;
+    flex-direction:column;
+    gap:18px;
+  }
+  .controls{
+    display:grid;
+    grid-template-columns:repeat(auto-fit,minmax(240px,1fr));
+    gap:18px 32px;
+  }
+  .control{ display:flex; flex-direction:column; gap:6px; }
+  .control .row{
+    display:flex;
+    justify-content:space-between;
+    align-items:baseline;
+    gap:10px;
+  }
+  .control label{ font-size:.86rem; font-weight:500; }
+  .control .num{
+    font-family:var(--mono);
+    font-variant-numeric:tabular-nums;
+    color:var(--wave);
+    font-size:.92rem;
+  }
+  input[type=range]{
+    -webkit-appearance:none;
+    appearance:none;
+    width:100%;
+    height:4px;
+    margin:8px 0;
+    border-radius:999px;
+    background:var(--line);
+    outline:none;
+  }
+  input[type=range]::-webkit-slider-thumb{
+    -webkit-appearance:none;
+    width:20px; height:20px;
+    border-radius:50%;
+    background:var(--wave);
+    border:2px solid var(--paper);
+    box-shadow:0 0 0 1px var(--line);
+    cursor:pointer;
+  }
+  input[type=range]::-moz-range-thumb{
+    width:18px; height:18px;
+    border-radius:50%;
+    background:var(--wave);
+    border:2px solid var(--paper);
+    box-shadow:0 0 0 1px var(--line);
+    cursor:pointer;
+  }
+  select{
+    font-family:var(--sans);
+    font-size:.86rem;
+    padding:7px 10px;
+    border-radius:8px;
+    border:1px solid var(--line);
+    background:var(--paper);
+    color:var(--ink);
+    width:100%;
+  }
+  .check{
+    display:flex;
+    align-items:center;
+    gap:8px;
+    font-size:.86rem;
+    font-weight:500;
+    cursor:pointer;
+  }
+  .check input{ width:18px; height:18px; accent-color:var(--accent); margin:0; }
+  .buttons{ display:flex; gap:10px; flex-wrap:wrap; }
+  button{
+    font-family:var(--sans);
+    font-size:.86rem;
+    font-weight:500;
+    padding:9px 16px;
+    border-radius:8px;
+    border:1px solid var(--line);
+    background:transparent;
+    color:var(--ink);
+    cursor:pointer;
+  }
+  button.primary{
+    background:var(--accent);
+    border-color:var(--accent);
+    color:var(--paper);
+  }
+  button:focus-visible, input:focus-visible, select:focus-visible{
+    outline:2px solid var(--accent);
+    outline-offset:2px;
+  }
+
+  /* ---------- Formules ---------- */
+  .formula{
+    font-family:var(--mono);
+    font-size:.86rem;
+    color:var(--ink-soft);
+    border-top:1px solid var(--line);
+    padding-top:14px;
+    display:flex;
+    flex-wrap:wrap;
+    gap:6px 22px;
+  }
+  .formula b{ color:var(--ink); font-weight:600; }
+  footer{
+    font-size:.78rem;
+    color:var(--ink-soft);
+    text-align:center;
+    text-wrap:balance;
+  }
+
+  /* ---------- Éléments communs aux ressources d'informatique ---------- */
+  [hidden]{ display:none !important; }
+  .tabs{ display:flex; gap:6px; flex-wrap:wrap; }
+  .tabs button{ padding:7px 14px; }
+  .tabs button[aria-selected=true]{ background:var(--accent); border-color:var(--accent); color:var(--paper); }
+  input[type=text], input[type=number], textarea.field{
+    font-family:var(--mono);
+    font-size:.88rem;
+    padding:7px 10px;
+    border-radius:8px;
+    border:1px solid var(--line);
+    background:var(--paper);
+    color:var(--ink);
+    width:100%;
+  }
+  textarea.field{ resize:vertical; min-height:90px; line-height:1.45; }
+  .table-wrap{ overflow-x:auto; }
+  table.data{ border-collapse:collapse; width:100%; font-family:var(--mono); font-size:.82rem; }
+  table.data th, table.data td{ border:1px solid var(--line); padding:5px 9px; text-align:left; white-space:nowrap; }
+  table.data th{ font-family:var(--sans); font-weight:600; color:var(--ink-soft); }
+  table.data tr.hit td{ background:var(--wave-glow); }
+  pre.code{
+    font-family:var(--mono);
+    font-size:.84rem;
+    line-height:1.5;
+    background:var(--bg);
+    border:1px solid var(--line);
+    border-radius:8px;
+    padding:10px 12px;
+    overflow-x:auto;
+    margin:0;
+    white-space:pre;
+  }
+  pre.code .hl{ background:var(--wave-glow); display:inline-block; min-width:100%; }
+  .err{ color:var(--warn); }
+  .good{ color:var(--ok); }
+  .chips{ display:flex; flex-wrap:wrap; gap:6px; }
+  .chip{ font-family:var(--mono); font-size:.8rem; padding:3px 9px; border-radius:999px; border:1px solid var(--line); }
+  .row2{ display:grid; grid-template-columns:repeat(auto-fit,minmax(280px,1fr)); gap:16px; }
+  .stack{ display:flex; flex-direction:column; gap:10px; min-width:0; }
+  .inline{ display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
+  .inline input[type=text], .inline input[type=number]{ width:auto; flex:1 1 120px; }
+  h3{ font-family:var(--serif); font-weight:600; font-size:1.02rem; margin:0; }
+  .muted{ color:var(--ink-soft); font-size:.84rem; margin:0; }
+  .frames{ display:flex; flex-direction:column-reverse; gap:5px; min-height:260px; justify-content:flex-start; padding:8px; border:2px solid var(--line); border-top:0; border-radius:0 0 12px 12px; }
+  .frame{ font-family:var(--mono); font-size:.86rem; padding:8px 12px; border:2px solid var(--blue); border-radius:8px; background:var(--paper); display:flex; justify-content:space-between; gap:8px; flex-wrap:wrap; }
+  .frame.top{ border-color:var(--wave); background:var(--wave-glow); }
+  .frame small{ font-family:var(--sans); color:var(--ink-soft); }
+  .log{ height:150px; overflow:auto; }
+</style>
+</head>
+<body>
+
+<main>
+  <header>
+    <span class="kicker">Informatique · NSI Terminale · Langages et programmation</span>
+    <h1>Récursivité : pile d'appels, arbre d'appels, tours de Hanoï</h1>
+    <p>Une fonction récursive s'appelle elle-même sur un problème plus petit, jusqu'à un cas de base qu'elle sait résoudre directement. Chaque appel en attente est conservé sur la pile d'appels, puis les résultats remontent un à un.</p>
+  </header>
+
+  <section class="scene">
+    <div class="scene-top">
+      <div class="tabs" id="part">
+        <button data-tab="stack">Pile d'appels</button>
+        <button data-tab="tree">Arbre d'appels de Fibonacci</button>
+        <button data-tab="hanoi">Tours de Hanoï</button>
+      </div>
+      <span id="status" class="status">—</span>
+    </div>
+
+    <!-- ===== Pile d'appels ===== -->
+    <div class="stack" data-panel="stack">
+      <div class="controls">
+        <div class="control"><div class="row"><label for="fn">Fonction</label></div>
+          <select id="fn"><option value="fact">factorielle(n)</option><option value="pow">puissance(2, n)</option><option value="digits">somme_chiffres(n)</option></select></div>
+        <div class="control"><div class="row"><label for="n">Valeur de n</label><span class="num" id="nVal"></span></div>
+          <input type="range" id="n" min="0" max="7" step="1" value="4"></div>
+        <div class="control"><label class="check"><input type="checkbox" id="nobase"> Oublier le cas de base</label></div>
+      </div>
+      <div class="row2">
+        <div class="stack">
+          <pre class="code" id="code"></pre>
+          <div class="buttons"><button class="primary" id="step">Étape suivante</button><button id="auto">Tout dérouler</button><button id="restart">Recommencer</button></div>
+          <pre class="code log" id="log"></pre>
+        </div>
+        <div class="stack"><span class="muted">sommet de la pile ↓ (l'appel en cours est en haut)</span><div class="frames" id="frames"></div></div>
+      </div>
+    </div>
+
+    <!-- ===== Arbre d'appels ===== -->
+    <div class="stack" data-panel="tree">
+      <div class="controls">
+        <div class="control"><div class="row"><label for="fibn">fibonacci(n) avec n =</label><span class="num" id="fibnVal"></span></div>
+          <input type="range" id="fibn" min="1" max="8" step="1" value="5"></div>
+        <div class="control"><label class="check"><input type="checkbox" id="memo"> Mémoïsation (on retient les résultats déjà calculés)</label></div>
+      </div>
+      <canvas id="tree" style="aspect-ratio:1000/400" aria-label="Arbre des appels récursifs de la fonction de Fibonacci."></canvas>
+      <div class="row2">
+        <pre class="code" id="fibCode"></pre>
+        <div class="readouts">
+          <div class="readout"><span class="label">Résultat</span><span class="value" id="rFib">—</span></div>
+          <div class="readout"><span class="label">Nombre d'appels</span><span class="value" id="rCalls">—</span></div>
+          <div class="readout"><span class="label">Appels refaits inutilement</span><span class="value" id="rDup">—</span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===== Hanoï ===== -->
+    <div class="stack" data-panel="hanoi">
+      <div class="controls">
+        <div class="control"><div class="row"><label for="disks">Nombre de disques</label><span class="num" id="disksVal"></span></div>
+          <input type="range" id="disks" min="1" max="7" step="1" value="4"></div>
+      </div>
+      <canvas id="pegs" class="tappable" style="aspect-ratio:1000/320" aria-label="Trois tiges et des disques empilés du plus grand au plus petit."></canvas>
+      <p class="hint">À toi : touche une tige pour prendre son disque du dessus, puis une autre pour l'y poser. Jamais un disque sur un plus petit.</p>
+      <div class="row2">
+        <pre class="code">def hanoi(n, depart, arrivee, intermediaire):
+    if n == 0:
+        return
+    hanoi(n - 1, depart, intermediaire, arrivee)
+    print('disque', n, ':', depart, '→', arrivee)
+    hanoi(n - 1, intermediaire, arrivee, depart)</pre>
+        <div class="stack">
+          <div class="readouts">
+            <div class="readout"><span class="label">Déplacements effectués</span><span class="value" id="rMoves">0</span></div>
+            <div class="readout"><span class="label">Minimum possible</span><span class="value" id="rMin">—</span></div>
+          </div>
+          <div class="buttons"><button class="primary" id="solve">Solution récursive</button><button id="hReset">Recommencer</button></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="panel">
+    <div class="formula">
+      <span>fonction récursive&nbsp;=&nbsp;<b>cas de base + appel sur un problème plus petit</b></span>
+      <span>sans cas de base&nbsp;:&nbsp;<b>la pile déborde</b> (RecursionError en Python)</span>
+      <span>Hanoï&nbsp;:&nbsp;<b>2<sup>n</sup> − 1 déplacements</b></span>
+    </div>
+  </section>
+
+  <footer>En Python, la profondeur de récursion est limitée par défaut à environ 1000 appels. Ici, la pile est arrêtée bien plus tôt pour rester lisible.</footer>
+</main>
+
+<script>
+(function(){
+  // ---------- Utilitaires ----------
+  const $ = id => document.getElementById(id);
+  const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
+  const fmt = (v, d) => Number.isFinite(v)
+    ? v.toLocaleString('fr-FR', {minimumFractionDigits:d, maximumFractionDigits:d})
+    : '—';
+  const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const MONO = 'ui-monospace, "Cascadia Mono", "SF Mono", Consolas, Menlo, monospace';
+  const SANS = 'system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif';
+
+  // Couleurs du thème, relues si le système bascule clair/sombre
+  const C = {};
+  function readColors(){
+    const s = getComputedStyle(document.documentElement);
+    for (const n of ['bg','paper','ink','ink-soft','line','wave','wave-glow','accent','blue','brass','violet','pink']){
+      C[n.replace(/-(.)/g, (_, c) => c.toUpperCase())] = s.getPropertyValue('--' + n).trim();
+    }
+  }
+  readColors();
+  window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', readColors);
+
+  // Canvas net sur tout écran : on dessine toujours dans un repère logique W × H
+  function setupCanvas(canvas, W, H){
+    const ctx = canvas.getContext('2d');
+    function fit(){
+      const dpr = Math.min(window.devicePixelRatio || 1, 3);
+      const cw = canvas.clientWidth || W;
+      canvas.width = Math.max(1, Math.round(cw * dpr));
+      canvas.height = Math.max(1, Math.round(cw * H / W * dpr));
+      ctx.setTransform(canvas.width / W, 0, 0, canvas.height / H, 0, 0);
+    }
+    window.addEventListener('resize', fit);
+    fit();
+    return ctx;
+  }
+  // Position du pointeur (souris ou doigt) dans le repère logique
+  function pointerPos(canvas, evt, W, H){
+    const r = canvas.getBoundingClientRect();
+    return { x: (evt.clientX - r.left) * W / r.width, y: (evt.clientY - r.top) * H / r.height };
+  }
+  function arrow(ctx, x1, y1, x2, y2, color, width){
+    const len = Math.hypot(x2 - x1, y2 - y1);
+    if (len < 3) return;
+    const a = Math.atan2(y2 - y1, x2 - x1), h = Math.min(10, len * 0.5);
+    ctx.strokeStyle = color; ctx.fillStyle = color; ctx.lineWidth = width || 2.5;
+    ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2 - Math.cos(a) * h * 0.8, y2 - Math.sin(a) * h * 0.8); ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(x2, y2);
+    ctx.lineTo(x2 - h * Math.cos(a - 0.42), y2 - h * Math.sin(a - 0.42));
+    ctx.lineTo(x2 - h * Math.cos(a + 0.42), y2 - h * Math.sin(a + 0.42));
+    ctx.closePath(); ctx.fill();
+  }
+  // Pas "rond" (1, 2, 5 × 10^n) pour graduer un axe
+  function niceStep(x){
+    if (!(x > 0)) return 1;
+    const p = Math.pow(10, Math.floor(Math.log10(x))), m = x / p;
+    return (m < 1.5 ? 1 : m < 3.5 ? 2 : m < 7.5 ? 5 : 10) * p;
+  }
+
+  // Relie un curseur, une liste ou une case à cocher à un paramètre (et affiche sa valeur)
+  function bind(id, onChange, format){
+    const el = $(id), label = $(id + 'Val');
+    const val = () => el.type === 'checkbox' ? el.checked : parseFloat(el.value);
+    const show = () => { if (label && format) label.textContent = format(val()); };
+    el.addEventListener(el.type === 'range' ? 'input' : 'change', () => { onChange(val()); show(); });
+    show();
+  }
+  const out = (id, text) => { $(id).textContent = text; };
+  function setStatus(text, cls){
+    const s = $('status');
+    s.textContent = text; s.className = 'status' + (cls ? ' ' + cls : '');
+  }
+  // Repère gradué dans le rectangle g ; renvoie les conversions X(x) et Y(y)
+  function axes(ctx, g, o){
+    const xMin = o.xMin || 0, yMin = o.yMin || 0;
+    const X = x => g.x + g.w * (x - xMin) / (o.xMax - xMin);
+    const Y = y => g.y + g.h - g.h * (y - yMin) / (o.yMax - yMin);
+    const ink = o.ink || C.ink, soft = o.soft || C.inkSoft, line = o.line || C.line;
+    const sx = niceStep((o.xMax - xMin) / (o.xTicks || 6)), sy = niceStep((o.yMax - yMin) / (o.yTicks || 4));
+    const dec = s => s >= 1 ? 0 : Math.min(4, Math.ceil(-Math.log10(s) - 1e-9));
+    ctx.save();
+    ctx.font = '13px ' + MONO; ctx.lineWidth = 1; ctx.textAlign = 'center';
+    for (let k = Math.ceil(xMin / sx - 1e-9); k * sx <= o.xMax + sx * 1e-6; k++){
+      ctx.strokeStyle = line; ctx.globalAlpha = 0.55;
+      ctx.beginPath(); ctx.moveTo(X(k * sx), g.y); ctx.lineTo(X(k * sx), g.y + g.h); ctx.stroke();
+      ctx.globalAlpha = 1; ctx.fillStyle = soft;
+      ctx.fillText(fmt(k * sx + 0, dec(sx)), X(k * sx), g.y + g.h + 18);
+    }
+    ctx.textAlign = 'right';
+    for (let k = Math.ceil(yMin / sy - 1e-9); k * sy <= o.yMax + sy * 1e-6; k++){
+      ctx.strokeStyle = line; ctx.globalAlpha = 0.55;
+      ctx.beginPath(); ctx.moveTo(g.x, Y(k * sy)); ctx.lineTo(g.x + g.w, Y(k * sy)); ctx.stroke();
+      ctx.globalAlpha = 1; ctx.fillStyle = soft;
+      ctx.fillText(fmt(k * sy + 0, dec(sy)), g.x - 8, Y(k * sy) + 4);
+    }
+    const y0 = yMin < 0 ? Y(0) : g.y + g.h;
+    ctx.strokeStyle = soft; ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.moveTo(g.x, g.y); ctx.lineTo(g.x, g.y + g.h); ctx.moveTo(g.x, y0); ctx.lineTo(g.x + g.w, y0); ctx.stroke();
+    ctx.fillStyle = ink; ctx.textAlign = 'left'; ctx.font = '14px ' + SANS;
+    if (o.title) ctx.fillText(o.title, g.x + 8, g.y - 10);
+    ctx.fillStyle = soft; ctx.textAlign = 'right'; ctx.font = '13px ' + MONO;
+    if (o.xLabel) ctx.fillText(o.xLabel, g.x + g.w, g.y + g.h + 36);
+    ctx.restore();
+    return { X, Y };
+  }
+  // Onglets : boutons [data-tab] dans #id, panneaux [data-panel] de même nom
+  function tabs(id, onChange){
+    const btns = [...document.querySelectorAll('#' + id + ' button')];
+    const names = btns.map(b => b.dataset.tab);
+    const show = name => {
+      for (const b of btns) b.setAttribute('aria-selected', String(b.dataset.tab === name));
+      for (const p of document.querySelectorAll('[data-panel]')) if (names.includes(p.dataset.panel)) p.hidden = p.dataset.panel !== name;
+      if (onChange) onChange(name);
+    };
+    for (const b of btns) b.addEventListener('click', () => show(b.dataset.tab));
+    show(btns[0].dataset.tab);
+    return show;
+  }
+  const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
+  const sleep = ms => new Promise(r => setTimeout(r, ms));
+
+  // =========================================================
+  // Pile d'appels
+  // =========================================================
+  const FUNCS = {
+    fact: { name: 'factorielle', arg: n => String(n), base: n => n === 0, baseVal: () => 1, child: n => n - 1,
+      combine: (n, r) => [n * r, n + ' * ' + r], baseLine: 2, recLine: 3,
+      code: (nb) => ['def factorielle(n):', nb ? '    # (cas de base oublié)' : '    if n == 0:', nb ? '' : '        return 1', '    return n * factorielle(n - 1)'] },
+    pow: { name: 'puissance', arg: n => '2, ' + n, base: n => n === 0, baseVal: () => 1, child: n => n - 1,
+      combine: (n, r) => [2 * r, '2 * ' + r], baseLine: 2, recLine: 3,
+      code: (nb) => ['def puissance(x, n):', nb ? '    # (cas de base oublié)' : '    if n == 0:', nb ? '' : '        return 1', '    return x * puissance(x, n - 1)'] },
+    digits: { name: 'somme_chiffres', arg: n => String(n), base: n => n < 10, baseVal: n => n, child: n => Math.floor(n / 10),
+      combine: (n, r) => [n % 10 + r, (n % 10) + ' + ' + r], baseLine: 2, recLine: 3,
+      code: (nb) => ['def somme_chiffres(n):', nb ? '    # (cas de base oublié)' : '    if n < 10:', nb ? '' : '        return n', '    return n % 10 + somme_chiffres(n // 10)'] }
+  };
+  let events = [], ev = 0, frames = [], logLines = [], autoTimer = null;
+  // Prépare la liste des événements (appels et retours) en simulant la récursion
+  function trace(){
+    const F = FUNCS[$('fn').value], nb = $('nobase').checked;
+    let n = +$('n').value;
+    if ($('fn').value === 'digits') n = [7, 42, 305, 1987, 20261, 314159, 2718281, 31415926][n];
+    events = [];
+    const rec = (x, depth) => {
+      events.push({ k: 'call', label: F.name + '(' + F.arg(x) + ')', line: 1 });
+      if (depth > 11){ events.push({ k: 'boom' }); return null; }
+      if (!nb && F.base(x)){ const v = F.baseVal(x); events.push({ k: 'ret', v, how: 'cas de base', line: F.baseLine }); return v; }
+      events.push({ k: 'wait', line: F.recLine, label: F.name + '(' + F.arg(F.child(x)) + ')' });
+      const r = rec(F.child(x), depth + 1);
+      if (r === null) return null;
+      const [v, how] = F.combine(x, r);
+      events.push({ k: 'ret', v, how: how + ' = ' + v, line: F.recLine });
+      return v;
+    };
+    rec(n, 0);
+  }
+  function restart(){
+    if (autoTimer){ clearInterval(autoTimer); autoTimer = null; }
+    trace(); ev = 0; frames = []; logLines = [];
+    renderStack(-1);
+  }
+  function step(){
+    if (ev >= events.length) return false;
+    const e = events[ev++];
+    if (e.k === 'call'){ frames.push({ label: e.label, note: 'en cours' }); logLines.push('appel de ' + e.label); }
+    if (e.k === 'wait'){ frames[frames.length - 1].note = 'attend ' + e.label; }
+    if (e.k === 'ret'){
+      const f = frames.pop();
+      logLines.push(f.label + ' renvoie ' + e.v + ' (' + e.how + ')');
+      if (frames.length) frames[frames.length - 1].note = 'a reçu ' + e.v;
+      else logLines.push('Résultat final : ' + e.v);
+    }
+    if (e.k === 'boom') logLines.push('RecursionError : la pile d\'appels déborde, aucun appel n\'atteint un cas de base.');
+    renderStack(e.line === undefined ? -1 : e.line, e.k);
+    return ev < events.length && e.k !== 'boom';
+  }
+  let lastLine = -1, lastKind;
+  function renderStack(line, kind){
+    lastLine = line; lastKind = kind;
+    const F = FUNCS[$('fn').value], nb = $('nobase').checked;
+    // Sans cas de base, la ligne « return » du cas de base disparaît : les lignes suivantes remontent d'un cran
+    if (nb && line === 3) line = 2;
+    $('code').innerHTML = F.code(nb).filter((l, i) => l || i !== 2).map((l, i) => i === line ? '<span class="hl">' + esc(l) + '</span>' : esc(l)).join('\n');
+    $('frames').innerHTML = frames.map((f, i) => '<div class="frame' + (i === frames.length - 1 ? ' top' : '') + '"><span>' + esc(f.label) + '</span><small>' + esc(f.note) + '</small></div>').join('') || '<span class="muted">pile vide</span>';
+    $('log').textContent = logLines.join('\n');
+    $('log').scrollTop = $('log').scrollHeight;
+    if (kind === 'boom') setStatus('Débordement de pile', 'off');
+    else if (ev >= events.length && events.length) setStatus('Terminé : la pile est vide', 'ok');
+    else setStatus('Profondeur de la pile : ' + frames.length);
+  }
+  $('step').addEventListener('click', () => { if (ev >= events.length) restart(); step(); });
+  $('auto').addEventListener('click', () => {
+    if (autoTimer) return;
+    if (ev >= events.length) restart();
+    autoTimer = setInterval(() => { if (!step()){ clearInterval(autoTimer); autoTimer = null; } }, reduceMotion ? 30 : 600);
+  });
+  $('restart').addEventListener('click', restart);
+  bind('n', restart, v => $('fn').value === 'digits' ? 'n = ' + [7, 42, 305, 1987, 20261, 314159, 2718281, 31415926][v] : 'n = ' + v);
+  $('fn').addEventListener('change', () => { $('n').dispatchEvent(new Event('input')); });
+  $('nobase').addEventListener('change', restart);
+
+  // =========================================================
+  // Arbre d'appels de Fibonacci
+  // =========================================================
+  const TW = 1000, TH = 400;
+  const tc = $('tree'), tctx = setupCanvas(tc, TW, TH);
+  function fibTree(){
+    const memo = $('memo').checked, known = new Set();
+    let calls = 0, dup = 0;
+    const seen = new Set();
+    const rec = n => {
+      calls++;
+      if (seen.has(n) && !memo) dup++;
+      seen.add(n);
+      const node = { n, kids: [] };
+      if (memo && known.has(n)){ node.memo = true; return node; }
+      if (n >= 2) node.kids = [rec(n - 1), rec(n - 2)];
+      known.add(n);
+      return node;
+    };
+    const root = rec(+$('fibn').value);
+    return { root, calls, dup };
+  }
+  const fib = n => n < 2 ? n : fib(n - 1) + fib(n - 2);
+  function drawTree(){
+    const { root, calls, dup } = fibTree();
+    let leaf = 0, depth = 0;
+    const place = (nd, d) => { nd.d = d; depth = Math.max(depth, d); if (!nd.kids.length){ nd.x = leaf++; } else { nd.kids.forEach(k => place(k, d + 1)); nd.x = (nd.kids[0].x + nd.kids[nd.kids.length - 1].x) / 2; } };
+    place(root, 0);
+    const sx = (TW - 60) / Math.max(1, leaf - 1 || 1), sy = (TH - 60) / Math.max(1, depth);
+    const X = nd => leaf === 1 ? TW / 2 : 30 + nd.x * sx, Y = nd => 30 + nd.d * sy;
+    const r = clamp(sx * 0.42, 7, 18);
+    tctx.clearRect(0, 0, TW, TH);
+    const edges = nd => { for (const k of nd.kids){ tctx.strokeStyle = C.line; tctx.lineWidth = 2; tctx.beginPath(); tctx.moveTo(X(nd), Y(nd)); tctx.lineTo(X(k), Y(k)); tctx.stroke(); edges(k); } };
+    edges(root);
+    const counts = {};
+    const countN = nd => { counts[nd.n] = (counts[nd.n] || 0) + 1; nd.kids.forEach(countN); };
+    countN(root);
+    const nodes = nd => {
+      tctx.fillStyle = nd.memo ? C.line : counts[nd.n] > 1 && !$('memo').checked ? C.waveGlow : C.paper;
+      tctx.strokeStyle = nd.memo ? C.inkSoft : counts[nd.n] > 1 && !$('memo').checked ? C.wave : C.blue; tctx.lineWidth = 2;
+      tctx.beginPath(); tctx.arc(X(nd), Y(nd), r, 0, Math.PI * 2); tctx.fill(); tctx.stroke();
+      tctx.fillStyle = C.ink; tctx.font = '600 ' + Math.round(r * 0.9) + 'px ' + MONO; tctx.textAlign = 'center';
+      tctx.fillText(String(nd.n), X(nd), Y(nd) + r * 0.33);
+      nd.kids.forEach(nodes);
+    };
+    nodes(root);
+    tctx.font = '13px ' + SANS; tctx.textAlign = 'left'; tctx.fillStyle = C.inkSoft;
+    tctx.fillText($('memo').checked ? 'gris : valeur déjà connue, lue en mémoire sans nouvel appel' : 'rouge : un appel déjà fait ailleurs dans l\'arbre, recalculé pour rien', 14, TH - 10);
+    out('rFib', 'fibonacci(' + $('fibn').value + ') = ' + fib(+$('fibn').value));
+    out('rCalls', String(calls));
+    out('rDup', $('memo').checked ? '0' : String(dup));
+    $('fibCode').textContent = $('memo').checked
+      ? 'memo = {}\n\ndef fibonacci(n):\n    if n in memo:\n        return memo[n]\n    if n < 2:\n        resultat = n\n    else:\n        resultat = fibonacci(n - 1) + fibonacci(n - 2)\n    memo[n] = resultat\n    return resultat'
+      : 'def fibonacci(n):\n    if n < 2:\n        return n\n    return fibonacci(n - 1) + fibonacci(n - 2)';
+    setStatus(calls + ' appels pour calculer fibonacci(' + $('fibn').value + ')', $('memo').checked ? 'ok' : '');
+  }
+  bind('fibn', drawTree, v => fmt(v, 0));
+  $('memo').addEventListener('change', drawTree);
+
+  // =========================================================
+  // Tours de Hanoï
+  // =========================================================
+  const HW = 1000, HH = 320;
+  const hc = $('pegs'), hctx = setupCanvas(hc, HW, HH);
+  const PX = [180, 500, 820], NAMES = ['A', 'B', 'C'];
+  let pegs = [[], [], []], moves = 0, held = -1, solving = null;
+  function hReset(){
+    if (solving){ clearInterval(solving); solving = null; }
+    const n = +$('disks').value;
+    pegs = [Array.from({ length: n }, (_, i) => n - i), [], []];
+    moves = 0; held = -1;
+    drawPegs();
+  }
+  function move(a, b){
+    const d = pegs[a][pegs[a].length - 1];
+    if (d === undefined) return false;
+    const top = pegs[b][pegs[b].length - 1];
+    if (top !== undefined && top < d) return false;
+    pegs[b].push(pegs[a].pop()); moves++;
+    return true;
+  }
+  function drawPegs(msg){
+    const n = +$('disks').value;
+    hctx.clearRect(0, 0, HW, HH);
+    hctx.fillStyle = C.inkSoft; hctx.fillRect(40, HH - 40, HW - 80, 10);
+    PX.forEach((x, k) => {
+      hctx.fillStyle = k === held ? C.wave : C.inkSoft; hctx.fillRect(x - 5, 60, 10, HH - 100);
+      hctx.fillStyle = C.ink; hctx.font = '600 16px ' + SANS; hctx.textAlign = 'center'; hctx.fillText(NAMES[k], x, HH - 12);
+      pegs[k].forEach((d, i) => {
+        const w = 40 + d * 32, h = Math.min(30, (HH - 120) / Math.max(n, 1));
+        let y = HH - 40 - (i + 1) * h;
+        if (k === held && i === pegs[k].length - 1) y = 26;
+        hctx.fillStyle = 'hsl(' + (d * 47 % 360) + ' 55% 52%)';
+        hctx.fillRect(x - w / 2, y, w, h - 3);
+        hctx.fillStyle = '#fff'; hctx.font = '600 13px ' + MONO; hctx.fillText(String(d), x, y + h / 2 + 3);
+      });
+    });
+    out('rMoves', String(moves));
+    out('rMin', String(Math.pow(2, n) - 1));
+    if (pegs[2].length === n) setStatus(moves === Math.pow(2, n) - 1 ? 'Résolu en un nombre minimal de déplacements' : 'Résolu en ' + moves + ' déplacements', 'ok');
+    else setStatus(msg || 'Objectif : tout déplacer de la tige A vers la tige C', msg ? 'off' : '');
+  }
+  hc.addEventListener('pointerdown', e => {
+    if (solving) return;
+    const p = pointerPos(hc, e, HW, HH), k = PX.findIndex(x => Math.abs(p.x - x) < 150);
+    if (k < 0) return;
+    if (held < 0){ if (pegs[k].length) held = k; drawPegs(); return; }
+    if (k === held){ held = -1; drawPegs(); return; }
+    const ok = move(held, k);
+    held = -1;
+    drawPegs(ok ? '' : 'Interdit : on ne pose jamais un disque sur un plus petit.');
+  });
+  $('solve').addEventListener('click', () => {
+    hReset();
+    const list = [];
+    const h = (n, a, b, c) => { if (!n) return; h(n - 1, a, c, b); list.push([a, b]); h(n - 1, c, b, a); };
+    h(+$('disks').value, 0, 2, 1);
+    let i = 0;
+    solving = setInterval(() => { if (i >= list.length){ clearInterval(solving); solving = null; return; } move(...list[i++]); drawPegs(); }, reduceMotion ? 20 : 420);
+  });
+  $('hReset').addEventListener('click', hReset);
+  bind('disks', hReset, v => fmt(v, 0));
+
+  // ---------- Onglets ----------
+  restart(); hReset();
+  tabs('part', p => { window.dispatchEvent(new Event('resize')); if (p === 'stack') renderStack(lastLine, lastKind); if (p === 'tree') drawTree(); if (p === 'hanoi') drawPegs(); });
+  window.addEventListener('resize', () => { drawTree(); drawPegs(); });
+  window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => setTimeout(() => { drawTree(); drawPegs(); }, 0));
+})();
+</script>
+<script>
+  // Compteur de visites GoatCounter (sans cookie), chargé uniquement sur le site en ligne
+  if (location.protocol === 'https:'){
+    const gc = document.createElement('script');
+    gc.async = true;
+    gc.src = 'https://gc.zgo.at/count.js';
+    gc.dataset.goatcounter = 'https://miyvi.goatcounter.com/count';
+    document.head.appendChild(gc);
+  }
+</script>
+</body>
+</html>

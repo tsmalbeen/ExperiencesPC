@@ -1,0 +1,844 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Algorithmique : graphes, diviser pour régner, recherche textuelle, programmation dynamique</title>
+<style>
+  /* ---------- Thème (clair / sombre automatique) ---------- */
+  :root{
+    --bg:#f3ede1;
+    --paper:#fbf8f0;
+    --ink:#22242e;
+    --ink-soft:#5b5a52;
+    --line:#d9d0ba;
+    --wave:#b8362b;
+    --wave-glow:rgba(184,54,43,.14);
+    --accent:#2f6f4f;
+    --blue:#2c5f8a;
+    --brass:#a9793f;
+    --violet:#8a3fc0;
+    --pink:#cf5f8c;
+    --ok:#2f6f4f;
+    --warn:#b8362b;
+    --serif:"Iowan Old Style","Palatino Linotype",Palatino,Georgia,serif;
+    --sans:system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+    --mono:ui-monospace,"Cascadia Mono","SF Mono",Consolas,Menlo,monospace;
+    color-scheme: light dark;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{
+      --bg:#171a21;
+      --paper:#1e222b;
+      --ink:#eae6da;
+      --ink-soft:#9a9689;
+      --line:#33384a;
+      --wave:#ff8a72;
+      --wave-glow:rgba(255,138,114,.14);
+      --accent:#79d6a3;
+      --blue:#7fb4e0;
+      --brass:#c99a5b;
+      --violet:#c39af5;
+      --pink:#f29bbd;
+      --ok:#79d6a3;
+      --warn:#ff8a72;
+    }
+  }
+
+  /* ---------- Mise en page ---------- */
+  *{box-sizing:border-box;}
+  html, body{ margin:0; padding:0; }
+  body{
+    background:var(--bg);
+    color:var(--ink);
+    font-family:var(--sans);
+    padding:28px 16px;
+    display:flex;
+    justify-content:center;
+  }
+  main{
+    width:100%;
+    max-width:920px;
+    display:flex;
+    flex-direction:column;
+    gap:20px;
+  }
+  header{ display:flex; flex-direction:column; gap:4px; }
+  .kicker{
+    font-size:.72rem;
+    text-transform:uppercase;
+    letter-spacing:.08em;
+    color:var(--ink-soft);
+  }
+  h1{
+    font-family:var(--serif);
+    font-weight:600;
+    font-size:clamp(1.5rem, 1.1rem + 1.6vw, 2.2rem);
+    margin:0;
+    text-wrap:balance;
+  }
+  header p{
+    margin:0;
+    color:var(--ink-soft);
+    font-size:.92rem;
+    max-width:66ch;
+  }
+
+  /* ---------- Zone de simulation ---------- */
+  .scene{
+    background:var(--paper);
+    border:1px solid var(--line);
+    border-radius:14px;
+    padding:20px clamp(12px,3vw,28px) 8px;
+    display:flex;
+    flex-direction:column;
+    gap:6px;
+  }
+  .scene-top{
+    display:flex;
+    justify-content:space-between;
+    align-items:baseline;
+    gap:12px;
+    flex-wrap:wrap;
+  }
+  .scene-title{ font-family:var(--serif); font-weight:600; }
+  .status{
+    font-family:var(--mono);
+    font-size:.82rem;
+    padding:3px 10px;
+    border-radius:999px;
+    border:1px solid var(--line);
+    color:var(--ink-soft);
+  }
+  .status.ok{ color:var(--ok); border-color:var(--ok); }
+  .status.off{ color:var(--warn); border-color:var(--warn); }
+  canvas{
+    width:100%;
+    height:auto;
+    display:block;
+  }
+  canvas.draggable{ touch-action:none; cursor:grab; }
+  canvas.dragging{ cursor:grabbing; }
+  canvas.tappable{ touch-action:manipulation; }
+  .hint{ margin:0; font-size:.78rem; color:var(--ink-soft); }
+
+  /* ---------- Mesures ---------- */
+  .readouts{
+    display:grid;
+    grid-template-columns:repeat(auto-fit,minmax(150px,1fr));
+    gap:10px 18px;
+    padding-block:10px;
+    border-top:1px solid var(--line);
+    margin-top:6px;
+  }
+  .readout{ display:flex; flex-direction:column; gap:2px; }
+  .readout .label{
+    font-size:.78rem;
+    color:var(--ink-soft);
+  }
+  .readout .value{
+    font-family:var(--mono);
+    font-variant-numeric:tabular-nums;
+    font-size:1.05rem;
+    font-weight:500;
+  }
+  .readout .value em{ color:var(--blue); font-style:normal; font-size:.9rem; }
+
+  /* ---------- Contrôles ---------- */
+  .panel{
+    background:var(--paper);
+    border:1px solid var(--line);
+    border-radius:14px;
+    padding:18px clamp(14px,3vw,26px);
+    display:flex;
+    flex-direction:column;
+    gap:18px;
+  }
+  .controls{
+    display:grid;
+    grid-template-columns:repeat(auto-fit,minmax(240px,1fr));
+    gap:18px 32px;
+  }
+  .control{ display:flex; flex-direction:column; gap:6px; }
+  .control .row{
+    display:flex;
+    justify-content:space-between;
+    align-items:baseline;
+    gap:10px;
+  }
+  .control label{ font-size:.86rem; font-weight:500; }
+  .control .num{
+    font-family:var(--mono);
+    font-variant-numeric:tabular-nums;
+    color:var(--wave);
+    font-size:.92rem;
+  }
+  input[type=range]{
+    -webkit-appearance:none;
+    appearance:none;
+    width:100%;
+    height:4px;
+    margin:8px 0;
+    border-radius:999px;
+    background:var(--line);
+    outline:none;
+  }
+  input[type=range]::-webkit-slider-thumb{
+    -webkit-appearance:none;
+    width:20px; height:20px;
+    border-radius:50%;
+    background:var(--wave);
+    border:2px solid var(--paper);
+    box-shadow:0 0 0 1px var(--line);
+    cursor:pointer;
+  }
+  input[type=range]::-moz-range-thumb{
+    width:18px; height:18px;
+    border-radius:50%;
+    background:var(--wave);
+    border:2px solid var(--paper);
+    box-shadow:0 0 0 1px var(--line);
+    cursor:pointer;
+  }
+  select{
+    font-family:var(--sans);
+    font-size:.86rem;
+    padding:7px 10px;
+    border-radius:8px;
+    border:1px solid var(--line);
+    background:var(--paper);
+    color:var(--ink);
+    width:100%;
+  }
+  .check{
+    display:flex;
+    align-items:center;
+    gap:8px;
+    font-size:.86rem;
+    font-weight:500;
+    cursor:pointer;
+  }
+  .check input{ width:18px; height:18px; accent-color:var(--accent); margin:0; }
+  .buttons{ display:flex; gap:10px; flex-wrap:wrap; }
+  button{
+    font-family:var(--sans);
+    font-size:.86rem;
+    font-weight:500;
+    padding:9px 16px;
+    border-radius:8px;
+    border:1px solid var(--line);
+    background:transparent;
+    color:var(--ink);
+    cursor:pointer;
+  }
+  button.primary{
+    background:var(--accent);
+    border-color:var(--accent);
+    color:var(--paper);
+  }
+  button:focus-visible, input:focus-visible, select:focus-visible{
+    outline:2px solid var(--accent);
+    outline-offset:2px;
+  }
+
+  /* ---------- Formules ---------- */
+  .formula{
+    font-family:var(--mono);
+    font-size:.86rem;
+    color:var(--ink-soft);
+    border-top:1px solid var(--line);
+    padding-top:14px;
+    display:flex;
+    flex-wrap:wrap;
+    gap:6px 22px;
+  }
+  .formula b{ color:var(--ink); font-weight:600; }
+  footer{
+    font-size:.78rem;
+    color:var(--ink-soft);
+    text-align:center;
+    text-wrap:balance;
+  }
+
+  /* ---------- Éléments communs aux ressources d'informatique ---------- */
+  [hidden]{ display:none !important; }
+  .tabs{ display:flex; gap:6px; flex-wrap:wrap; }
+  .tabs button{ padding:7px 14px; }
+  .tabs button[aria-selected=true]{ background:var(--accent); border-color:var(--accent); color:var(--paper); }
+  input[type=text], input[type=number], textarea.field{
+    font-family:var(--mono);
+    font-size:.88rem;
+    padding:7px 10px;
+    border-radius:8px;
+    border:1px solid var(--line);
+    background:var(--paper);
+    color:var(--ink);
+    width:100%;
+  }
+  textarea.field{ resize:vertical; min-height:90px; line-height:1.45; }
+  .table-wrap{ overflow-x:auto; }
+  table.data{ border-collapse:collapse; width:100%; font-family:var(--mono); font-size:.82rem; }
+  table.data th, table.data td{ border:1px solid var(--line); padding:5px 9px; text-align:left; white-space:nowrap; }
+  table.data th{ font-family:var(--sans); font-weight:600; color:var(--ink-soft); }
+  table.data tr.hit td{ background:var(--wave-glow); }
+  pre.code{
+    font-family:var(--mono);
+    font-size:.84rem;
+    line-height:1.5;
+    background:var(--bg);
+    border:1px solid var(--line);
+    border-radius:8px;
+    padding:10px 12px;
+    overflow-x:auto;
+    margin:0;
+    white-space:pre;
+  }
+  pre.code .hl{ background:var(--wave-glow); display:inline-block; min-width:100%; }
+  .err{ color:var(--warn); }
+  .good{ color:var(--ok); }
+  .chips{ display:flex; flex-wrap:wrap; gap:6px; }
+  .chip{ font-family:var(--mono); font-size:.8rem; padding:3px 9px; border-radius:999px; border:1px solid var(--line); }
+  .row2{ display:grid; grid-template-columns:repeat(auto-fit,minmax(280px,1fr)); gap:16px; }
+  .stack{ display:flex; flex-direction:column; gap:10px; min-width:0; }
+  .inline{ display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
+  .inline input[type=text], .inline input[type=number]{ width:auto; flex:1 1 120px; }
+  h3{ font-family:var(--serif); font-weight:600; font-size:1.02rem; margin:0; }
+  .muted{ color:var(--ink-soft); font-size:.84rem; margin:0; }
+  .txt{ display:grid; gap:2px; font-family:var(--mono); font-size:.95rem; overflow-x:auto; padding-bottom:4px; }
+  .txt span{ width:24px; height:28px; display:flex; align-items:center; justify-content:center; border-radius:4px; }
+  .txt .t{ background:var(--bg); border:1px solid var(--line); }
+  .txt .ok{ background:var(--ok); color:var(--paper); }
+  .txt .ko{ background:var(--warn); color:var(--paper); }
+  .txt .found{ outline:2px solid var(--ok); }
+  .txt small{ font-size:.6rem; color:var(--ink-soft); }
+  .dp{ display:flex; flex-wrap:wrap; gap:3px; }
+  .dp div{ min-width:44px; border:1px solid var(--line); border-radius:6px; text-align:center; font-family:var(--mono); font-size:.82rem; padding:3px 2px; }
+  .dp div small{ display:block; font-size:.62rem; color:var(--ink-soft); }
+  .dp .cur{ border-color:var(--wave); background:var(--wave-glow); }
+  .dp .src{ border-color:var(--blue); }
+  .dp .path{ border-color:var(--ok); border-width:2px; }
+</style>
+</head>
+<body>
+
+<main>
+  <header>
+    <span class="kicker">Informatique · NSI Terminale · Algorithmique</span>
+    <h1>Algorithmique : graphes, diviser pour régner, recherche textuelle, programmation dynamique</h1>
+    <p>Quatre familles d'algorithmes du programme de Terminale, à suivre étape par étape : les parcours d'un graphe en largeur et en profondeur, le tri fusion, la recherche d'un motif dans un texte avec l'algorithme de Boyer-Moore, et le rendu de monnaie résolu par programmation dynamique.</p>
+  </header>
+
+  <section class="scene">
+    <div class="scene-top">
+      <div class="tabs" id="part">
+        <button data-tab="graph">Parcours de graphes</button>
+        <button data-tab="merge">Tri fusion</button>
+        <button data-tab="text">Recherche textuelle</button>
+        <button data-tab="dyn">Programmation dynamique</button>
+      </div>
+      <span id="status" class="status">—</span>
+    </div>
+
+    <!-- ===== Graphes ===== -->
+    <div class="stack" data-panel="graph">
+      <div class="inline">
+        <label for="walk">Parcours</label>
+        <select id="walk"><option value="bfs">en largeur (avec une file)</option><option value="dfs">en profondeur (avec une pile)</option></select>
+        <button class="primary" id="gStep">Étape suivante</button><button id="gAll">Tout dérouler</button><button id="gReset">Recommencer</button>
+      </div>
+      <canvas id="graph" class="tappable" style="aspect-ratio:1000/400" aria-label="Graphe de neuf sommets ; les sommets visités sont numérotés dans l'ordre du parcours."></canvas>
+      <p class="hint">Touche un sommet pour en faire le point de départ. Les voisins sont examinés par ordre alphabétique.</p>
+      <div class="row2">
+        <pre class="code" id="gCode"></pre>
+        <div class="readouts">
+          <div class="readout"><span class="label" id="gStructLabel">File</span><span class="value" id="gStruct">—</span></div>
+          <div class="readout"><span class="label">Ordre de visite</span><span class="value" id="gOrder">—</span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===== Tri fusion ===== -->
+    <div class="stack" data-panel="merge">
+      <div class="inline">
+        <label for="msize">Taille</label><input type="range" id="msize" min="4" max="32" step="1" value="16" style="flex:1"><span class="num" id="msizeVal"></span>
+        <button class="primary" id="mPlay">Lancer</button><button id="mStep">Une étape</button><button id="mNew">Nouveau tableau</button>
+      </div>
+      <canvas id="bars" style="aspect-ratio:1000/300" aria-label="Barres du tableau en cours de tri fusion."></canvas>
+      <div class="row2">
+        <pre class="code">def tri_fusion(t):
+    if len(t) &lt;= 1:
+        return t                      # cas de base : déjà trié
+    milieu = len(t) // 2
+    gauche = tri_fusion(t[:milieu])   # diviser...
+    droite = tri_fusion(t[milieu:])
+    return fusion(gauche, droite)     # ...puis combiner
+
+def fusion(a, b):
+    resultat, i, j = [], 0, 0
+    while i &lt; len(a) and j &lt; len(b):
+        if a[i] &lt;= b[j]:
+            resultat.append(a[i]); i += 1
+        else:
+            resultat.append(b[j]); j += 1
+    return resultat + a[i:] + b[j:]</pre>
+        <div class="readouts">
+          <div class="readout"><span class="label">Étape</span><span class="value" id="mPhase">—</span></div>
+          <div class="readout"><span class="label">Comparaisons</span><span class="value" id="mCmp">0</span></div>
+          <div class="readout"><span class="label">Ordre de grandeur n·log₂(n)</span><span class="value" id="mRef">—</span></div>
+          <div class="readout"><span class="label">Tri par sélection, pour comparer</span><span class="value" id="mSel">—</span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===== Recherche textuelle ===== -->
+    <div class="stack" data-panel="text">
+      <div class="controls">
+        <div class="control"><div class="row"><label for="hay">Texte</label></div><input type="text" id="hay" value="LE CHAT CHASSE LE CHIEN QUI CHASSE LE CHAT"></div>
+        <div class="control"><div class="row"><label for="needle">Motif cherché</label></div><input type="text" id="needle" value="CHASSE"></div>
+        <div class="control"><div class="row"><label for="tAlgo">Algorithme</label></div>
+          <select id="tAlgo"><option value="bm">Boyer-Moore (version de Horspool)</option><option value="naive">recherche naïve</option></select></div>
+      </div>
+      <div class="txt" id="txt"></div>
+      <div class="buttons"><button class="primary" id="tStep">Étape suivante</button><button id="tAll">Tout dérouler</button><button id="tReset">Recommencer</button></div>
+      <div class="row2">
+        <div class="stack"><span class="muted">Table des décalages (Boyer-Moore) : de combien avancer selon le caractère du texte aligné sur la fin du motif</span><div class="table-wrap"><table class="data" id="shift"></table></div></div>
+        <div class="readouts">
+          <div class="readout"><span class="label">Comparaisons de caractères</span><span class="value" id="tCmp">0</span></div>
+          <div class="readout"><span class="label">Positions trouvées</span><span class="value" id="tFound">—</span></div>
+          <div class="readout"><span class="label">Comparaisons de l'autre algorithme</span><span class="value" id="tOther">—</span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===== Programmation dynamique ===== -->
+    <div class="stack" data-panel="dyn">
+      <div class="controls">
+        <div class="control"><div class="row"><label for="coins">Pièces disponibles</label></div>
+          <select id="coins"><option value="1,3,4">1, 3, 4</option><option value="1,6,10">1, 6, 10</option><option value="1,2,5,10,20">1, 2, 5, 10, 20</option></select></div>
+        <div class="control"><div class="row"><label for="sum">Somme à rendre</label><span class="num" id="sumVal"></span></div>
+          <input type="range" id="sum" min="1" max="40" step="1" value="12"></div>
+      </div>
+      <p class="muted">La case s contient le nombre minimal de pièces pour rendre s. Elle se calcule à partir des cases déjà remplies : pour chaque pièce p, on essaie 1 + case(s − p) et on garde le minimum.</p>
+      <div class="dp" id="dp"></div>
+      <div class="buttons"><button class="primary" id="dStep">Remplir la case suivante</button><button id="dAll">Tout remplir</button><button id="dReset">Recommencer</button></div>
+      <div class="row2">
+        <pre class="code">def rendu_dynamique(somme, pieces):
+    nb = [0] + [float('inf')] * somme
+    for s in range(1, somme + 1):
+        for p in pieces:
+            if p &lt;= s and nb[s - p] + 1 &lt; nb[s]:
+                nb[s] = nb[s - p] + 1
+    return nb[somme]</pre>
+        <div class="readouts">
+          <div class="readout"><span class="label">Solution optimale</span><span class="value" id="dOpt">—</span></div>
+          <div class="readout"><span class="label">Algorithme glouton, pour comparer</span><span class="value" id="dGreedy">—</span></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="panel">
+    <div class="formula" data-panel="graph"><span>largeur&nbsp;:&nbsp;<b>file</b>, sommets par distance croissante</span><span>profondeur&nbsp;:&nbsp;<b>pile</b>, on va le plus loin possible avant de revenir</span></div>
+    <div class="formula" data-panel="merge"><span>diviser pour régner&nbsp;:&nbsp;<b>diviser, résoudre récursivement, combiner</b></span><span>tri fusion&nbsp;:&nbsp;<b>de l'ordre de n·log(n)</b> comparaisons</span></div>
+    <div class="formula" data-panel="text"><span>Boyer-Moore&nbsp;:&nbsp;<b>comparer de droite à gauche</b> et <b>sauter</b> plusieurs positions à la fois</span><span>recherche naïve&nbsp;:&nbsp;<b>avancer d'une seule position</b> à chaque fois</span></div>
+    <div class="formula" data-panel="dyn"><span>programmation dynamique&nbsp;:&nbsp;<b>résoudre les sous-problèmes une fois</b> et <b>mémoriser</b> leurs solutions</span></div>
+  </section>
+
+  <footer>La recherche textuelle utilise la variante de Horspool de l'algorithme de Boyer-Moore, la plus courante au lycée : elle n'emploie que la table des décalages du mauvais caractère.</footer>
+</main>
+
+<script>
+(function(){
+  // ---------- Utilitaires ----------
+  const $ = id => document.getElementById(id);
+  const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
+  const fmt = (v, d) => Number.isFinite(v)
+    ? v.toLocaleString('fr-FR', {minimumFractionDigits:d, maximumFractionDigits:d})
+    : '—';
+  const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const MONO = 'ui-monospace, "Cascadia Mono", "SF Mono", Consolas, Menlo, monospace';
+  const SANS = 'system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif';
+
+  // Couleurs du thème, relues si le système bascule clair/sombre
+  const C = {};
+  function readColors(){
+    const s = getComputedStyle(document.documentElement);
+    for (const n of ['bg','paper','ink','ink-soft','line','wave','wave-glow','accent','blue','brass','violet','pink']){
+      C[n.replace(/-(.)/g, (_, c) => c.toUpperCase())] = s.getPropertyValue('--' + n).trim();
+    }
+  }
+  readColors();
+  window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', readColors);
+
+  // Canvas net sur tout écran : on dessine toujours dans un repère logique W × H
+  function setupCanvas(canvas, W, H){
+    const ctx = canvas.getContext('2d');
+    function fit(){
+      const dpr = Math.min(window.devicePixelRatio || 1, 3);
+      const cw = canvas.clientWidth || W;
+      canvas.width = Math.max(1, Math.round(cw * dpr));
+      canvas.height = Math.max(1, Math.round(cw * H / W * dpr));
+      ctx.setTransform(canvas.width / W, 0, 0, canvas.height / H, 0, 0);
+    }
+    window.addEventListener('resize', fit);
+    fit();
+    return ctx;
+  }
+  // Position du pointeur (souris ou doigt) dans le repère logique
+  function pointerPos(canvas, evt, W, H){
+    const r = canvas.getBoundingClientRect();
+    return { x: (evt.clientX - r.left) * W / r.width, y: (evt.clientY - r.top) * H / r.height };
+  }
+  function arrow(ctx, x1, y1, x2, y2, color, width){
+    const len = Math.hypot(x2 - x1, y2 - y1);
+    if (len < 3) return;
+    const a = Math.atan2(y2 - y1, x2 - x1), h = Math.min(10, len * 0.5);
+    ctx.strokeStyle = color; ctx.fillStyle = color; ctx.lineWidth = width || 2.5;
+    ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2 - Math.cos(a) * h * 0.8, y2 - Math.sin(a) * h * 0.8); ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(x2, y2);
+    ctx.lineTo(x2 - h * Math.cos(a - 0.42), y2 - h * Math.sin(a - 0.42));
+    ctx.lineTo(x2 - h * Math.cos(a + 0.42), y2 - h * Math.sin(a + 0.42));
+    ctx.closePath(); ctx.fill();
+  }
+  // Pas "rond" (1, 2, 5 × 10^n) pour graduer un axe
+  function niceStep(x){
+    if (!(x > 0)) return 1;
+    const p = Math.pow(10, Math.floor(Math.log10(x))), m = x / p;
+    return (m < 1.5 ? 1 : m < 3.5 ? 2 : m < 7.5 ? 5 : 10) * p;
+  }
+
+  // Relie un curseur, une liste ou une case à cocher à un paramètre (et affiche sa valeur)
+  function bind(id, onChange, format){
+    const el = $(id), label = $(id + 'Val');
+    const val = () => el.type === 'checkbox' ? el.checked : parseFloat(el.value);
+    const show = () => { if (label && format) label.textContent = format(val()); };
+    el.addEventListener(el.type === 'range' ? 'input' : 'change', () => { onChange(val()); show(); });
+    show();
+  }
+  const out = (id, text) => { $(id).textContent = text; };
+  function setStatus(text, cls){
+    const s = $('status');
+    s.textContent = text; s.className = 'status' + (cls ? ' ' + cls : '');
+  }
+  // Repère gradué dans le rectangle g ; renvoie les conversions X(x) et Y(y)
+  function axes(ctx, g, o){
+    const xMin = o.xMin || 0, yMin = o.yMin || 0;
+    const X = x => g.x + g.w * (x - xMin) / (o.xMax - xMin);
+    const Y = y => g.y + g.h - g.h * (y - yMin) / (o.yMax - yMin);
+    const ink = o.ink || C.ink, soft = o.soft || C.inkSoft, line = o.line || C.line;
+    const sx = niceStep((o.xMax - xMin) / (o.xTicks || 6)), sy = niceStep((o.yMax - yMin) / (o.yTicks || 4));
+    const dec = s => s >= 1 ? 0 : Math.min(4, Math.ceil(-Math.log10(s) - 1e-9));
+    ctx.save();
+    ctx.font = '13px ' + MONO; ctx.lineWidth = 1; ctx.textAlign = 'center';
+    for (let k = Math.ceil(xMin / sx - 1e-9); k * sx <= o.xMax + sx * 1e-6; k++){
+      ctx.strokeStyle = line; ctx.globalAlpha = 0.55;
+      ctx.beginPath(); ctx.moveTo(X(k * sx), g.y); ctx.lineTo(X(k * sx), g.y + g.h); ctx.stroke();
+      ctx.globalAlpha = 1; ctx.fillStyle = soft;
+      ctx.fillText(fmt(k * sx + 0, dec(sx)), X(k * sx), g.y + g.h + 18);
+    }
+    ctx.textAlign = 'right';
+    for (let k = Math.ceil(yMin / sy - 1e-9); k * sy <= o.yMax + sy * 1e-6; k++){
+      ctx.strokeStyle = line; ctx.globalAlpha = 0.55;
+      ctx.beginPath(); ctx.moveTo(g.x, Y(k * sy)); ctx.lineTo(g.x + g.w, Y(k * sy)); ctx.stroke();
+      ctx.globalAlpha = 1; ctx.fillStyle = soft;
+      ctx.fillText(fmt(k * sy + 0, dec(sy)), g.x - 8, Y(k * sy) + 4);
+    }
+    const y0 = yMin < 0 ? Y(0) : g.y + g.h;
+    ctx.strokeStyle = soft; ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.moveTo(g.x, g.y); ctx.lineTo(g.x, g.y + g.h); ctx.moveTo(g.x, y0); ctx.lineTo(g.x + g.w, y0); ctx.stroke();
+    ctx.fillStyle = ink; ctx.textAlign = 'left'; ctx.font = '14px ' + SANS;
+    if (o.title) ctx.fillText(o.title, g.x + 8, g.y - 10);
+    ctx.fillStyle = soft; ctx.textAlign = 'right'; ctx.font = '13px ' + MONO;
+    if (o.xLabel) ctx.fillText(o.xLabel, g.x + g.w, g.y + g.h + 36);
+    ctx.restore();
+    return { X, Y };
+  }
+  // Onglets : boutons [data-tab] dans #id, panneaux [data-panel] de même nom
+  function tabs(id, onChange){
+    const btns = [...document.querySelectorAll('#' + id + ' button')];
+    const names = btns.map(b => b.dataset.tab);
+    const show = name => {
+      for (const b of btns) b.setAttribute('aria-selected', String(b.dataset.tab === name));
+      for (const p of document.querySelectorAll('[data-panel]')) if (names.includes(p.dataset.panel)) p.hidden = p.dataset.panel !== name;
+      if (onChange) onChange(name);
+    };
+    for (const b of btns) b.addEventListener('click', () => show(b.dataset.tab));
+    show(btns[0].dataset.tab);
+    return show;
+  }
+  const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
+  const sleep = ms => new Promise(r => setTimeout(r, ms));
+  const rnd = (a, b) => a + Math.floor(Math.random() * (b - a + 1));
+
+  // =========================================================
+  // Parcours de graphes
+  // =========================================================
+  const GW = 1000, GH = 400;
+  const gcv = $('graph'), gctx = setupCanvas(gcv, GW, GH);
+  const V = { A: [90, 200], B: [250, 80], C: [250, 320], D: [430, 200], E: [430, 60], F: [600, 320], G: [620, 120], H: [800, 220], I: [920, 80] };
+  const E = [['A','B'],['A','C'],['B','D'],['B','E'],['C','D'],['C','F'],['D','G'],['E','G'],['F','H'],['G','H'],['G','I'],['H','I']];
+  const nbrs = v => E.filter(e => e.includes(v)).map(e => e[0] === v ? e[1] : e[0]).sort();
+  let start = 'A', order = [], struct = [], seen = new Set(), current = null, gTimer = null, from = {};
+  const CODE = {
+    bfs: 'def parcours_largeur(graphe, depart):\n    vus = [depart]\n    file = [depart]\n    while file:\n        sommet = file.pop(0)          # on retire en tête\n        print(sommet)\n        for voisin in graphe[sommet]:\n            if voisin not in vus:\n                vus.append(voisin)\n                file.append(voisin)',
+    dfs: 'def parcours_profondeur(graphe, depart):\n    vus = []\n    pile = [depart]\n    while pile:\n        sommet = pile.pop()           # on retire au sommet\n        if sommet not in vus:\n            vus.append(sommet)\n            print(sommet)\n            for voisin in reversed(graphe[sommet]):\n                if voisin not in vus:\n                    pile.append(voisin)'
+  };
+  function gReset(){
+    if (gTimer){ clearInterval(gTimer); gTimer = null; }
+    order = []; current = null; from = {};
+    struct = [start];
+    seen = new Set($('walk').value === 'bfs' ? [start] : []);
+    drawGraph();
+  }
+  function gStep(){
+    const bfs = $('walk').value === 'bfs';
+    if (!struct.length) return false;
+    if (bfs){
+      const v = struct.shift(); current = v; order.push(v);
+      for (const w of nbrs(v)) if (!seen.has(w)){ seen.add(w); struct.push(w); from[w] = v; }
+    } else {
+      let v;
+      do { v = struct.pop(); } while (v !== undefined && seen.has(v));
+      if (v === undefined){ drawGraph(); return false; }
+      seen.add(v); current = v; order.push(v);
+      // Le dernier sommet qui empile w est celui d'où on l'atteindra : c'est son parent dans l'arbre du parcours
+      for (const w of nbrs(v).slice().reverse()) if (!seen.has(w)){ struct.push(w); from[w] = v; }
+    }
+    drawGraph();
+    return struct.some(w => !seen.has(w) || bfs);
+  }
+  function drawGraph(){
+    gctx.clearRect(0, 0, GW, GH);
+    for (const [a, b] of E){
+      const tree = (from[b] === a && order.includes(b)) || (from[a] === b && order.includes(a));
+      gctx.strokeStyle = tree ? C.accent : C.line; gctx.lineWidth = tree ? 5 : 3;
+      gctx.beginPath(); gctx.moveTo(...V[a]); gctx.lineTo(...V[b]); gctx.stroke();
+    }
+    for (const v in V){
+      const k = order.indexOf(v), inS = struct.includes(v) && !order.includes(v);
+      gctx.fillStyle = v === current ? C.wave : k >= 0 ? C.accent : inS ? C.waveGlow : C.paper;
+      gctx.strokeStyle = v === start ? C.ink : C.inkSoft; gctx.lineWidth = v === start ? 3.5 : 2;
+      gctx.beginPath(); gctx.arc(V[v][0], V[v][1], 24, 0, Math.PI * 2); gctx.fill(); gctx.stroke();
+      gctx.fillStyle = k >= 0 ? C.paper : C.ink; gctx.font = '600 16px ' + MONO; gctx.textAlign = 'center';
+      gctx.fillText(v, V[v][0], V[v][1] + 6);
+      if (k >= 0){ gctx.fillStyle = C.wave; gctx.font = '600 13px ' + SANS; gctx.fillText(String(k + 1), V[v][0] + 26, V[v][1] - 20); }
+    }
+    const bfs = $('walk').value === 'bfs';
+    $('gCode').textContent = CODE[$('walk').value];
+    out('gStructLabel', bfs ? 'File (tête à gauche)' : 'Pile (sommet à droite)');
+    out('gStruct', '[' + struct.join(', ') + ']');
+    out('gOrder', order.join(' → ') || '—');
+    if (order.length === Object.keys(V).length && !struct.some(w => !seen.has(w))) setStatus('Parcours terminé : tous les sommets ont été visités', 'ok');
+    else setStatus(current ? 'Visite de ' + current : 'Départ : ' + start);
+  }
+  gcv.addEventListener('pointerdown', e => {
+    const p = pointerPos(gcv, e, GW, GH), v = Object.keys(V).find(k => Math.hypot(V[k][0] - p.x, V[k][1] - p.y) < 30);
+    if (v){ start = v; gReset(); }
+  });
+  $('gStep').addEventListener('click', gStep);
+  $('gAll').addEventListener('click', () => { if (gTimer) return; gTimer = setInterval(() => { if (!gStep()){ clearInterval(gTimer); gTimer = null; drawGraph(); } }, reduceMotion ? 30 : 650); });
+  $('gReset').addEventListener('click', gReset);
+  $('walk').addEventListener('change', gReset);
+
+  // =========================================================
+  // Tri fusion
+  // =========================================================
+  const MW = 1000, MH = 300;
+  const mcv = $('bars'), mctx = setupCanvas(mcv, MW, MH);
+  let marr = [], mgen = null, mst = {}, mcmp = 0, mTimer = null;
+  // Version en place, étape par étape : chaque étape est une découpe ou une fusion
+  function* mergeSort(t, lo, hi, depth){
+    if (hi - lo <= 1) return;
+    const mid = (lo + hi) >> 1;
+    yield { phase: 'diviser [' + lo + ' … ' + (hi - 1) + '] en deux moitiés', lo, mid, hi };
+    yield* mergeSort(t, lo, mid, depth + 1);
+    yield* mergeSort(t, mid, hi, depth + 1);
+    const a = t.slice(lo, mid), b = t.slice(mid, hi);
+    let i = 0, j = 0, k = lo;
+    while (i < a.length && j < b.length){ mcmp++; t[k++] = a[i] <= b[j] ? a[i++] : b[j++]; }
+    while (i < a.length) t[k++] = a[i++];
+    while (j < b.length) t[k++] = b[j++];
+    yield { phase: 'fusionner [' + lo + ' … ' + (mid - 1) + '] et [' + mid + ' … ' + (hi - 1) + ']', lo, mid, hi, merged: true };
+  }
+  function mNew(){
+    if (mTimer){ clearInterval(mTimer); mTimer = null; $('mPlay').textContent = 'Lancer'; }
+    const n = +$('msize').value;
+    marr = Array.from({ length: n }, () => rnd(5, 100));
+    mcmp = 0; mst = {};
+    mgen = mergeSort(marr, 0, n, 0);
+    drawMerge();
+  }
+  function mStep(){
+    if (!mgen) return false;
+    const r = mgen.next();
+    if (r.done){ mgen = null; mst = { done: true }; drawMerge(); return false; }
+    mst = r.value; drawMerge(); return true;
+  }
+  function drawMerge(){
+    mctx.clearRect(0, 0, MW, MH);
+    const n = marr.length, w = (MW - 40) / n;
+    marr.forEach((v, i) => {
+      let col = C.line;
+      if (mst.done) col = C.accent;
+      else if (mst.hi !== undefined && i >= mst.lo && i < mst.hi) col = mst.merged ? C.wave : i < mst.mid ? C.blue : C.brass;
+      mctx.fillStyle = col;
+      const h = v / 100 * (MH - 50);
+      mctx.fillRect(20 + i * w + 2, MH - 30 - h, w - 4, h);
+    });
+    if (mst.hi !== undefined && !mst.done){
+      mctx.strokeStyle = C.ink; mctx.lineWidth = 2;
+      mctx.beginPath(); mctx.moveTo(20 + mst.lo * w, MH - 18); mctx.lineTo(20 + mst.hi * w, MH - 18); mctx.stroke();
+      if (!mst.merged){ mctx.beginPath(); mctx.moveTo(20 + mst.mid * w, MH - 26); mctx.lineTo(20 + mst.mid * w, MH - 10); mctx.stroke(); }
+    }
+    out('mPhase', mst.done ? 'tableau trié' : mst.phase || '—');
+    out('mCmp', String(mcmp));
+    out('mRef', '≈ ' + fmt(n * Math.log2(n), 0));
+    out('mSel', fmt(n * (n - 1) / 2, 0) + ' comparaisons');
+    setStatus(mst.done ? 'Tri terminé en ' + mcmp + ' comparaisons' : mst.merged ? 'Combiner' : mst.phase ? 'Diviser' : 'Prêt', mst.done ? 'ok' : '');
+  }
+  $('mStep').addEventListener('click', () => { if (!mgen && mst.done) mNew(); mStep(); });
+  $('mPlay').addEventListener('click', () => {
+    if (mTimer){ clearInterval(mTimer); mTimer = null; $('mPlay').textContent = 'Lancer'; return; }
+    if (!mgen) mNew();
+    mTimer = setInterval(() => { if (!mStep()){ clearInterval(mTimer); mTimer = null; $('mPlay').textContent = 'Lancer'; } }, reduceMotion ? 20 : 380);
+    $('mPlay').textContent = 'Pause';
+  });
+  $('mNew').addEventListener('click', mNew);
+  bind('msize', mNew, v => fmt(v, 0));
+
+  // =========================================================
+  // Recherche textuelle
+  // =========================================================
+  let tState = null, tTimer = null;
+  function shiftTable(m){
+    const t = {};
+    for (let i = 0; i < m.length - 1; i++) t[m[i]] = m.length - 1 - i;
+    return t;
+  }
+  // Compte les comparaisons d'un algorithme complet (pour comparer les deux)
+  function countAll(algo, T, M){
+    let c = 0, s = 0;
+    const table = shiftTable(M);
+    while (s <= T.length - M.length){
+      if (algo === 'naive'){ let i = 0; while (i < M.length){ c++; if (T[s + i] !== M[i]) break; i++; } s++; }
+      else { let i = M.length - 1; while (i >= 0){ c++; if (T[s + i] !== M[i]) break; i--; } s += table[T[s + M.length - 1]] || M.length; }
+    }
+    return c;
+  }
+  function tReset(){
+    if (tTimer){ clearInterval(tTimer); tTimer = null; }
+    const T = $('hay').value, M = $('needle').value;
+    tState = { T, M, s: 0, i: $('tAlgo').value === 'naive' ? 0 : M.length - 1, cmp: 0, found: [], marks: {}, done: !M.length || M.length > T.length };
+    const tab = shiftTable(M), keys = Object.keys(tab);
+    $('shift').innerHTML = '<tr><th>Caractère</th>' + keys.map(k => '<th>' + (k === ' ' ? '␣' : esc(k)) + '</th>').join('') + '<th>autre</th></tr><tr><td>Décalage</td>' + keys.map(k => '<td>' + tab[k] + '</td>').join('') + '<td>' + M.length + '</td></tr>';
+    out('tOther', M && M.length <= T.length ? countAll($('tAlgo').value === 'naive' ? 'bm' : 'naive', T, M) + ' (' + ($('tAlgo').value === 'naive' ? 'Boyer-Moore' : 'naïve') + ')' : '—');
+    drawText();
+  }
+  // Une étape = une comparaison de caractère, ou le décalage du motif qui la suit
+  function tStep(){
+    const st = tState;
+    if (!st || st.done) return false;
+    const { T, M } = st, bm = $('tAlgo').value === 'bm';
+    if (st.pending){
+      st.s += st.pending; st.pending = 0;
+      st.i = bm ? M.length - 1 : 0; st.marks = {};
+      if (st.s > T.length - M.length) st.done = true;
+      drawText();
+      return !st.done;
+    }
+    const a = T[st.s + st.i], b = M[st.i];
+    st.cmp++;
+    st.marks[st.i] = a === b ? 'ok' : 'ko';
+    let shift = 0;
+    if (a === b){
+      if (bm ? st.i === 0 : st.i === M.length - 1){ st.found.push(st.s); shift = bm ? (shiftTable(M)[T[st.s + M.length - 1]] || M.length) : 1; }
+      else st.i += bm ? -1 : 1;
+    } else shift = bm ? (shiftTable(M)[T[st.s + M.length - 1]] || M.length) : 1;
+    st.pending = shift;      // le motif avancera à l'étape suivante, une fois la comparaison vue
+    drawText();
+    return true;
+  }
+  function drawText(){
+    const st = tState;
+    if (!st) return;
+    const { T, M } = st;
+    const cols = T.length;
+    $('txt').style.gridTemplateColumns = 'repeat(' + cols + ', 24px)';
+    let html = '';
+    for (let k = 0; k < cols; k++) html += '<span class="t' + (st.found.some(f => k >= f && k < f + M.length) ? ' found' : '') + '">' + (T[k] === ' ' ? '␣' : esc(T[k])) + '</span>';
+    for (let k = 0; k < cols; k++){
+      const i = k - st.s;
+      if (st.done || i < 0 || i >= M.length) html += '<span></span>';
+      else html += '<span class="t ' + (st.marks[i] || '') + '">' + (M[i] === ' ' ? '␣' : esc(M[i])) + '</span>';
+    }
+    for (let k = 0; k < cols; k++) html += '<span><small>' + (k % 5 === 0 ? k : '') + '</small></span>';
+    $('txt').innerHTML = html;
+    out('tCmp', String(st.cmp));
+    out('tFound', st.found.length ? st.found.join(', ') : 'aucune pour l\'instant');
+    setStatus(st.done ? 'Recherche terminée : ' + st.found.length + ' occurrence(s), ' + st.cmp + ' comparaisons' : 'Motif aligné à la position ' + st.s, st.done ? 'ok' : '');
+  }
+  $('tStep').addEventListener('click', () => { if (tState && tState.done) tReset(); tStep(); });
+  $('tAll').addEventListener('click', () => { if (tTimer) return; if (tState.done) tReset(); tTimer = setInterval(() => { if (!tStep()){ clearInterval(tTimer); tTimer = null; } }, reduceMotion ? 10 : 260); });
+  $('tReset').addEventListener('click', tReset);
+  for (const id of ['hay', 'needle']) $(id).addEventListener('input', tReset);
+  $('tAlgo').addEventListener('change', tReset);
+
+  // =========================================================
+  // Programmation dynamique
+  // =========================================================
+  let dpState = null;
+  function dReset(){
+    const S = +$('sum').value;
+    dpState = { S, nb: [0].concat(new Array(S).fill(Infinity)), last: new Array(S + 1).fill(0), s: 1 };
+    drawDp();
+  }
+  function dStep(){
+    const st = dpState, coins = $('coins').value.split(',').map(Number);
+    if (st.s > st.S) return false;
+    for (const p of coins) if (p <= st.s && st.nb[st.s - p] + 1 < st.nb[st.s]){ st.nb[st.s] = st.nb[st.s - p] + 1; st.last[st.s] = p; }
+    st.cur = st.s; st.s++;
+    drawDp();
+    return st.s <= st.S;
+  }
+  function drawDp(){
+    const st = dpState, coins = $('coins').value.split(',').map(Number);
+    const srcs = st.cur ? coins.filter(p => p <= st.cur).map(p => st.cur - p) : [];
+    const done = st.s > st.S, path = new Set();
+    if (done){ let x = st.S; while (x > 0){ path.add(x); x -= st.last[x]; } path.add(0); }
+    $('dp').innerHTML = st.nb.map((v, i) => '<div class="' + (i === st.cur && !done ? 'cur' : srcs.includes(i) && !done ? 'src' : path.has(i) ? 'path' : '') + '"><small>s = ' + i + '</small>' + (i < st.s ? (v === Infinity ? '∞' : v) : '·') + '</div>').join('');
+    if (done){
+      const used = []; let x = st.S; while (x > 0){ used.push(st.last[x]); x -= st.last[x]; }
+      out('dOpt', st.nb[st.S] + ' pièces : ' + used.sort((a, b) => b - a).join(' + '));
+    } else out('dOpt', '—');
+    const g = []; let r = st.S; for (const p of coins.slice().sort((a, b) => b - a)) while (r >= p){ g.push(p); r -= p; }
+    out('dGreedy', g.length + ' pièces : ' + g.join(' + '));
+    if (done) setStatus(g.length === st.nb[st.S] ? 'Ici, le glouton trouve aussi l\'optimum' : 'Le glouton utilise ' + g.length + ' pièces au lieu de ' + st.nb[st.S], g.length === st.nb[st.S] ? 'ok' : 'off');
+    else setStatus('Case ' + (st.cur || 0) + ' remplie, à partir des cases en bleu');
+  }
+  $('dStep').addEventListener('click', () => { if (dpState.s > dpState.S) dReset(); dStep(); });
+  $('dAll').addEventListener('click', () => { while (dStep()); });
+  $('dReset').addEventListener('click', dReset);
+  $('coins').addEventListener('change', dReset);
+  bind('sum', dReset, v => fmt(v, 0));
+
+  // ---------- Onglets ----------
+  gReset(); mNew(); tReset(); dReset();
+  const redraw = { graph: drawGraph, merge: drawMerge, text: drawText, dyn: drawDp };
+  tabs('part', p => { window.dispatchEvent(new Event('resize')); redraw[p](); });
+  window.addEventListener('resize', () => { drawGraph(); drawMerge(); });
+  window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => setTimeout(() => { drawGraph(); drawMerge(); }, 0));
+})();
+</script>
+<script>
+  // Compteur de visites GoatCounter (sans cookie), chargé uniquement sur le site en ligne
+  if (location.protocol === 'https:'){
+    const gc = document.createElement('script');
+    gc.async = true;
+    gc.src = 'https://gc.zgo.at/count.js';
+    gc.dataset.goatcounter = 'https://miyvi.goatcounter.com/count';
+    document.head.appendChild(gc);
+  }
+</script>
+</body>
+</html>

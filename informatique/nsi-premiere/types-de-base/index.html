@@ -1,0 +1,685 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Représentation des données : types de base</title>
+<style>
+  /* ---------- Thème (clair / sombre automatique) ---------- */
+  :root{
+    --bg:#f3ede1;
+    --paper:#fbf8f0;
+    --ink:#22242e;
+    --ink-soft:#5b5a52;
+    --line:#d9d0ba;
+    --wave:#b8362b;
+    --wave-glow:rgba(184,54,43,.14);
+    --accent:#2f6f4f;
+    --blue:#2c5f8a;
+    --brass:#a9793f;
+    --violet:#8a3fc0;
+    --pink:#cf5f8c;
+    --ok:#2f6f4f;
+    --warn:#b8362b;
+    --serif:"Iowan Old Style","Palatino Linotype",Palatino,Georgia,serif;
+    --sans:system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+    --mono:ui-monospace,"Cascadia Mono","SF Mono",Consolas,Menlo,monospace;
+    color-scheme: light dark;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{
+      --bg:#171a21;
+      --paper:#1e222b;
+      --ink:#eae6da;
+      --ink-soft:#9a9689;
+      --line:#33384a;
+      --wave:#ff8a72;
+      --wave-glow:rgba(255,138,114,.14);
+      --accent:#79d6a3;
+      --blue:#7fb4e0;
+      --brass:#c99a5b;
+      --violet:#c39af5;
+      --pink:#f29bbd;
+      --ok:#79d6a3;
+      --warn:#ff8a72;
+    }
+  }
+
+  /* ---------- Mise en page ---------- */
+  *{box-sizing:border-box;}
+  html, body{ margin:0; padding:0; }
+  body{
+    background:var(--bg);
+    color:var(--ink);
+    font-family:var(--sans);
+    padding:28px 16px;
+    display:flex;
+    justify-content:center;
+  }
+  main{
+    width:100%;
+    max-width:920px;
+    display:flex;
+    flex-direction:column;
+    gap:20px;
+  }
+  header{ display:flex; flex-direction:column; gap:4px; }
+  .kicker{
+    font-size:.72rem;
+    text-transform:uppercase;
+    letter-spacing:.08em;
+    color:var(--ink-soft);
+  }
+  h1{
+    font-family:var(--serif);
+    font-weight:600;
+    font-size:clamp(1.5rem, 1.1rem + 1.6vw, 2.2rem);
+    margin:0;
+    text-wrap:balance;
+  }
+  header p{
+    margin:0;
+    color:var(--ink-soft);
+    font-size:.92rem;
+    max-width:66ch;
+  }
+
+  /* ---------- Zone de simulation ---------- */
+  .scene{
+    background:var(--paper);
+    border:1px solid var(--line);
+    border-radius:14px;
+    padding:20px clamp(12px,3vw,28px) 8px;
+    display:flex;
+    flex-direction:column;
+    gap:6px;
+  }
+  .scene-top{
+    display:flex;
+    justify-content:space-between;
+    align-items:baseline;
+    gap:12px;
+    flex-wrap:wrap;
+  }
+  .scene-title{ font-family:var(--serif); font-weight:600; }
+  .status{
+    font-family:var(--mono);
+    font-size:.82rem;
+    padding:3px 10px;
+    border-radius:999px;
+    border:1px solid var(--line);
+    color:var(--ink-soft);
+  }
+  .status.ok{ color:var(--ok); border-color:var(--ok); }
+  .status.off{ color:var(--warn); border-color:var(--warn); }
+  canvas{
+    width:100%;
+    height:auto;
+    display:block;
+  }
+  canvas.draggable{ touch-action:none; cursor:grab; }
+  canvas.dragging{ cursor:grabbing; }
+  canvas.tappable{ touch-action:manipulation; }
+  .hint{ margin:0; font-size:.78rem; color:var(--ink-soft); }
+
+  /* ---------- Mesures ---------- */
+  .readouts{
+    display:grid;
+    grid-template-columns:repeat(auto-fit,minmax(150px,1fr));
+    gap:10px 18px;
+    padding-block:10px;
+    border-top:1px solid var(--line);
+    margin-top:6px;
+  }
+  .readout{ display:flex; flex-direction:column; gap:2px; }
+  .readout .label{
+    font-size:.78rem;
+    color:var(--ink-soft);
+  }
+  .readout .value{
+    font-family:var(--mono);
+    font-variant-numeric:tabular-nums;
+    font-size:1.05rem;
+    font-weight:500;
+  }
+  .readout .value em{ color:var(--blue); font-style:normal; font-size:.9rem; }
+
+  /* ---------- Contrôles ---------- */
+  .panel{
+    background:var(--paper);
+    border:1px solid var(--line);
+    border-radius:14px;
+    padding:18px clamp(14px,3vw,26px);
+    display:flex;
+    flex-direction:column;
+    gap:18px;
+  }
+  .controls{
+    display:grid;
+    grid-template-columns:repeat(auto-fit,minmax(240px,1fr));
+    gap:18px 32px;
+  }
+  .control{ display:flex; flex-direction:column; gap:6px; }
+  .control .row{
+    display:flex;
+    justify-content:space-between;
+    align-items:baseline;
+    gap:10px;
+  }
+  .control label{ font-size:.86rem; font-weight:500; }
+  .control .num{
+    font-family:var(--mono);
+    font-variant-numeric:tabular-nums;
+    color:var(--wave);
+    font-size:.92rem;
+  }
+  input[type=range]{
+    -webkit-appearance:none;
+    appearance:none;
+    width:100%;
+    height:4px;
+    margin:8px 0;
+    border-radius:999px;
+    background:var(--line);
+    outline:none;
+  }
+  input[type=range]::-webkit-slider-thumb{
+    -webkit-appearance:none;
+    width:20px; height:20px;
+    border-radius:50%;
+    background:var(--wave);
+    border:2px solid var(--paper);
+    box-shadow:0 0 0 1px var(--line);
+    cursor:pointer;
+  }
+  input[type=range]::-moz-range-thumb{
+    width:18px; height:18px;
+    border-radius:50%;
+    background:var(--wave);
+    border:2px solid var(--paper);
+    box-shadow:0 0 0 1px var(--line);
+    cursor:pointer;
+  }
+  select{
+    font-family:var(--sans);
+    font-size:.86rem;
+    padding:7px 10px;
+    border-radius:8px;
+    border:1px solid var(--line);
+    background:var(--paper);
+    color:var(--ink);
+    width:100%;
+  }
+  .check{
+    display:flex;
+    align-items:center;
+    gap:8px;
+    font-size:.86rem;
+    font-weight:500;
+    cursor:pointer;
+  }
+  .check input{ width:18px; height:18px; accent-color:var(--accent); margin:0; }
+  .buttons{ display:flex; gap:10px; flex-wrap:wrap; }
+  button{
+    font-family:var(--sans);
+    font-size:.86rem;
+    font-weight:500;
+    padding:9px 16px;
+    border-radius:8px;
+    border:1px solid var(--line);
+    background:transparent;
+    color:var(--ink);
+    cursor:pointer;
+  }
+  button.primary{
+    background:var(--accent);
+    border-color:var(--accent);
+    color:var(--paper);
+  }
+  button:focus-visible, input:focus-visible, select:focus-visible{
+    outline:2px solid var(--accent);
+    outline-offset:2px;
+  }
+
+  /* ---------- Formules ---------- */
+  .formula{
+    font-family:var(--mono);
+    font-size:.86rem;
+    color:var(--ink-soft);
+    border-top:1px solid var(--line);
+    padding-top:14px;
+    display:flex;
+    flex-wrap:wrap;
+    gap:6px 22px;
+  }
+  .formula b{ color:var(--ink); font-weight:600; }
+  footer{
+    font-size:.78rem;
+    color:var(--ink-soft);
+    text-align:center;
+    text-wrap:balance;
+  }
+
+  /* ---------- Éléments communs aux ressources d'informatique ---------- */
+  [hidden]{ display:none !important; }
+  .tabs{ display:flex; gap:6px; flex-wrap:wrap; }
+  .tabs button{ padding:7px 14px; }
+  .tabs button[aria-selected=true]{ background:var(--accent); border-color:var(--accent); color:var(--paper); }
+  input[type=text], input[type=number], textarea.field{
+    font-family:var(--mono);
+    font-size:.88rem;
+    padding:7px 10px;
+    border-radius:8px;
+    border:1px solid var(--line);
+    background:var(--paper);
+    color:var(--ink);
+    width:100%;
+  }
+  textarea.field{ resize:vertical; min-height:90px; line-height:1.45; }
+  .table-wrap{ overflow-x:auto; }
+  table.data{ border-collapse:collapse; width:100%; font-family:var(--mono); font-size:.82rem; }
+  table.data th, table.data td{ border:1px solid var(--line); padding:5px 9px; text-align:left; white-space:nowrap; }
+  table.data th{ font-family:var(--sans); font-weight:600; color:var(--ink-soft); }
+  table.data tr.hit td{ background:var(--wave-glow); }
+  pre.code{
+    font-family:var(--mono);
+    font-size:.84rem;
+    line-height:1.5;
+    background:var(--bg);
+    border:1px solid var(--line);
+    border-radius:8px;
+    padding:10px 12px;
+    overflow-x:auto;
+    margin:0;
+    white-space:pre;
+  }
+  pre.code .hl{ background:var(--wave-glow); display:inline-block; min-width:100%; }
+  .err{ color:var(--warn); }
+  .good{ color:var(--ok); }
+  .chips{ display:flex; flex-wrap:wrap; gap:6px; }
+  .chip{ font-family:var(--mono); font-size:.8rem; padding:3px 9px; border-radius:999px; border:1px solid var(--line); }
+  .row2{ display:grid; grid-template-columns:repeat(auto-fit,minmax(280px,1fr)); gap:16px; }
+  .stack{ display:flex; flex-direction:column; gap:10px; min-width:0; }
+  .inline{ display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
+  .inline input[type=text], .inline input[type=number]{ width:auto; flex:1 1 120px; }
+  h3{ font-family:var(--serif); font-weight:600; font-size:1.02rem; margin:0; }
+  .muted{ color:var(--ink-soft); font-size:.84rem; margin:0; }
+  .bits{ display:flex; gap:4px; flex-wrap:wrap; }
+  .bit{ display:flex; flex-direction:column; align-items:center; gap:3px; }
+  .bit button{ width:40px; height:44px; padding:0; font-family:var(--mono); font-size:1.15rem; font-weight:600; }
+  .bit button[aria-pressed=true]{ background:var(--accent); border-color:var(--accent); color:var(--paper); }
+  .bit small{ font-family:var(--mono); font-size:.68rem; color:var(--ink-soft); }
+  .bit.s button[aria-pressed=true]{ background:var(--wave); border-color:var(--wave); }
+  .bit.e button[aria-pressed=true]{ background:var(--blue); border-color:var(--blue); }
+  .bit.gap{ margin-left:8px; }
+  .big{ font-family:var(--mono); font-size:1.05rem; word-break:break-all; }
+  .legend{ display:flex; gap:16px; flex-wrap:wrap; font-size:.82rem; }
+  .legend b{ display:inline-block; width:12px; height:12px; border-radius:3px; margin-right:5px; vertical-align:-1px; }
+</style>
+</head>
+<body>
+
+<main>
+  <header>
+    <span class="kicker">Informatique · NSI Première · Représentation des données</span>
+    <h1>Représentation des données : types de base</h1>
+    <p>Dans la mémoire d'un ordinateur, tout est suite de bits. Selon le type de la donnée, la même suite se lit comme un entier, un entier relatif, un nombre à virgule ou un texte. Clique sur les bits pour les changer, ou saisis une valeur pour voir son codage.</p>
+  </header>
+
+  <section class="scene">
+    <div class="tabs" id="kind">
+      <button data-tab="nat">Entiers naturels</button>
+      <button data-tab="rel">Entiers relatifs</button>
+      <button data-tab="flt">Nombres flottants</button>
+      <button data-tab="bool">Booléens</button>
+      <button data-tab="txt">Texte</button>
+    </div>
+
+    <div class="stack" data-panel="nat">
+      <div class="inline">
+        <label for="natN">Valeur décimale</label>
+        <input type="number" id="natN" min="0" value="164">
+        <select id="natSize" aria-label="Nombre de bits"><option value="8" selected>sur 8 bits (1 octet)</option><option value="16">sur 16 bits (2 octets)</option></select>
+      </div>
+      <div class="bits" id="natBits"></div>
+      <div class="readouts">
+        <div class="readout"><span class="label">Binaire</span><span class="value" id="natBin">—</span></div>
+        <div class="readout"><span class="label">Hexadécimal</span><span class="value" id="natHex">—</span></div>
+        <div class="readout"><span class="label">Plus grande valeur possible</span><span class="value" id="natMax">—</span></div>
+      </div>
+      <p class="big" id="natSum"></p>
+    </div>
+
+    <div class="stack" data-panel="rel">
+      <div class="control">
+        <div class="row"><label for="relN">Entier relatif sur 8 bits</label><span class="num" id="relNVal"></span></div>
+        <input type="range" id="relN" min="-128" max="127" step="1" value="-42">
+      </div>
+      <div class="bits" id="relBits"></div>
+      <div class="readouts">
+        <div class="readout"><span class="label">Lu comme entier relatif (complément à deux)</span><span class="value" id="relS">—</span></div>
+        <div class="readout"><span class="label">Même octet lu comme entier naturel</span><span class="value" id="relU">—</span></div>
+        <div class="readout"><span class="label">Plage représentable</span><span class="value">−128 à 127</span></div>
+      </div>
+      <div class="table-wrap"><table class="data" id="relSteps"></table></div>
+    </div>
+
+    <div class="stack" data-panel="flt">
+      <div class="inline">
+        <label for="fltIn">Nombre décimal</label>
+        <input type="text" id="fltIn" value="0,1">
+      </div>
+      <div class="legend"><span><b style="background:var(--wave)"></b>signe (1 bit)</span><span><b style="background:var(--blue)"></b>exposant (8 bits)</span><span><b style="background:var(--accent)"></b>mantisse (23 bits)</span></div>
+      <div class="bits" id="fltBits"></div>
+      <div class="readouts">
+        <div class="readout"><span class="label">Signe · exposant · mantisse</span><span class="value" id="fltParts">—</span></div>
+        <div class="readout"><span class="label">Valeur exacte réellement stockée</span><span class="value" id="fltExact">—</span></div>
+        <div class="readout"><span class="label">Erreur d'arrondi</span><span class="value" id="fltErr">—</span></div>
+      </div>
+      <p class="muted">Format IEEE 754 simple précision (32 bits) : valeur = (−1)<sup>signe</sup> × 1,mantisse × 2<sup>exposant − 127</sup>. Python utilise la double précision (64 bits) : l'arrondi est plus fin, mais il existe toujours.</p>
+      <pre class="code">&gt;&gt;&gt; 0.1 + 0.2
+0.30000000000000004
+&gt;&gt;&gt; 0.1 + 0.2 == 0.3
+False</pre>
+    </div>
+
+    <div class="stack" data-panel="bool">
+      <div class="inline">
+        <button id="bA" aria-pressed="true">a = True</button>
+        <button id="bB" aria-pressed="false">b = False</button>
+      </div>
+      <div class="table-wrap"><table class="data" id="boolTable"></table></div>
+      <p class="muted">La ligne surlignée correspond aux valeurs choisies pour a et b.</p>
+    </div>
+
+    <div class="stack" data-panel="txt">
+      <div class="inline">
+        <label for="txtIn">Texte</label>
+        <input type="text" id="txtIn" value="Été à 12 € 🙂">
+      </div>
+      <div class="readouts">
+        <div class="readout"><span class="label">Caractères</span><span class="value" id="txtChars">—</span></div>
+        <div class="readout"><span class="label">Octets en UTF-8</span><span class="value" id="txtBytes">—</span></div>
+        <div class="readout"><span class="label">Uniquement de l'ASCII ?</span><span class="value" id="txtAscii">—</span></div>
+      </div>
+      <div class="table-wrap"><table class="data" id="txtTable"></table></div>
+    </div>
+  </section>
+
+  <section class="panel">
+    <div class="formula">
+      <span>1 octet&nbsp;=&nbsp;<b>8 bits</b></span>
+      <span>n bits&nbsp;:&nbsp;<b>2<sup>n</sup> valeurs</b> différentes</span>
+      <span>1 chiffre hexadécimal&nbsp;=&nbsp;<b>4 bits</b></span>
+      <span>complément à deux&nbsp;:&nbsp;<b>inverser les bits puis ajouter 1</b></span>
+    </div>
+  </section>
+
+  <footer>En Python, les entiers n'ont pas de taille limite : le langage ajoute des octets au besoin. Les tailles fixes (8, 16, 32 bits) montrées ici sont celles qu'utilisent le processeur et de nombreux autres langages.</footer>
+</main>
+
+<script>
+(function(){
+  // ---------- Utilitaires ----------
+  const $ = id => document.getElementById(id);
+  const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
+  const fmt = (v, d) => Number.isFinite(v)
+    ? v.toLocaleString('fr-FR', {minimumFractionDigits:d, maximumFractionDigits:d})
+    : '—';
+  const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const MONO = 'ui-monospace, "Cascadia Mono", "SF Mono", Consolas, Menlo, monospace';
+  const SANS = 'system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif';
+
+  // Couleurs du thème, relues si le système bascule clair/sombre
+  const C = {};
+  function readColors(){
+    const s = getComputedStyle(document.documentElement);
+    for (const n of ['bg','paper','ink','ink-soft','line','wave','wave-glow','accent','blue','brass','violet','pink']){
+      C[n.replace(/-(.)/g, (_, c) => c.toUpperCase())] = s.getPropertyValue('--' + n).trim();
+    }
+  }
+  readColors();
+  window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', readColors);
+
+  // Canvas net sur tout écran : on dessine toujours dans un repère logique W × H
+  function setupCanvas(canvas, W, H){
+    const ctx = canvas.getContext('2d');
+    function fit(){
+      const dpr = Math.min(window.devicePixelRatio || 1, 3);
+      const cw = canvas.clientWidth || W;
+      canvas.width = Math.max(1, Math.round(cw * dpr));
+      canvas.height = Math.max(1, Math.round(cw * H / W * dpr));
+      ctx.setTransform(canvas.width / W, 0, 0, canvas.height / H, 0, 0);
+    }
+    window.addEventListener('resize', fit);
+    fit();
+    return ctx;
+  }
+  // Position du pointeur (souris ou doigt) dans le repère logique
+  function pointerPos(canvas, evt, W, H){
+    const r = canvas.getBoundingClientRect();
+    return { x: (evt.clientX - r.left) * W / r.width, y: (evt.clientY - r.top) * H / r.height };
+  }
+  function arrow(ctx, x1, y1, x2, y2, color, width){
+    const len = Math.hypot(x2 - x1, y2 - y1);
+    if (len < 3) return;
+    const a = Math.atan2(y2 - y1, x2 - x1), h = Math.min(10, len * 0.5);
+    ctx.strokeStyle = color; ctx.fillStyle = color; ctx.lineWidth = width || 2.5;
+    ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2 - Math.cos(a) * h * 0.8, y2 - Math.sin(a) * h * 0.8); ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(x2, y2);
+    ctx.lineTo(x2 - h * Math.cos(a - 0.42), y2 - h * Math.sin(a - 0.42));
+    ctx.lineTo(x2 - h * Math.cos(a + 0.42), y2 - h * Math.sin(a + 0.42));
+    ctx.closePath(); ctx.fill();
+  }
+  // Pas "rond" (1, 2, 5 × 10^n) pour graduer un axe
+  function niceStep(x){
+    if (!(x > 0)) return 1;
+    const p = Math.pow(10, Math.floor(Math.log10(x))), m = x / p;
+    return (m < 1.5 ? 1 : m < 3.5 ? 2 : m < 7.5 ? 5 : 10) * p;
+  }
+
+  // Relie un curseur, une liste ou une case à cocher à un paramètre (et affiche sa valeur)
+  function bind(id, onChange, format){
+    const el = $(id), label = $(id + 'Val');
+    const val = () => el.type === 'checkbox' ? el.checked : parseFloat(el.value);
+    const show = () => { if (label && format) label.textContent = format(val()); };
+    el.addEventListener(el.type === 'range' ? 'input' : 'change', () => { onChange(val()); show(); });
+    show();
+  }
+  const out = (id, text) => { $(id).textContent = text; };
+  function setStatus(text, cls){
+    const s = $('status');
+    s.textContent = text; s.className = 'status' + (cls ? ' ' + cls : '');
+  }
+  // Repère gradué dans le rectangle g ; renvoie les conversions X(x) et Y(y)
+  function axes(ctx, g, o){
+    const xMin = o.xMin || 0, yMin = o.yMin || 0;
+    const X = x => g.x + g.w * (x - xMin) / (o.xMax - xMin);
+    const Y = y => g.y + g.h - g.h * (y - yMin) / (o.yMax - yMin);
+    const ink = o.ink || C.ink, soft = o.soft || C.inkSoft, line = o.line || C.line;
+    const sx = niceStep((o.xMax - xMin) / (o.xTicks || 6)), sy = niceStep((o.yMax - yMin) / (o.yTicks || 4));
+    const dec = s => s >= 1 ? 0 : Math.min(4, Math.ceil(-Math.log10(s) - 1e-9));
+    ctx.save();
+    ctx.font = '13px ' + MONO; ctx.lineWidth = 1; ctx.textAlign = 'center';
+    for (let k = Math.ceil(xMin / sx - 1e-9); k * sx <= o.xMax + sx * 1e-6; k++){
+      ctx.strokeStyle = line; ctx.globalAlpha = 0.55;
+      ctx.beginPath(); ctx.moveTo(X(k * sx), g.y); ctx.lineTo(X(k * sx), g.y + g.h); ctx.stroke();
+      ctx.globalAlpha = 1; ctx.fillStyle = soft;
+      ctx.fillText(fmt(k * sx + 0, dec(sx)), X(k * sx), g.y + g.h + 18);
+    }
+    ctx.textAlign = 'right';
+    for (let k = Math.ceil(yMin / sy - 1e-9); k * sy <= o.yMax + sy * 1e-6; k++){
+      ctx.strokeStyle = line; ctx.globalAlpha = 0.55;
+      ctx.beginPath(); ctx.moveTo(g.x, Y(k * sy)); ctx.lineTo(g.x + g.w, Y(k * sy)); ctx.stroke();
+      ctx.globalAlpha = 1; ctx.fillStyle = soft;
+      ctx.fillText(fmt(k * sy + 0, dec(sy)), g.x - 8, Y(k * sy) + 4);
+    }
+    const y0 = yMin < 0 ? Y(0) : g.y + g.h;
+    ctx.strokeStyle = soft; ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.moveTo(g.x, g.y); ctx.lineTo(g.x, g.y + g.h); ctx.moveTo(g.x, y0); ctx.lineTo(g.x + g.w, y0); ctx.stroke();
+    ctx.fillStyle = ink; ctx.textAlign = 'left'; ctx.font = '14px ' + SANS;
+    if (o.title) ctx.fillText(o.title, g.x + 8, g.y - 10);
+    ctx.fillStyle = soft; ctx.textAlign = 'right'; ctx.font = '13px ' + MONO;
+    if (o.xLabel) ctx.fillText(o.xLabel, g.x + g.w, g.y + g.h + 36);
+    ctx.restore();
+    return { X, Y };
+  }
+  // Onglets : boutons [data-tab] dans #id, panneaux [data-panel] de même nom
+  function tabs(id, onChange){
+    const btns = [...document.querySelectorAll('#' + id + ' button')];
+    const names = btns.map(b => b.dataset.tab);
+    const show = name => {
+      for (const b of btns) b.setAttribute('aria-selected', String(b.dataset.tab === name));
+      for (const p of document.querySelectorAll('[data-panel]')) if (names.includes(p.dataset.panel)) p.hidden = p.dataset.panel !== name;
+      if (onChange) onChange(name);
+    };
+    for (const b of btns) b.addEventListener('click', () => show(b.dataset.tab));
+    show(btns[0].dataset.tab);
+    return show;
+  }
+  const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
+  const sleep = ms => new Promise(r => setTimeout(r, ms));
+
+  // ---------- Ligne de bits cliquables ----------
+  // kinds : classe de chaque bit (pour les couleurs), gaps : positions où laisser un espace
+  function bitRow(id, n, value, onToggle, opts){
+    opts = opts || {};
+    const box = $(id);
+    box.innerHTML = '';
+    for (let i = n - 1; i >= 0; i--){
+      const on = typeof value === 'bigint' ? ((value >> BigInt(i)) & 1n) === 1n : ((value >>> i) & 1) === 1;
+      const k = n - 1 - i;
+      const cell = document.createElement('div');
+      cell.className = 'bit' + (opts.kinds ? ' ' + opts.kinds(k) : '') + (opts.gaps && opts.gaps.includes(k) ? ' gap' : '');
+      cell.innerHTML = '<button aria-pressed="' + on + '" aria-label="bit ' + i + '">' + (on ? 1 : 0) + '</button><small>' + (opts.label ? opts.label(i) : '') + '</small>';
+      cell.querySelector('button').addEventListener('click', () => onToggle(i));
+      box.appendChild(cell);
+    }
+  }
+  const groups = (s, k) => s.replace(new RegExp('(.{' + k + '})(?=.)', 'g'), '$1 ');
+
+  // ---------- Entiers naturels ----------
+  function nat(){
+    const n = +$('natSize').value, max = Math.pow(2, n) - 1;
+    let v = Math.floor(+$('natN').value || 0);
+    if (v > max){ v = max; $('natN').value = v; }
+    if (v < 0){ v = 0; $('natN').value = 0; }
+    bitRow('natBits', n, v, i => { $('natN').value = v ^ (1 << i); nat(); }, { label: i => String(Math.pow(2, i)), gaps: n === 16 ? [8] : [] });
+    out('natBin', groups(v.toString(2).padStart(n, '0'), 4));
+    out('natHex', '0x' + v.toString(16).toUpperCase().padStart(n / 4, '0'));
+    out('natMax', fmt(max, 0) + ' (2^' + n + ' − 1)');
+    const terms = [];
+    for (let i = n - 1; i >= 0; i--) if ((v >> i) & 1) terms.push(Math.pow(2, i));
+    $('natSum').textContent = v + ' = ' + (terms.length ? terms.join(' + ') : '0');
+  }
+  $('natN').addEventListener('input', nat);
+  $('natSize').addEventListener('change', nat);
+
+  // ---------- Entiers relatifs (complément à deux sur 8 bits) ----------
+  function rel(){
+    const v = +$('relN').value, u = v & 0xff;
+    out('relNVal', String(v));
+    bitRow('relBits', 8, u, i => { const w = u ^ (1 << i); $('relN').value = w > 127 ? w - 256 : w; rel(); },
+      { label: i => i === 7 ? '−128' : String(Math.pow(2, i)), kinds: k => k === 0 ? 's' : '' });
+    out('relS', String(v));
+    out('relU', String(u));
+    const b = x => x.toString(2).padStart(8, '0');
+    let rows;
+    if (v >= 0) rows = [['Le nombre est positif : on écrit simplement son binaire', b(v)]];
+    else {
+      const a = -v;
+      rows = [['1. Binaire de la valeur absolue ' + a, a === 128 ? '10000000' : b(a)],
+              ['2. On inverse tous les bits', b((~a) & 0xff)],
+              ['3. On ajoute 1', b(u)]];
+    }
+    rows.push(['Vérification : −128 × bit de gauche + le reste', (u >> 7 ? '−128 + ' : '0 + ') + (u & 0x7f) + ' = ' + v]);
+    $('relSteps').innerHTML = rows.map(([a, c]) => '<tr><th>' + a + '</th><td>' + c + '</td></tr>').join('');
+  }
+  $('relN').addEventListener('input', rel);
+
+  // ---------- Flottants (IEEE 754, 32 bits) ----------
+  const dv = new DataView(new ArrayBuffer(4));
+  let fbits = 0;
+  // Écriture décimale exacte d'un flottant 32 bits, calculée avec des entiers sans limite
+  function exact(bits){
+    const s = bits >>> 31, e = (bits >>> 23) & 0xff, f = bits & 0x7fffff;
+    if (e === 255) return f ? 'NaN (pas un nombre)' : (s ? '−' : '') + 'infini';
+    const m = BigInt(e ? (f | 0x800000) : f), p = (e ? e : 1) - 127 - 23;
+    let str;
+    if (p >= 0) str = (m << BigInt(p)).toString();
+    else {
+      const digits = (m * 5n ** BigInt(-p)).toString().padStart(-p + 1, '0');
+      str = (digits.slice(0, p) + ',' + digits.slice(p)).replace(/,?0+$/, '');
+    }
+    return (s ? '−' : '') + str;
+  }
+  function flt(fromBits){
+    if (!fromBits){
+      const x = parseFloat($('fltIn').value.replace(',', '.').replace(/\s/g, ''));
+      dv.setFloat32(0, Number.isFinite(x) ? x : 0);
+      fbits = dv.getUint32(0);
+    }
+    dv.setUint32(0, fbits);
+    const val = dv.getFloat32(0);
+    bitRow('fltBits', 32, fbits, i => { fbits = (fbits ^ (1 << i)) >>> 0; dv.setUint32(0, fbits); $('fltIn').value = String(dv.getFloat32(0)).replace('.', ','); flt(true); },
+      { kinds: k => k === 0 ? 's' : k <= 8 ? 'e' : '', gaps: [1, 9], label: i => i === 31 ? 's' : '' });
+    const s = fbits >>> 31, e = (fbits >>> 23) & 0xff, f = fbits & 0x7fffff;
+    out('fltParts', s + ' · ' + e + ' (2^' + (e - 127) + ') · ' + f.toString(2).padStart(23, '0'));
+    const ex = exact(fbits);
+    out('fltExact', ex);
+    const typed = parseFloat($('fltIn').value.replace(',', '.'));
+    if (fromBits || !Number.isFinite(typed)) out('fltErr', '—');
+    else {
+      const err = Math.abs(val - typed);
+      out('fltErr', err === 0 ? 'aucune : valeur exacte' : err.toExponential(2).replace('.', ',').replace('e', ' × 10^'));
+    }
+  }
+  $('fltIn').addEventListener('input', () => flt(false));
+
+  // ---------- Booléens ----------
+  let A = true, B = false;
+  const py = v => v ? 'True' : 'False';
+  function bool(){
+    $('bA').textContent = 'a = ' + py(A); $('bA').setAttribute('aria-pressed', String(A));
+    $('bB').textContent = 'b = ' + py(B); $('bB').setAttribute('aria-pressed', String(B));
+    const rows = [[false, false], [false, true], [true, false], [true, true]];
+    $('boolTable').innerHTML = '<tr><th>a</th><th>b</th><th>not a</th><th>a and b</th><th>a or b</th><th>a ^ b (ou exclusif)</th></tr>'
+      + rows.map(([a, b]) => '<tr' + (a === A && b === B ? ' class="hit"' : '') + '><td>' + py(a) + '</td><td>' + py(b) + '</td><td>' + py(!a) + '</td><td>' + py(a && b) + '</td><td>' + py(a || b) + '</td><td>' + py(a !== b) + '</td></tr>').join('');
+  }
+  $('bA').addEventListener('click', () => { A = !A; bool(); });
+  $('bB').addEventListener('click', () => { B = !B; bool(); });
+
+  // ---------- Texte ----------
+  function txt(){
+    const chars = Array.from($('txtIn').value), enc = new TextEncoder();
+    let total = 0;
+    $('txtTable').innerHTML = '<tr><th>Caractère</th><th>Point de code Unicode</th><th>Octets UTF-8 (hexadécimal)</th><th>Octets UTF-8 (binaire)</th></tr>'
+      + chars.map(c => {
+        const bytes = [...enc.encode(c)], cp = c.codePointAt(0);
+        total += bytes.length;
+        return '<tr><td>' + (c === ' ' ? '(espace)' : esc(c)) + '</td><td>U+' + cp.toString(16).toUpperCase().padStart(4, '0') + ' (' + cp + ')</td><td>'
+          + bytes.map(x => x.toString(16).toUpperCase().padStart(2, '0')).join(' ') + '</td><td>' + bytes.map(x => x.toString(2).padStart(8, '0')).join(' ') + '</td></tr>';
+      }).join('');
+    out('txtChars', String(chars.length));
+    out('txtBytes', String(total));
+    out('txtAscii', chars.every(c => c.codePointAt(0) < 128) ? 'oui : 1 octet par caractère' : 'non : certains caractères prennent plusieurs octets');
+  }
+  $('txtIn').addEventListener('input', txt);
+
+  tabs('kind');
+  nat(); rel(); flt(false); bool(); txt();
+})();
+</script>
+<script>
+  // Compteur de visites GoatCounter (sans cookie), chargé uniquement sur le site en ligne
+  if (location.protocol === 'https:'){
+    const gc = document.createElement('script');
+    gc.async = true;
+    gc.src = 'https://gc.zgo.at/count.js';
+    gc.dataset.goatcounter = 'https://miyvi.goatcounter.com/count';
+    document.head.appendChild(gc);
+  }
+</script>
+</body>
+</html>

@@ -1,0 +1,721 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Structures de données : pile, file, arbre binaire de recherche</title>
+<style>
+  /* ---------- Thème (clair / sombre automatique) ---------- */
+  :root{
+    --bg:#f3ede1;
+    --paper:#fbf8f0;
+    --ink:#22242e;
+    --ink-soft:#5b5a52;
+    --line:#d9d0ba;
+    --wave:#b8362b;
+    --wave-glow:rgba(184,54,43,.14);
+    --accent:#2f6f4f;
+    --blue:#2c5f8a;
+    --brass:#a9793f;
+    --violet:#8a3fc0;
+    --pink:#cf5f8c;
+    --ok:#2f6f4f;
+    --warn:#b8362b;
+    --serif:"Iowan Old Style","Palatino Linotype",Palatino,Georgia,serif;
+    --sans:system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+    --mono:ui-monospace,"Cascadia Mono","SF Mono",Consolas,Menlo,monospace;
+    color-scheme: light dark;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{
+      --bg:#171a21;
+      --paper:#1e222b;
+      --ink:#eae6da;
+      --ink-soft:#9a9689;
+      --line:#33384a;
+      --wave:#ff8a72;
+      --wave-glow:rgba(255,138,114,.14);
+      --accent:#79d6a3;
+      --blue:#7fb4e0;
+      --brass:#c99a5b;
+      --violet:#c39af5;
+      --pink:#f29bbd;
+      --ok:#79d6a3;
+      --warn:#ff8a72;
+    }
+  }
+
+  /* ---------- Mise en page ---------- */
+  *{box-sizing:border-box;}
+  html, body{ margin:0; padding:0; }
+  body{
+    background:var(--bg);
+    color:var(--ink);
+    font-family:var(--sans);
+    padding:28px 16px;
+    display:flex;
+    justify-content:center;
+  }
+  main{
+    width:100%;
+    max-width:920px;
+    display:flex;
+    flex-direction:column;
+    gap:20px;
+  }
+  header{ display:flex; flex-direction:column; gap:4px; }
+  .kicker{
+    font-size:.72rem;
+    text-transform:uppercase;
+    letter-spacing:.08em;
+    color:var(--ink-soft);
+  }
+  h1{
+    font-family:var(--serif);
+    font-weight:600;
+    font-size:clamp(1.5rem, 1.1rem + 1.6vw, 2.2rem);
+    margin:0;
+    text-wrap:balance;
+  }
+  header p{
+    margin:0;
+    color:var(--ink-soft);
+    font-size:.92rem;
+    max-width:66ch;
+  }
+
+  /* ---------- Zone de simulation ---------- */
+  .scene{
+    background:var(--paper);
+    border:1px solid var(--line);
+    border-radius:14px;
+    padding:20px clamp(12px,3vw,28px) 8px;
+    display:flex;
+    flex-direction:column;
+    gap:6px;
+  }
+  .scene-top{
+    display:flex;
+    justify-content:space-between;
+    align-items:baseline;
+    gap:12px;
+    flex-wrap:wrap;
+  }
+  .scene-title{ font-family:var(--serif); font-weight:600; }
+  .status{
+    font-family:var(--mono);
+    font-size:.82rem;
+    padding:3px 10px;
+    border-radius:999px;
+    border:1px solid var(--line);
+    color:var(--ink-soft);
+  }
+  .status.ok{ color:var(--ok); border-color:var(--ok); }
+  .status.off{ color:var(--warn); border-color:var(--warn); }
+  canvas{
+    width:100%;
+    height:auto;
+    display:block;
+  }
+  canvas.draggable{ touch-action:none; cursor:grab; }
+  canvas.dragging{ cursor:grabbing; }
+  canvas.tappable{ touch-action:manipulation; }
+  .hint{ margin:0; font-size:.78rem; color:var(--ink-soft); }
+
+  /* ---------- Mesures ---------- */
+  .readouts{
+    display:grid;
+    grid-template-columns:repeat(auto-fit,minmax(150px,1fr));
+    gap:10px 18px;
+    padding-block:10px;
+    border-top:1px solid var(--line);
+    margin-top:6px;
+  }
+  .readout{ display:flex; flex-direction:column; gap:2px; }
+  .readout .label{
+    font-size:.78rem;
+    color:var(--ink-soft);
+  }
+  .readout .value{
+    font-family:var(--mono);
+    font-variant-numeric:tabular-nums;
+    font-size:1.05rem;
+    font-weight:500;
+  }
+  .readout .value em{ color:var(--blue); font-style:normal; font-size:.9rem; }
+
+  /* ---------- Contrôles ---------- */
+  .panel{
+    background:var(--paper);
+    border:1px solid var(--line);
+    border-radius:14px;
+    padding:18px clamp(14px,3vw,26px);
+    display:flex;
+    flex-direction:column;
+    gap:18px;
+  }
+  .controls{
+    display:grid;
+    grid-template-columns:repeat(auto-fit,minmax(240px,1fr));
+    gap:18px 32px;
+  }
+  .control{ display:flex; flex-direction:column; gap:6px; }
+  .control .row{
+    display:flex;
+    justify-content:space-between;
+    align-items:baseline;
+    gap:10px;
+  }
+  .control label{ font-size:.86rem; font-weight:500; }
+  .control .num{
+    font-family:var(--mono);
+    font-variant-numeric:tabular-nums;
+    color:var(--wave);
+    font-size:.92rem;
+  }
+  input[type=range]{
+    -webkit-appearance:none;
+    appearance:none;
+    width:100%;
+    height:4px;
+    margin:8px 0;
+    border-radius:999px;
+    background:var(--line);
+    outline:none;
+  }
+  input[type=range]::-webkit-slider-thumb{
+    -webkit-appearance:none;
+    width:20px; height:20px;
+    border-radius:50%;
+    background:var(--wave);
+    border:2px solid var(--paper);
+    box-shadow:0 0 0 1px var(--line);
+    cursor:pointer;
+  }
+  input[type=range]::-moz-range-thumb{
+    width:18px; height:18px;
+    border-radius:50%;
+    background:var(--wave);
+    border:2px solid var(--paper);
+    box-shadow:0 0 0 1px var(--line);
+    cursor:pointer;
+  }
+  select{
+    font-family:var(--sans);
+    font-size:.86rem;
+    padding:7px 10px;
+    border-radius:8px;
+    border:1px solid var(--line);
+    background:var(--paper);
+    color:var(--ink);
+    width:100%;
+  }
+  .check{
+    display:flex;
+    align-items:center;
+    gap:8px;
+    font-size:.86rem;
+    font-weight:500;
+    cursor:pointer;
+  }
+  .check input{ width:18px; height:18px; accent-color:var(--accent); margin:0; }
+  .buttons{ display:flex; gap:10px; flex-wrap:wrap; }
+  button{
+    font-family:var(--sans);
+    font-size:.86rem;
+    font-weight:500;
+    padding:9px 16px;
+    border-radius:8px;
+    border:1px solid var(--line);
+    background:transparent;
+    color:var(--ink);
+    cursor:pointer;
+  }
+  button.primary{
+    background:var(--accent);
+    border-color:var(--accent);
+    color:var(--paper);
+  }
+  button:focus-visible, input:focus-visible, select:focus-visible{
+    outline:2px solid var(--accent);
+    outline-offset:2px;
+  }
+
+  /* ---------- Formules ---------- */
+  .formula{
+    font-family:var(--mono);
+    font-size:.86rem;
+    color:var(--ink-soft);
+    border-top:1px solid var(--line);
+    padding-top:14px;
+    display:flex;
+    flex-wrap:wrap;
+    gap:6px 22px;
+  }
+  .formula b{ color:var(--ink); font-weight:600; }
+  footer{
+    font-size:.78rem;
+    color:var(--ink-soft);
+    text-align:center;
+    text-wrap:balance;
+  }
+
+  /* ---------- Éléments communs aux ressources d'informatique ---------- */
+  [hidden]{ display:none !important; }
+  .tabs{ display:flex; gap:6px; flex-wrap:wrap; }
+  .tabs button{ padding:7px 14px; }
+  .tabs button[aria-selected=true]{ background:var(--accent); border-color:var(--accent); color:var(--paper); }
+  input[type=text], input[type=number], textarea.field{
+    font-family:var(--mono);
+    font-size:.88rem;
+    padding:7px 10px;
+    border-radius:8px;
+    border:1px solid var(--line);
+    background:var(--paper);
+    color:var(--ink);
+    width:100%;
+  }
+  textarea.field{ resize:vertical; min-height:90px; line-height:1.45; }
+  .table-wrap{ overflow-x:auto; }
+  table.data{ border-collapse:collapse; width:100%; font-family:var(--mono); font-size:.82rem; }
+  table.data th, table.data td{ border:1px solid var(--line); padding:5px 9px; text-align:left; white-space:nowrap; }
+  table.data th{ font-family:var(--sans); font-weight:600; color:var(--ink-soft); }
+  table.data tr.hit td{ background:var(--wave-glow); }
+  pre.code{
+    font-family:var(--mono);
+    font-size:.84rem;
+    line-height:1.5;
+    background:var(--bg);
+    border:1px solid var(--line);
+    border-radius:8px;
+    padding:10px 12px;
+    overflow-x:auto;
+    margin:0;
+    white-space:pre;
+  }
+  pre.code .hl{ background:var(--wave-glow); display:inline-block; min-width:100%; }
+  .err{ color:var(--warn); }
+  .good{ color:var(--ok); }
+  .chips{ display:flex; flex-wrap:wrap; gap:6px; }
+  .chip{ font-family:var(--mono); font-size:.8rem; padding:3px 9px; border-radius:999px; border:1px solid var(--line); }
+  .row2{ display:grid; grid-template-columns:repeat(auto-fit,minmax(280px,1fr)); gap:16px; }
+  .stack{ display:flex; flex-direction:column; gap:10px; min-width:0; }
+  .inline{ display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
+  .inline input[type=text], .inline input[type=number]{ width:auto; flex:1 1 120px; }
+  h3{ font-family:var(--serif); font-weight:600; font-size:1.02rem; margin:0; }
+  .muted{ color:var(--ink-soft); font-size:.84rem; margin:0; }
+  .stackview{ display:flex; flex-direction:column-reverse; gap:4px; align-items:center; min-height:260px; justify-content:flex-start; padding:8px; border:2px solid var(--line); border-top:0; border-radius:0 0 12px 12px; width:180px; }
+  .queueview{ display:flex; gap:4px; align-items:center; min-height:70px; padding:8px 12px; border:2px solid var(--line); border-left:0; border-right:0; overflow-x:auto; }
+  .item{ min-width:70px; padding:9px 12px; border:2px solid var(--blue); border-radius:8px; background:var(--paper); font-family:var(--mono); text-align:center; }
+  .item.top{ border-color:var(--wave); background:var(--wave-glow); }
+  .ends{ display:flex; justify-content:space-between; font-size:.78rem; color:var(--ink-soft); }
+  .console{ height:170px; overflow:auto; }
+  .expr{ font-family:var(--mono); font-size:1.1rem; letter-spacing:.08em; }
+  .expr span.cur{ background:var(--wave-glow); outline:2px solid var(--wave); }
+</style>
+</head>
+<body>
+
+<main>
+  <header>
+    <span class="kicker">Informatique · NSI Terminale · Structures de données</span>
+    <h1>Structures de données : pile, file, arbre binaire de recherche</h1>
+    <p>Une pile rend d'abord le dernier élément arrivé, une file le premier. Un arbre binaire de recherche range chaque valeur à gauche ou à droite selon qu'elle est plus petite ou plus grande : on y retrouve une valeur en descendant un seul chemin.</p>
+  </header>
+
+  <section class="scene">
+    <div class="scene-top">
+      <div class="tabs" id="part">
+        <button data-tab="stack">Pile</button>
+        <button data-tab="queue">File</button>
+        <button data-tab="bst">Arbre binaire de recherche</button>
+      </div>
+      <span id="status" class="status">—</span>
+    </div>
+
+    <!-- ===== Pile ===== -->
+    <div class="row2" data-panel="stack">
+      <div class="stack" style="align-items:center">
+        <span class="muted">sommet ↓</span>
+        <div class="stackview" id="stackView"></div>
+      </div>
+      <div class="stack">
+        <div class="inline"><input type="text" id="sVal" value="7" aria-label="Valeur à empiler"><button class="primary" id="push">empiler</button><button id="pop">depiler</button><button id="top">sommet</button><button id="sEmpty">est_vide</button></div>
+        <pre class="code console" id="sLog"></pre>
+        <h3>Application : vérifier un parenthésage</h3>
+        <div class="inline"><input type="text" id="expr" value="(a + [b * c]) - {d / (e)}" aria-label="Expression"><button id="check">Vérifier pas à pas</button></div>
+        <div class="expr" id="exprView"></div>
+        <p class="muted" id="exprMsg">Chaque ouvrante est empilée ; chaque fermante doit correspondre au sommet, que l'on dépile.</p>
+      </div>
+    </div>
+
+    <!-- ===== File ===== -->
+    <div class="stack" data-panel="queue">
+      <div class="ends"><span>← sortie (tête)</span><span>entrée (queue) ←</span></div>
+      <div class="queueview" id="queueView"></div>
+      <div class="inline"><input type="text" id="qVal" value="client 1" aria-label="Valeur à enfiler"><button class="primary" id="enq">enfiler</button><button id="deq">defiler</button><button id="qEmpty">est_vide</button></div>
+      <pre class="code console" id="qLog"></pre>
+    </div>
+
+    <!-- ===== Arbre binaire de recherche ===== -->
+    <div class="stack" data-panel="bst">
+      <canvas id="tree" style="aspect-ratio:1000/380" aria-label="Arbre binaire de recherche dessiné, avec le chemin parcouru en surbrillance."></canvas>
+      <div class="inline">
+        <input type="number" id="bVal" value="35" aria-label="Valeur"><button class="primary" id="ins">Insérer</button><button id="find">Rechercher</button>
+        <button id="rand">Arbre au hasard</button><button id="comb">Insérer 1 à 7 dans l'ordre</button><button id="empty">Vider</button>
+      </div>
+      <div class="inline">
+        <span class="muted">Parcours :</span>
+        <button data-walk="pre">préfixe</button><button data-walk="in">infixe</button><button data-walk="post">suffixe</button><button data-walk="bfs">en largeur</button>
+      </div>
+      <div class="readouts">
+        <div class="readout"><span class="label">Taille (nombre de nœuds)</span><span class="value" id="rSize">—</span></div>
+        <div class="readout"><span class="label">Hauteur</span><span class="value" id="rHeight">—</span></div>
+        <div class="readout"><span class="label">Ordre du parcours</span><span class="value" id="rWalk">—</span></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="panel">
+    <div class="row2">
+      <div class="stack"><h3>Une pile en Python (programmation objet)</h3>
+        <pre class="code">class Pile:
+    def __init__(self):
+        self.contenu = []
+
+    def est_vide(self):
+        return self.contenu == []
+
+    def empiler(self, x):
+        self.contenu.append(x)
+
+    def depiler(self):
+        if self.est_vide():
+            raise IndexError('pile vide')
+        return self.contenu.pop()
+
+    def sommet(self):
+        if self.est_vide():
+            raise IndexError('pile vide')
+        return self.contenu[-1]</pre></div>
+      <div class="stack"><h3>Insertion dans un arbre binaire de recherche</h3>
+        <pre class="code">def inserer(arbre, x):
+    if arbre is None:
+        return Noeud(x, None, None)
+    if x &lt; arbre.valeur:
+        arbre.gauche = inserer(arbre.gauche, x)
+    elif x &gt; arbre.valeur:
+        arbre.droit = inserer(arbre.droit, x)
+    return arbre</pre></div>
+    </div>
+    <div class="formula">
+      <span>pile&nbsp;:&nbsp;<b>dernier entré, premier sorti</b> (LIFO)</span>
+      <span>file&nbsp;:&nbsp;<b>premier entré, premier sorti</b> (FIFO)</span>
+      <span>parcours infixe d'un arbre binaire de recherche&nbsp;:&nbsp;<b>valeurs dans l'ordre croissant</b></span>
+    </div>
+  </section>
+
+  <footer>Convention de hauteur utilisée ici : un arbre vide a une hauteur 0, un arbre réduit à sa racine une hauteur 1. Certains manuels comptent à partir de 0 ou de −1. Les valeurs déjà présentes ne sont pas insérées une seconde fois.</footer>
+</main>
+
+<script>
+(function(){
+  // ---------- Utilitaires ----------
+  const $ = id => document.getElementById(id);
+  const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
+  const fmt = (v, d) => Number.isFinite(v)
+    ? v.toLocaleString('fr-FR', {minimumFractionDigits:d, maximumFractionDigits:d})
+    : '—';
+  const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const MONO = 'ui-monospace, "Cascadia Mono", "SF Mono", Consolas, Menlo, monospace';
+  const SANS = 'system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif';
+
+  // Couleurs du thème, relues si le système bascule clair/sombre
+  const C = {};
+  function readColors(){
+    const s = getComputedStyle(document.documentElement);
+    for (const n of ['bg','paper','ink','ink-soft','line','wave','wave-glow','accent','blue','brass','violet','pink']){
+      C[n.replace(/-(.)/g, (_, c) => c.toUpperCase())] = s.getPropertyValue('--' + n).trim();
+    }
+  }
+  readColors();
+  window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', readColors);
+
+  // Canvas net sur tout écran : on dessine toujours dans un repère logique W × H
+  function setupCanvas(canvas, W, H){
+    const ctx = canvas.getContext('2d');
+    function fit(){
+      const dpr = Math.min(window.devicePixelRatio || 1, 3);
+      const cw = canvas.clientWidth || W;
+      canvas.width = Math.max(1, Math.round(cw * dpr));
+      canvas.height = Math.max(1, Math.round(cw * H / W * dpr));
+      ctx.setTransform(canvas.width / W, 0, 0, canvas.height / H, 0, 0);
+    }
+    window.addEventListener('resize', fit);
+    fit();
+    return ctx;
+  }
+  // Position du pointeur (souris ou doigt) dans le repère logique
+  function pointerPos(canvas, evt, W, H){
+    const r = canvas.getBoundingClientRect();
+    return { x: (evt.clientX - r.left) * W / r.width, y: (evt.clientY - r.top) * H / r.height };
+  }
+  function arrow(ctx, x1, y1, x2, y2, color, width){
+    const len = Math.hypot(x2 - x1, y2 - y1);
+    if (len < 3) return;
+    const a = Math.atan2(y2 - y1, x2 - x1), h = Math.min(10, len * 0.5);
+    ctx.strokeStyle = color; ctx.fillStyle = color; ctx.lineWidth = width || 2.5;
+    ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2 - Math.cos(a) * h * 0.8, y2 - Math.sin(a) * h * 0.8); ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(x2, y2);
+    ctx.lineTo(x2 - h * Math.cos(a - 0.42), y2 - h * Math.sin(a - 0.42));
+    ctx.lineTo(x2 - h * Math.cos(a + 0.42), y2 - h * Math.sin(a + 0.42));
+    ctx.closePath(); ctx.fill();
+  }
+  // Pas "rond" (1, 2, 5 × 10^n) pour graduer un axe
+  function niceStep(x){
+    if (!(x > 0)) return 1;
+    const p = Math.pow(10, Math.floor(Math.log10(x))), m = x / p;
+    return (m < 1.5 ? 1 : m < 3.5 ? 2 : m < 7.5 ? 5 : 10) * p;
+  }
+
+  // Relie un curseur, une liste ou une case à cocher à un paramètre (et affiche sa valeur)
+  function bind(id, onChange, format){
+    const el = $(id), label = $(id + 'Val');
+    const val = () => el.type === 'checkbox' ? el.checked : parseFloat(el.value);
+    const show = () => { if (label && format) label.textContent = format(val()); };
+    el.addEventListener(el.type === 'range' ? 'input' : 'change', () => { onChange(val()); show(); });
+    show();
+  }
+  const out = (id, text) => { $(id).textContent = text; };
+  function setStatus(text, cls){
+    const s = $('status');
+    s.textContent = text; s.className = 'status' + (cls ? ' ' + cls : '');
+  }
+  // Repère gradué dans le rectangle g ; renvoie les conversions X(x) et Y(y)
+  function axes(ctx, g, o){
+    const xMin = o.xMin || 0, yMin = o.yMin || 0;
+    const X = x => g.x + g.w * (x - xMin) / (o.xMax - xMin);
+    const Y = y => g.y + g.h - g.h * (y - yMin) / (o.yMax - yMin);
+    const ink = o.ink || C.ink, soft = o.soft || C.inkSoft, line = o.line || C.line;
+    const sx = niceStep((o.xMax - xMin) / (o.xTicks || 6)), sy = niceStep((o.yMax - yMin) / (o.yTicks || 4));
+    const dec = s => s >= 1 ? 0 : Math.min(4, Math.ceil(-Math.log10(s) - 1e-9));
+    ctx.save();
+    ctx.font = '13px ' + MONO; ctx.lineWidth = 1; ctx.textAlign = 'center';
+    for (let k = Math.ceil(xMin / sx - 1e-9); k * sx <= o.xMax + sx * 1e-6; k++){
+      ctx.strokeStyle = line; ctx.globalAlpha = 0.55;
+      ctx.beginPath(); ctx.moveTo(X(k * sx), g.y); ctx.lineTo(X(k * sx), g.y + g.h); ctx.stroke();
+      ctx.globalAlpha = 1; ctx.fillStyle = soft;
+      ctx.fillText(fmt(k * sx + 0, dec(sx)), X(k * sx), g.y + g.h + 18);
+    }
+    ctx.textAlign = 'right';
+    for (let k = Math.ceil(yMin / sy - 1e-9); k * sy <= o.yMax + sy * 1e-6; k++){
+      ctx.strokeStyle = line; ctx.globalAlpha = 0.55;
+      ctx.beginPath(); ctx.moveTo(g.x, Y(k * sy)); ctx.lineTo(g.x + g.w, Y(k * sy)); ctx.stroke();
+      ctx.globalAlpha = 1; ctx.fillStyle = soft;
+      ctx.fillText(fmt(k * sy + 0, dec(sy)), g.x - 8, Y(k * sy) + 4);
+    }
+    const y0 = yMin < 0 ? Y(0) : g.y + g.h;
+    ctx.strokeStyle = soft; ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.moveTo(g.x, g.y); ctx.lineTo(g.x, g.y + g.h); ctx.moveTo(g.x, y0); ctx.lineTo(g.x + g.w, y0); ctx.stroke();
+    ctx.fillStyle = ink; ctx.textAlign = 'left'; ctx.font = '14px ' + SANS;
+    if (o.title) ctx.fillText(o.title, g.x + 8, g.y - 10);
+    ctx.fillStyle = soft; ctx.textAlign = 'right'; ctx.font = '13px ' + MONO;
+    if (o.xLabel) ctx.fillText(o.xLabel, g.x + g.w, g.y + g.h + 36);
+    ctx.restore();
+    return { X, Y };
+  }
+  // Onglets : boutons [data-tab] dans #id, panneaux [data-panel] de même nom
+  function tabs(id, onChange){
+    const btns = [...document.querySelectorAll('#' + id + ' button')];
+    const names = btns.map(b => b.dataset.tab);
+    const show = name => {
+      for (const b of btns) b.setAttribute('aria-selected', String(b.dataset.tab === name));
+      for (const p of document.querySelectorAll('[data-panel]')) if (names.includes(p.dataset.panel)) p.hidden = p.dataset.panel !== name;
+      if (onChange) onChange(name);
+    };
+    for (const b of btns) b.addEventListener('click', () => show(b.dataset.tab));
+    show(btns[0].dataset.tab);
+    return show;
+  }
+  const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
+  const sleep = ms => new Promise(r => setTimeout(r, ms));
+  const repr = v => /^-?\d+(\.\d+)?$/.test(v) ? v : "'" + v + "'";
+  function logTo(id, lines, text, isErr){
+    lines.push(isErr ? '!' + text : text);
+    while (lines.length > 50) lines.shift();
+    $(id).innerHTML = lines.map(l => l[0] === '!' ? '<span class="err">' + esc(l.slice(1)) + '</span>' : esc(l)).join('\n');
+    $(id).scrollTop = $(id).scrollHeight;
+  }
+
+  // =========================================================
+  // Pile
+  // =========================================================
+  let pile = [];
+  const sLines = [];
+  const sLog = (t, e) => logTo('sLog', sLines, t, e);
+  function showStack(){
+    $('stackView').innerHTML = pile.map((v, i) => '<div class="item' + (i === pile.length - 1 ? ' top' : '') + '">' + esc(v) + '</div>').join('') || '<span class="muted">pile vide</span>';
+    setStatus(pile.length + ' élément(s) dans la pile');
+  }
+  $('push').addEventListener('click', () => { const v = $('sVal').value.trim() || '0'; pile.push(v); sLog('>>> p.empiler(' + repr(v) + ')'); showStack(); $('sVal').value = String((parseInt(v, 10) || 0) + 1); });
+  $('pop').addEventListener('click', () => {
+    sLog('>>> p.depiler()');
+    if (!pile.length) sLog('IndexError: pile vide', true); else sLog(repr(pile.pop()));
+    showStack();
+  });
+  $('top').addEventListener('click', () => { sLog('>>> p.sommet()'); if (!pile.length) sLog('IndexError: pile vide', true); else sLog(repr(pile[pile.length - 1])); });
+  $('sEmpty').addEventListener('click', () => { sLog('>>> p.est_vide()'); sLog(pile.length ? 'False' : 'True'); });
+
+  // Parenthésage vérifié avec la pile, un caractère à la fois
+  const PAIRS = { ')': '(', ']': '[', '}': '{' };
+  let exprPos = -1, exprTimer = null;
+  function exprRender(msg, cls){
+    const s = $('expr').value;
+    $('exprView').innerHTML = [...s].map((c, i) => '<span' + (i === exprPos ? ' class="cur"' : '') + '>' + (c === ' ' ? '&nbsp;' : esc(c)) + '</span>').join('');
+    if (msg){ $('exprMsg').textContent = msg; $('exprMsg').className = cls || 'muted'; }
+  }
+  function exprStep(){
+    const s = $('expr').value;
+    exprPos++;
+    if (exprPos >= s.length){
+      clearInterval(exprTimer); exprTimer = null; exprPos = -1;
+      const ok = pile.length === 0;
+      exprRender(ok ? 'Fin du texte et pile vide : l\'expression est bien parenthésée.' : 'Fin du texte mais la pile n\'est pas vide : il manque des fermantes.', ok ? 'good' : 'err');
+      return;
+    }
+    const c = s[exprPos];
+    if ('([{'.includes(c)){ pile.push(c); showStack(); exprRender('« ' + c + ' » est une ouvrante : on l\'empile.'); }
+    else if (c in PAIRS){
+      if (!pile.length || pile[pile.length - 1] !== PAIRS[c]){
+        clearInterval(exprTimer); exprTimer = null;
+        exprRender('« ' + c + ' » ne correspond pas au sommet de la pile (' + (pile.length ? pile[pile.length - 1] : 'pile vide') + ') : expression mal parenthésée.', 'err');
+        exprPos = -1;
+        return;
+      }
+      pile.pop(); showStack(); exprRender('« ' + c + ' » ferme bien « ' + PAIRS[c] + ' » : on dépile.');
+    } else exprRender((c === ' ' ? 'Un espace' : '« ' + c + ' »') + ' n\'est pas une parenthèse : on passe.');
+  }
+  $('check').addEventListener('click', () => {
+    if (exprTimer) return;
+    pile = []; showStack(); exprPos = -1;
+    exprTimer = setInterval(exprStep, reduceMotion ? 30 : 450);
+  });
+  $('expr').addEventListener('input', () => { exprPos = -1; exprRender(); });
+
+  // =========================================================
+  // File
+  // =========================================================
+  let file = [], qn = 1;
+  const qLines = [];
+  const qLog = (t, e) => logTo('qLog', qLines, t, e);
+  function showQueue(){
+    $('queueView').innerHTML = file.map((v, i) => '<div class="item' + (i === 0 ? ' top' : '') + '">' + esc(v) + '</div>').join('') || '<span class="muted">file vide</span>';
+    setStatus(file.length + ' élément(s) dans la file');
+  }
+  $('enq').addEventListener('click', () => { const v = $('qVal').value.trim() || '?'; file.push(v); qLog('>>> f.enfiler(' + repr(v) + ')'); showQueue(); qn++; $('qVal').value = 'client ' + qn; });
+  $('deq').addEventListener('click', () => { qLog('>>> f.defiler()'); if (!file.length) qLog('IndexError: file vide', true); else qLog(repr(file.shift())); showQueue(); });
+  $('qEmpty').addEventListener('click', () => { qLog('>>> f.est_vide()'); qLog(file.length ? 'False' : 'True'); });
+
+  // =========================================================
+  // Arbre binaire de recherche
+  // =========================================================
+  const TW = 1000, TH = 380;
+  const tc = $('tree'), tctx = setupCanvas(tc, TW, TH);
+  let root = null, path = [], order = [], shown = 0, walkTimer = null, msg = '';
+  function insert(x){
+    if (!root){ root = { v: x, l: null, r: null }; return true; }
+    let n = root;
+    for (;;){
+      if (x === n.v) return false;
+      const side = x < n.v ? 'l' : 'r';
+      if (!n[side]){ n[side] = { v: x, l: null, r: null }; return true; }
+      n = n[side];
+    }
+  }
+  const size = n => n ? 1 + size(n.l) + size(n.r) : 0;
+  const height = n => n ? 1 + Math.max(height(n.l), height(n.r)) : 0;
+  function walk(kind){
+    const res = [];
+    const rec = n => { if (!n) return; if (kind === 'pre') res.push(n); rec(n.l); if (kind === 'in') res.push(n); rec(n.r); if (kind === 'post') res.push(n); };
+    if (kind === 'bfs'){ const q = root ? [root] : []; while (q.length){ const n = q.shift(); res.push(n); if (n.l) q.push(n.l); if (n.r) q.push(n.r); } }
+    else rec(root);
+    return res;
+  }
+  function layout(){
+    const nodes = walk('in'), h = Math.max(1, height(root));
+    nodes.forEach((n, i) => { n.x = 40 + (i + 0.5) * (TW - 80) / nodes.length; });
+    const depth = (n, d) => { if (!n) return; n.y = 40 + d * Math.min(80, (TH - 80) / Math.max(1, h - 1)); depth(n.l, d + 1); depth(n.r, d + 1); };
+    depth(root, 0);
+  }
+  function drawTree(){
+    tctx.clearRect(0, 0, TW, TH);
+    if (!root){ tctx.fillStyle = C.inkSoft; tctx.font = '15px ' + SANS; tctx.textAlign = 'center'; tctx.fillText('Arbre vide : insère une valeur.', TW / 2, TH / 2); }
+    else {
+      layout();
+      const edges = n => { for (const c of [n.l, n.r]) if (c){ const hot = path.includes(n) && path.includes(c); tctx.strokeStyle = hot ? C.wave : C.line; tctx.lineWidth = hot ? 4 : 2.5; tctx.beginPath(); tctx.moveTo(n.x, n.y); tctx.lineTo(c.x, c.y); tctx.stroke(); edges(c); } };
+      edges(root);
+      const visited = order.slice(0, shown);
+      for (const n of walk('in')){
+        const k = visited.indexOf(n);
+        tctx.fillStyle = path[path.length - 1] === n && msg.startsWith('trouvé') ? C.accent : path.includes(n) ? C.waveGlow : k >= 0 ? C.blue : C.paper;
+        tctx.strokeStyle = path.includes(n) ? C.wave : C.inkSoft; tctx.lineWidth = 2;
+        tctx.beginPath(); tctx.arc(n.x, n.y, 19, 0, Math.PI * 2); tctx.fill(); tctx.stroke();
+        tctx.fillStyle = k >= 0 || (path[path.length - 1] === n && msg.startsWith('trouvé')) ? C.paper : C.ink;
+        tctx.font = '600 14px ' + MONO; tctx.textAlign = 'center'; tctx.fillText(String(n.v), n.x, n.y + 5);
+        if (k >= 0){ tctx.fillStyle = C.wave; tctx.font = '600 12px ' + SANS; tctx.fillText(String(k + 1), n.x + 22, n.y - 16); }
+      }
+    }
+    out('rSize', String(size(root)));
+    out('rHeight', String(height(root)));
+    out('rWalk', order.length ? order.slice(0, shown).map(n => n.v).join(', ') + (shown < order.length ? ' …' : '') : '—');
+    if (msg) setStatus(msg, msg.startsWith('trouvé') || msg.startsWith('inséré') ? 'ok' : msg.startsWith('absent') || msg.startsWith('déjà') ? 'off' : '');
+  }
+  function stopWalk(){ if (walkTimer){ clearInterval(walkTimer); walkTimer = null; } }
+  function search(x){
+    path = []; let n = root;
+    while (n){ path.push(n); if (x === n.v) break; n = x < n.v ? n.l : n.r; }
+    msg = n ? 'trouvé en ' + path.length + ' comparaison(s)' : 'absent après ' + path.length + ' comparaison(s)';
+  }
+  $('ins').addEventListener('click', () => {
+    stopWalk(); order = []; const x = parseInt($('bVal').value, 10);
+    if (!Number.isFinite(x)) return;
+    const ok = insert(x); search(x);
+    msg = ok ? 'inséré : chemin de ' + path.length + ' nœud(s) depuis la racine' : 'déjà présent : rien n\'est inséré';
+    drawTree();
+    $('bVal').value = String(Math.floor(Math.random() * 99) + 1);
+  });
+  $('find').addEventListener('click', () => { stopWalk(); order = []; search(parseInt($('bVal').value, 10)); drawTree(); });
+  function build(list){ stopWalk(); root = null; path = []; order = []; msg = ''; list.forEach(insert); drawTree(); }
+  $('rand').addEventListener('click', () => { const s = new Set(); while (s.size < 11) s.add(Math.floor(Math.random() * 99) + 1); build([...s]); setStatus('Arbre de 11 valeurs tirées au hasard'); });
+  $('comb').addEventListener('click', () => { build([1, 2, 3, 4, 5, 6, 7]); setStatus('Valeurs insérées dans l\'ordre : l\'arbre dégénère en peigne', 'off'); });
+  $('empty').addEventListener('click', () => { build([]); setStatus('Arbre vide'); });
+  for (const b of document.querySelectorAll('[data-walk]')){
+    b.addEventListener('click', () => {
+      stopWalk(); path = []; msg = '';
+      order = walk(b.dataset.walk); shown = 0;
+      setStatus('Parcours ' + b.textContent);
+      walkTimer = setInterval(() => { shown++; drawTree(); if (shown >= order.length) stopWalk(); }, reduceMotion ? 10 : 500);
+    });
+  }
+
+  // ---------- Onglets ----------
+  build([50, 30, 70, 20, 40, 60, 80, 45]);
+  showStack(); showQueue(); exprRender();
+  tabs('part', p => { window.dispatchEvent(new Event('resize')); if (p === 'stack') showStack(); else if (p === 'queue') showQueue(); else drawTree(); });
+  window.addEventListener('resize', drawTree);
+  window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => setTimeout(drawTree, 0));
+})();
+</script>
+<script>
+  // Compteur de visites GoatCounter (sans cookie), chargé uniquement sur le site en ligne
+  if (location.protocol === 'https:'){
+    const gc = document.createElement('script');
+    gc.async = true;
+    gc.src = 'https://gc.zgo.at/count.js';
+    gc.dataset.goatcounter = 'https://miyvi.goatcounter.com/count';
+    document.head.appendChild(gc);
+  }
+</script>
+</body>
+</html>

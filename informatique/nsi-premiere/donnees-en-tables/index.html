@@ -1,0 +1,629 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Traitement de données en tables</title>
+<style>
+  /* ---------- Thème (clair / sombre automatique) ---------- */
+  :root{
+    --bg:#f3ede1;
+    --paper:#fbf8f0;
+    --ink:#22242e;
+    --ink-soft:#5b5a52;
+    --line:#d9d0ba;
+    --wave:#b8362b;
+    --wave-glow:rgba(184,54,43,.14);
+    --accent:#2f6f4f;
+    --blue:#2c5f8a;
+    --brass:#a9793f;
+    --violet:#8a3fc0;
+    --pink:#cf5f8c;
+    --ok:#2f6f4f;
+    --warn:#b8362b;
+    --serif:"Iowan Old Style","Palatino Linotype",Palatino,Georgia,serif;
+    --sans:system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+    --mono:ui-monospace,"Cascadia Mono","SF Mono",Consolas,Menlo,monospace;
+    color-scheme: light dark;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{
+      --bg:#171a21;
+      --paper:#1e222b;
+      --ink:#eae6da;
+      --ink-soft:#9a9689;
+      --line:#33384a;
+      --wave:#ff8a72;
+      --wave-glow:rgba(255,138,114,.14);
+      --accent:#79d6a3;
+      --blue:#7fb4e0;
+      --brass:#c99a5b;
+      --violet:#c39af5;
+      --pink:#f29bbd;
+      --ok:#79d6a3;
+      --warn:#ff8a72;
+    }
+  }
+
+  /* ---------- Mise en page ---------- */
+  *{box-sizing:border-box;}
+  html, body{ margin:0; padding:0; }
+  body{
+    background:var(--bg);
+    color:var(--ink);
+    font-family:var(--sans);
+    padding:28px 16px;
+    display:flex;
+    justify-content:center;
+  }
+  main{
+    width:100%;
+    max-width:920px;
+    display:flex;
+    flex-direction:column;
+    gap:20px;
+  }
+  header{ display:flex; flex-direction:column; gap:4px; }
+  .kicker{
+    font-size:.72rem;
+    text-transform:uppercase;
+    letter-spacing:.08em;
+    color:var(--ink-soft);
+  }
+  h1{
+    font-family:var(--serif);
+    font-weight:600;
+    font-size:clamp(1.5rem, 1.1rem + 1.6vw, 2.2rem);
+    margin:0;
+    text-wrap:balance;
+  }
+  header p{
+    margin:0;
+    color:var(--ink-soft);
+    font-size:.92rem;
+    max-width:66ch;
+  }
+
+  /* ---------- Zone de simulation ---------- */
+  .scene{
+    background:var(--paper);
+    border:1px solid var(--line);
+    border-radius:14px;
+    padding:20px clamp(12px,3vw,28px) 8px;
+    display:flex;
+    flex-direction:column;
+    gap:6px;
+  }
+  .scene-top{
+    display:flex;
+    justify-content:space-between;
+    align-items:baseline;
+    gap:12px;
+    flex-wrap:wrap;
+  }
+  .scene-title{ font-family:var(--serif); font-weight:600; }
+  .status{
+    font-family:var(--mono);
+    font-size:.82rem;
+    padding:3px 10px;
+    border-radius:999px;
+    border:1px solid var(--line);
+    color:var(--ink-soft);
+  }
+  .status.ok{ color:var(--ok); border-color:var(--ok); }
+  .status.off{ color:var(--warn); border-color:var(--warn); }
+  canvas{
+    width:100%;
+    height:auto;
+    display:block;
+  }
+  canvas.draggable{ touch-action:none; cursor:grab; }
+  canvas.dragging{ cursor:grabbing; }
+  canvas.tappable{ touch-action:manipulation; }
+  .hint{ margin:0; font-size:.78rem; color:var(--ink-soft); }
+
+  /* ---------- Mesures ---------- */
+  .readouts{
+    display:grid;
+    grid-template-columns:repeat(auto-fit,minmax(150px,1fr));
+    gap:10px 18px;
+    padding-block:10px;
+    border-top:1px solid var(--line);
+    margin-top:6px;
+  }
+  .readout{ display:flex; flex-direction:column; gap:2px; }
+  .readout .label{
+    font-size:.78rem;
+    color:var(--ink-soft);
+  }
+  .readout .value{
+    font-family:var(--mono);
+    font-variant-numeric:tabular-nums;
+    font-size:1.05rem;
+    font-weight:500;
+  }
+  .readout .value em{ color:var(--blue); font-style:normal; font-size:.9rem; }
+
+  /* ---------- Contrôles ---------- */
+  .panel{
+    background:var(--paper);
+    border:1px solid var(--line);
+    border-radius:14px;
+    padding:18px clamp(14px,3vw,26px);
+    display:flex;
+    flex-direction:column;
+    gap:18px;
+  }
+  .controls{
+    display:grid;
+    grid-template-columns:repeat(auto-fit,minmax(240px,1fr));
+    gap:18px 32px;
+  }
+  .control{ display:flex; flex-direction:column; gap:6px; }
+  .control .row{
+    display:flex;
+    justify-content:space-between;
+    align-items:baseline;
+    gap:10px;
+  }
+  .control label{ font-size:.86rem; font-weight:500; }
+  .control .num{
+    font-family:var(--mono);
+    font-variant-numeric:tabular-nums;
+    color:var(--wave);
+    font-size:.92rem;
+  }
+  input[type=range]{
+    -webkit-appearance:none;
+    appearance:none;
+    width:100%;
+    height:4px;
+    margin:8px 0;
+    border-radius:999px;
+    background:var(--line);
+    outline:none;
+  }
+  input[type=range]::-webkit-slider-thumb{
+    -webkit-appearance:none;
+    width:20px; height:20px;
+    border-radius:50%;
+    background:var(--wave);
+    border:2px solid var(--paper);
+    box-shadow:0 0 0 1px var(--line);
+    cursor:pointer;
+  }
+  input[type=range]::-moz-range-thumb{
+    width:18px; height:18px;
+    border-radius:50%;
+    background:var(--wave);
+    border:2px solid var(--paper);
+    box-shadow:0 0 0 1px var(--line);
+    cursor:pointer;
+  }
+  select{
+    font-family:var(--sans);
+    font-size:.86rem;
+    padding:7px 10px;
+    border-radius:8px;
+    border:1px solid var(--line);
+    background:var(--paper);
+    color:var(--ink);
+    width:100%;
+  }
+  .check{
+    display:flex;
+    align-items:center;
+    gap:8px;
+    font-size:.86rem;
+    font-weight:500;
+    cursor:pointer;
+  }
+  .check input{ width:18px; height:18px; accent-color:var(--accent); margin:0; }
+  .buttons{ display:flex; gap:10px; flex-wrap:wrap; }
+  button{
+    font-family:var(--sans);
+    font-size:.86rem;
+    font-weight:500;
+    padding:9px 16px;
+    border-radius:8px;
+    border:1px solid var(--line);
+    background:transparent;
+    color:var(--ink);
+    cursor:pointer;
+  }
+  button.primary{
+    background:var(--accent);
+    border-color:var(--accent);
+    color:var(--paper);
+  }
+  button:focus-visible, input:focus-visible, select:focus-visible{
+    outline:2px solid var(--accent);
+    outline-offset:2px;
+  }
+
+  /* ---------- Formules ---------- */
+  .formula{
+    font-family:var(--mono);
+    font-size:.86rem;
+    color:var(--ink-soft);
+    border-top:1px solid var(--line);
+    padding-top:14px;
+    display:flex;
+    flex-wrap:wrap;
+    gap:6px 22px;
+  }
+  .formula b{ color:var(--ink); font-weight:600; }
+  footer{
+    font-size:.78rem;
+    color:var(--ink-soft);
+    text-align:center;
+    text-wrap:balance;
+  }
+
+  /* ---------- Éléments communs aux ressources d'informatique ---------- */
+  [hidden]{ display:none !important; }
+  .tabs{ display:flex; gap:6px; flex-wrap:wrap; }
+  .tabs button{ padding:7px 14px; }
+  .tabs button[aria-selected=true]{ background:var(--accent); border-color:var(--accent); color:var(--paper); }
+  input[type=text], input[type=number], textarea.field{
+    font-family:var(--mono);
+    font-size:.88rem;
+    padding:7px 10px;
+    border-radius:8px;
+    border:1px solid var(--line);
+    background:var(--paper);
+    color:var(--ink);
+    width:100%;
+  }
+  textarea.field{ resize:vertical; min-height:90px; line-height:1.45; }
+  .table-wrap{ overflow-x:auto; }
+  table.data{ border-collapse:collapse; width:100%; font-family:var(--mono); font-size:.82rem; }
+  table.data th, table.data td{ border:1px solid var(--line); padding:5px 9px; text-align:left; white-space:nowrap; }
+  table.data th{ font-family:var(--sans); font-weight:600; color:var(--ink-soft); }
+  table.data tr.hit td{ background:var(--wave-glow); }
+  pre.code{
+    font-family:var(--mono);
+    font-size:.84rem;
+    line-height:1.5;
+    background:var(--bg);
+    border:1px solid var(--line);
+    border-radius:8px;
+    padding:10px 12px;
+    overflow-x:auto;
+    margin:0;
+    white-space:pre;
+  }
+  pre.code .hl{ background:var(--wave-glow); display:inline-block; min-width:100%; }
+  .err{ color:var(--warn); }
+  .good{ color:var(--ok); }
+  .chips{ display:flex; flex-wrap:wrap; gap:6px; }
+  .chip{ font-family:var(--mono); font-size:.8rem; padding:3px 9px; border-radius:999px; border:1px solid var(--line); }
+  .row2{ display:grid; grid-template-columns:repeat(auto-fit,minmax(280px,1fr)); gap:16px; }
+  .stack{ display:flex; flex-direction:column; gap:10px; min-width:0; }
+  .inline{ display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
+  .inline input[type=text], .inline input[type=number]{ width:auto; flex:1 1 120px; }
+  h3{ font-family:var(--serif); font-weight:600; font-size:1.02rem; margin:0; }
+  .muted{ color:var(--ink-soft); font-size:.84rem; margin:0; }
+  textarea.field{ min-height:200px; white-space:pre; }
+  .checks{ display:flex; gap:12px; flex-wrap:wrap; }
+</style>
+</head>
+<body>
+
+<main>
+  <header>
+    <span class="kicker">Informatique · NSI Première · Traitement de données en tables</span>
+    <h1>Traitement de données en tables</h1>
+    <p>Deux fichiers CSV, des élèves et leurs notes, importés en Python sous forme de listes de dictionnaires. On y recherche des lignes, on les trie, on fusionne les deux tables et on calcule des moyennes. Chaque opération est accompagnée du code Python qui la réalise.</p>
+  </header>
+
+  <section class="panel">
+    <div class="row2">
+      <div class="stack"><label for="csvE"><strong>eleves.csv</strong></label><textarea class="field" id="csvE" spellcheck="false"></textarea></div>
+      <div class="stack"><label for="csvN"><strong>notes.csv</strong></label><textarea class="field" id="csvN" spellcheck="false"></textarea></div>
+    </div>
+    <p class="muted">Les deux fichiers sont modifiables : les résultats se mettent à jour.</p>
+  </section>
+
+  <section class="scene">
+    <div class="scene-top">
+      <div class="tabs" id="op">
+        <button data-tab="import">Importer</button>
+        <button data-tab="select">Rechercher</button>
+        <button data-tab="sort">Trier</button>
+        <button data-tab="join">Fusionner</button>
+        <button data-tab="mean">Moyennes</button>
+      </div>
+      <span id="status" class="status">—</span>
+    </div>
+
+    <div class="controls" data-panel="select">
+      <div class="control"><div class="row"><label for="sT">Table</label></div><select id="sT"><option value="notes">notes</option><option value="eleves">eleves</option></select></div>
+      <div class="control"><div class="row"><label for="sC">Descripteur</label></div><select id="sC"></select></div>
+      <div class="control"><div class="row"><label for="sO">Comparaison</label></div>
+        <select id="sO"><option>==</option><option>!=</option><option>&lt;</option><option>&lt;=</option><option>&gt;</option><option selected>&gt;=</option></select></div>
+      <div class="control"><div class="row"><label for="sV">Valeur</label></div><input type="text" id="sV" value="12"></div>
+      <div class="control"><div class="row"><span>Colonnes gardées (projection)</span></div><div class="checks" id="sK"></div></div>
+    </div>
+    <div class="controls" data-panel="sort">
+      <div class="control"><div class="row"><label for="tT">Table</label></div><select id="tT"><option value="notes">notes</option><option value="eleves">eleves</option></select></div>
+      <div class="control"><div class="row"><label for="tC">Trier selon</label></div><select id="tC"></select></div>
+      <div class="control"><div class="row"><label for="tO">Ordre</label></div><select id="tO"><option value="asc">croissant</option><option value="desc" selected>décroissant</option></select></div>
+    </div>
+
+    <div class="row2">
+      <div class="stack"><span class="muted">Code Python</span><pre class="code" id="code"></pre></div>
+      <div class="stack"><span class="muted" id="resLabel">Résultat</span><div class="table-wrap"><table class="data" id="res"></table></div></div>
+    </div>
+  </section>
+
+  <section class="panel">
+    <div class="formula">
+      <span>import&nbsp;:&nbsp;<b>une ligne du fichier → un dictionnaire</b></span>
+      <span>valeurs lues&nbsp;:&nbsp;<b>toujours des chaînes</b>, à convertir avec int() ou float()</span>
+      <span>fusion&nbsp;:&nbsp;<b>associer les lignes qui partagent une même valeur</b> (ici l'identifiant de l'élève)</span>
+    </div>
+  </section>
+
+  <footer>Les élèves et les notes sont fictifs. La fonction sorted de Python trie de façon stable : deux lignes égales pour le critère gardent leur ordre de départ.</footer>
+</main>
+
+<script>
+(function(){
+  // ---------- Utilitaires ----------
+  const $ = id => document.getElementById(id);
+  const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
+  const fmt = (v, d) => Number.isFinite(v)
+    ? v.toLocaleString('fr-FR', {minimumFractionDigits:d, maximumFractionDigits:d})
+    : '—';
+  const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const MONO = 'ui-monospace, "Cascadia Mono", "SF Mono", Consolas, Menlo, monospace';
+  const SANS = 'system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif';
+
+  // Couleurs du thème, relues si le système bascule clair/sombre
+  const C = {};
+  function readColors(){
+    const s = getComputedStyle(document.documentElement);
+    for (const n of ['bg','paper','ink','ink-soft','line','wave','wave-glow','accent','blue','brass','violet','pink']){
+      C[n.replace(/-(.)/g, (_, c) => c.toUpperCase())] = s.getPropertyValue('--' + n).trim();
+    }
+  }
+  readColors();
+  window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', readColors);
+
+  // Canvas net sur tout écran : on dessine toujours dans un repère logique W × H
+  function setupCanvas(canvas, W, H){
+    const ctx = canvas.getContext('2d');
+    function fit(){
+      const dpr = Math.min(window.devicePixelRatio || 1, 3);
+      const cw = canvas.clientWidth || W;
+      canvas.width = Math.max(1, Math.round(cw * dpr));
+      canvas.height = Math.max(1, Math.round(cw * H / W * dpr));
+      ctx.setTransform(canvas.width / W, 0, 0, canvas.height / H, 0, 0);
+    }
+    window.addEventListener('resize', fit);
+    fit();
+    return ctx;
+  }
+  // Position du pointeur (souris ou doigt) dans le repère logique
+  function pointerPos(canvas, evt, W, H){
+    const r = canvas.getBoundingClientRect();
+    return { x: (evt.clientX - r.left) * W / r.width, y: (evt.clientY - r.top) * H / r.height };
+  }
+  function arrow(ctx, x1, y1, x2, y2, color, width){
+    const len = Math.hypot(x2 - x1, y2 - y1);
+    if (len < 3) return;
+    const a = Math.atan2(y2 - y1, x2 - x1), h = Math.min(10, len * 0.5);
+    ctx.strokeStyle = color; ctx.fillStyle = color; ctx.lineWidth = width || 2.5;
+    ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2 - Math.cos(a) * h * 0.8, y2 - Math.sin(a) * h * 0.8); ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(x2, y2);
+    ctx.lineTo(x2 - h * Math.cos(a - 0.42), y2 - h * Math.sin(a - 0.42));
+    ctx.lineTo(x2 - h * Math.cos(a + 0.42), y2 - h * Math.sin(a + 0.42));
+    ctx.closePath(); ctx.fill();
+  }
+  // Pas "rond" (1, 2, 5 × 10^n) pour graduer un axe
+  function niceStep(x){
+    if (!(x > 0)) return 1;
+    const p = Math.pow(10, Math.floor(Math.log10(x))), m = x / p;
+    return (m < 1.5 ? 1 : m < 3.5 ? 2 : m < 7.5 ? 5 : 10) * p;
+  }
+
+  // Relie un curseur, une liste ou une case à cocher à un paramètre (et affiche sa valeur)
+  function bind(id, onChange, format){
+    const el = $(id), label = $(id + 'Val');
+    const val = () => el.type === 'checkbox' ? el.checked : parseFloat(el.value);
+    const show = () => { if (label && format) label.textContent = format(val()); };
+    el.addEventListener(el.type === 'range' ? 'input' : 'change', () => { onChange(val()); show(); });
+    show();
+  }
+  const out = (id, text) => { $(id).textContent = text; };
+  function setStatus(text, cls){
+    const s = $('status');
+    s.textContent = text; s.className = 'status' + (cls ? ' ' + cls : '');
+  }
+  // Repère gradué dans le rectangle g ; renvoie les conversions X(x) et Y(y)
+  function axes(ctx, g, o){
+    const xMin = o.xMin || 0, yMin = o.yMin || 0;
+    const X = x => g.x + g.w * (x - xMin) / (o.xMax - xMin);
+    const Y = y => g.y + g.h - g.h * (y - yMin) / (o.yMax - yMin);
+    const ink = o.ink || C.ink, soft = o.soft || C.inkSoft, line = o.line || C.line;
+    const sx = niceStep((o.xMax - xMin) / (o.xTicks || 6)), sy = niceStep((o.yMax - yMin) / (o.yTicks || 4));
+    const dec = s => s >= 1 ? 0 : Math.min(4, Math.ceil(-Math.log10(s) - 1e-9));
+    ctx.save();
+    ctx.font = '13px ' + MONO; ctx.lineWidth = 1; ctx.textAlign = 'center';
+    for (let k = Math.ceil(xMin / sx - 1e-9); k * sx <= o.xMax + sx * 1e-6; k++){
+      ctx.strokeStyle = line; ctx.globalAlpha = 0.55;
+      ctx.beginPath(); ctx.moveTo(X(k * sx), g.y); ctx.lineTo(X(k * sx), g.y + g.h); ctx.stroke();
+      ctx.globalAlpha = 1; ctx.fillStyle = soft;
+      ctx.fillText(fmt(k * sx + 0, dec(sx)), X(k * sx), g.y + g.h + 18);
+    }
+    ctx.textAlign = 'right';
+    for (let k = Math.ceil(yMin / sy - 1e-9); k * sy <= o.yMax + sy * 1e-6; k++){
+      ctx.strokeStyle = line; ctx.globalAlpha = 0.55;
+      ctx.beginPath(); ctx.moveTo(g.x, Y(k * sy)); ctx.lineTo(g.x + g.w, Y(k * sy)); ctx.stroke();
+      ctx.globalAlpha = 1; ctx.fillStyle = soft;
+      ctx.fillText(fmt(k * sy + 0, dec(sy)), g.x - 8, Y(k * sy) + 4);
+    }
+    const y0 = yMin < 0 ? Y(0) : g.y + g.h;
+    ctx.strokeStyle = soft; ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.moveTo(g.x, g.y); ctx.lineTo(g.x, g.y + g.h); ctx.moveTo(g.x, y0); ctx.lineTo(g.x + g.w, y0); ctx.stroke();
+    ctx.fillStyle = ink; ctx.textAlign = 'left'; ctx.font = '14px ' + SANS;
+    if (o.title) ctx.fillText(o.title, g.x + 8, g.y - 10);
+    ctx.fillStyle = soft; ctx.textAlign = 'right'; ctx.font = '13px ' + MONO;
+    if (o.xLabel) ctx.fillText(o.xLabel, g.x + g.w, g.y + g.h + 36);
+    ctx.restore();
+    return { X, Y };
+  }
+  // Onglets : boutons [data-tab] dans #id, panneaux [data-panel] de même nom
+  function tabs(id, onChange){
+    const btns = [...document.querySelectorAll('#' + id + ' button')];
+    const names = btns.map(b => b.dataset.tab);
+    const show = name => {
+      for (const b of btns) b.setAttribute('aria-selected', String(b.dataset.tab === name));
+      for (const p of document.querySelectorAll('[data-panel]')) if (names.includes(p.dataset.panel)) p.hidden = p.dataset.panel !== name;
+      if (onChange) onChange(name);
+    };
+    for (const b of btns) b.addEventListener('click', () => show(b.dataset.tab));
+    show(btns[0].dataset.tab);
+    return show;
+  }
+  const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
+  const sleep = ms => new Promise(r => setTimeout(r, ms));
+
+  // ---------- Données de départ ----------
+  $('csvE').value = ['id,nom,prenom,classe', '1,Martin,Léa,1G1', '2,Bernard,Hugo,1G2', '3,Dubois,Inès,1G1', '4,Thomas,Nathan,1G2',
+    '5,Robert,Chloé,1G1', '6,Petit,Yanis,1G2', '7,Durand,Manon,1G1', '8,Leroy,Sacha,1G2'].join('\n');
+  $('csvN').value = ['id_eleve,matiere,note', '1,maths,14', '1,NSI,17', '1,physique,12', '2,maths,9', '2,NSI,13', '3,maths,16',
+    '3,NSI,15', '3,physique,18', '4,maths,11', '4,NSI,8', '5,maths,13', '5,NSI,19', '5,physique,14', '6,maths,7', '6,NSI,12',
+    '7,maths,15', '7,physique,10', '9,maths,12'].join('\n');
+
+  // ---------- Lecture des CSV ----------
+  function parse(text){
+    const lines = text.replace(/\r/g, '').split('\n').filter(l => l.trim());
+    const cols = lines.length ? lines[0].split(',').map(s => s.trim()) : [];
+    const rows = lines.slice(1).map(l => { const v = l.split(','); const o = {}; cols.forEach((c, i) => { o[c] = (v[i] || '').trim(); }); return o; });
+    return { cols, rows };
+  }
+  const T = {};
+  const isNum = (t, c) => T[t].rows.length > 0 && T[t].rows.every(r => r[c] !== '' && Number.isFinite(Number(r[c])));
+  const conv = (t, c) => isNum(t, c) ? "float(ligne['" + c + "'])" : "ligne['" + c + "']";
+  const pyStr = s => "'" + s.replace(/'/g, "\\'") + "'";
+  const pyFloat = x => Number.isInteger(x) ? x + '.0' : String(x);      // même écriture que Python pour un float
+  const pyDict = o => '{' + Object.entries(o).map(([k, v]) => pyStr(k) + ': ' + pyStr(v)).join(', ') + '}';
+
+  function table(cols, rows, max){
+    const shown = max ? rows.slice(0, max) : rows;
+    $('res').innerHTML = '<tr>' + cols.map(c => '<th>' + esc(c) + '</th>').join('') + '</tr>'
+      + shown.map(r => '<tr>' + cols.map(c => '<td>' + esc(r[c] === undefined ? '' : r[c]) + '</td>').join('') + '</tr>').join('')
+      + (max && rows.length > max ? '<tr><td colspan="' + cols.length + '">… ' + (rows.length - max) + ' autres lignes</td></tr>' : '');
+  }
+  function fillCols(sel, t, keep){
+    const v = $(sel).value;
+    $(sel).innerHTML = T[t].cols.map(c => '<option>' + esc(c) + '</option>').join('');
+    if (T[t].cols.includes(v)) $(sel).value = v; else if (keep && T[t].cols.includes(keep)) $(sel).value = keep;
+  }
+
+  // ---------- Opérations ----------
+  let op = 'import';
+  function run(){
+    T.eleves = parse($('csvE').value);
+    T.notes = parse($('csvN').value);
+    let code = '', count = '';
+    if (op === 'import'){
+      code = 'import csv\n\nwith open(\'eleves.csv\', encoding=\'utf-8\') as f:\n    eleves = list(csv.DictReader(f))\n\nwith open(\'notes.csv\', encoding=\'utf-8\') as f:\n    notes = list(csv.DictReader(f))\n\n'
+        + '>>> eleves[0]\n' + (T.eleves.rows[0] ? pyDict(T.eleves.rows[0]) : 'IndexError') + '\n>>> len(notes)\n' + T.notes.rows.length;
+      table(T.eleves.cols, T.eleves.rows);
+      $('resLabel').textContent = 'eleves : liste de ' + T.eleves.rows.length + ' dictionnaires';
+      count = T.eleves.rows.length + ' élèves, ' + T.notes.rows.length + ' notes';
+    }
+    if (op === 'select'){
+      const t = $('sT').value;
+      fillCols('sC', t, t === 'notes' ? 'note' : 'classe');
+      const c = $('sC').value, o = $('sO').value, raw = $('sV').value.trim(), num = isNum(t, c) && raw !== '' && Number.isFinite(Number(raw));
+      const keep = [...$('sK').querySelectorAll('input:checked')].map(i => i.value).filter(k => T[t].cols.includes(k));
+      const cols = keep.length ? keep : T[t].cols;
+      const test = r => { const a = num ? Number(r[c]) : r[c], b = num ? Number(raw) : raw;
+        return { '==': a === b, '!=': a !== b, '<': a < b, '<=': a <= b, '>': a > b, '>=': a >= b }[o]; };
+      const rows = T[t].rows.filter(test);
+      const cond = (num ? "float(ligne['" + c + "'])" : "ligne['" + c + "']") + ' ' + o + ' ' + (num ? raw : pyStr(raw));
+      code = 'resultat = [ligne for ligne in ' + t + ' if ' + cond + ']';
+      if (keep.length && keep.length < T[t].cols.length)
+        code += '\n\n# projection : on ne garde que certaines colonnes\nresultat = [{' + cols.map(k => pyStr(k) + ": ligne['" + k + "']").join(', ') + '}\n            for ligne in resultat]';
+      code += '\n\n>>> len(resultat)\n' + rows.length;
+      table(cols, rows);
+      $('resLabel').textContent = 'Lignes de ' + t + ' qui vérifient la condition';
+      count = rows.length + ' ligne(s) trouvée(s) sur ' + T[t].rows.length;
+    }
+    if (op === 'sort'){
+      const t = $('tT').value;
+      fillCols('tC', t, t === 'notes' ? 'note' : 'nom');
+      const c = $('tC').value, desc = $('tO').value === 'desc', num = isNum(t, c);
+      const rows = T[t].rows.map((r, i) => [r, i]).sort((x, y) => {
+        const d = num ? Number(x[0][c]) - Number(y[0][c]) : (x[0][c] < y[0][c] ? -1 : x[0][c] > y[0][c] ? 1 : 0);
+        return (desc ? -d : d) || x[1] - y[1];
+      }).map(x => x[0]);
+      code = 'tri = sorted(' + t + ', key=lambda ligne: ' + conv(t, c) + (desc ? ', reverse=True' : '') + ')';
+      if (!num) code += '\n\n# comparaison de chaînes : ordre des codes des caractères\n# (les majuscules passent avant les minuscules, les accents après)';
+      table(T[t].cols, rows);
+      $('resLabel').textContent = t + ' trié selon ' + c;
+      count = 'tri ' + (desc ? 'décroissant' : 'croissant') + (num ? ' (valeurs numériques)' : ' (texte)');
+    }
+    if (op === 'join'){
+      const rows = [];
+      for (const e of T.eleves.rows) for (const n of T.notes.rows) if (e.id === n.id_eleve)
+        rows.push({ nom: e.nom, prenom: e.prenom, classe: e.classe, matiere: n.matiere, note: n.note });
+      code = 'fusion = []\nfor e in eleves:\n    for n in notes:\n        if e[\'id\'] == n[\'id_eleve\']:\n            fusion.append({\'nom\': e[\'nom\'], \'prenom\': e[\'prenom\'],\n                           \'classe\': e[\'classe\'], \'matiere\': n[\'matiere\'],\n                           \'note\': n[\'note\']})';
+      const lonely = T.eleves.rows.filter(e => !T.notes.rows.some(n => n.id_eleve === e.id)).map(e => e.prenom + ' ' + e.nom);
+      const orphan = T.notes.rows.filter(n => !T.eleves.rows.some(e => e.id === n.id_eleve)).map(n => 'id ' + n.id_eleve);
+      code += '\n\n>>> len(fusion)\n' + rows.length;
+      if (lonely.length) code += '\n# sans note, donc absent de la fusion : ' + lonely.join(', ');
+      if (orphan.length) code += '\n# note d\'un élève inconnu, ignorée : ' + orphan.join(', ');
+      table(['nom', 'prenom', 'classe', 'matiere', 'note'], rows);
+      $('resLabel').textContent = 'Table fusionnée (élèves × notes, même identifiant)';
+      count = rows.length + ' lignes fusionnées';
+    }
+    if (op === 'mean'){
+      const acc = {};
+      for (const n of T.notes.rows){ const v = Number(n.note); if (!Number.isFinite(v)) continue; acc[n.id_eleve] = acc[n.id_eleve] || [0, 0]; acc[n.id_eleve][0] += v; acc[n.id_eleve][1]++; }
+      const rows = T.eleves.rows.filter(e => acc[e.id]).map(e => ({ prenom: e.prenom, nom: e.nom, classe: e.classe, 'nombre de notes': String(acc[e.id][1]), moyenne: fmt(acc[e.id][0] / acc[e.id][1], 2) }));
+      code = 'somme = {}\nnombre = {}\nfor n in notes:\n    ident = n[\'id_eleve\']\n    somme[ident] = somme.get(ident, 0) + float(n[\'note\'])\n    nombre[ident] = nombre.get(ident, 0) + 1\n\n'
+        + 'moyennes = {ident: somme[ident] / nombre[ident] for ident in somme}\n\n>>> moyennes\n{'
+        + Object.keys(acc).map(k => pyStr(k) + ': ' + pyFloat(acc[k][0] / acc[k][1])).join(', ') + '}';
+      table(['prenom', 'nom', 'classe', 'nombre de notes', 'moyenne'], rows);
+      $('resLabel').textContent = 'Moyenne de chaque élève';
+      count = rows.length + ' moyennes calculées';
+    }
+    $('code').textContent = code;
+    setStatus(count, 'ok');
+  }
+
+  // Cases à cocher de la projection, selon la table choisie
+  function keepBoxes(){
+    const t = $('sT').value;
+    T[t] = parse($(t === 'notes' ? 'csvN' : 'csvE').value);
+    $('sK').innerHTML = T[t].cols.map(c => '<label class="check"><input type="checkbox" value="' + esc(c) + '" checked> ' + esc(c) + '</label>').join('');
+    for (const i of $('sK').querySelectorAll('input')) i.addEventListener('change', run);
+  }
+
+  // ---------- Interactions ----------
+  for (const id of ['csvE', 'csvN', 'sV']) $(id).addEventListener('input', run);
+  for (const id of ['sC', 'sO', 'tT', 'tC', 'tO']) $(id).addEventListener('change', run);
+  $('sT').addEventListener('change', () => { keepBoxes(); run(); });
+  tabs('op', o => { op = o; run(); });
+  keepBoxes();
+  run();
+})();
+</script>
+<script>
+  // Compteur de visites GoatCounter (sans cookie), chargé uniquement sur le site en ligne
+  if (location.protocol === 'https:'){
+    const gc = document.createElement('script');
+    gc.async = true;
+    gc.src = 'https://gc.zgo.at/count.js';
+    gc.dataset.goatcounter = 'https://miyvi.goatcounter.com/count';
+    document.head.appendChild(gc);
+  }
+</script>
+</body>
+</html>
